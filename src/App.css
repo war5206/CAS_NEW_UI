@@ -1,0 +1,151 @@
+#root {
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+}
+
+.lock-screen-page {
+  width: 1920px;
+  height: 1080px;
+  margin: 0 auto;
+  display: flex;
+  justify-content: center;
+  background:
+    radial-gradient(1320px 760px at 50% -250px, #081426 0%, #030614 48%, #02040f 75%, #01020a 100%),
+    #01020a;
+  color: #f5f8ff;
+  font-family: 'Microsoft YaHei', 'PingFang SC', 'Segoe UI', sans-serif;
+}
+
+.lock-screen-card {
+  width: 1920px;
+  height: 1080px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding-top: 88px;
+  padding-bottom: 88px;
+}
+
+.title {
+  margin: 0;
+  font-size: 32px;
+  line-height: 1.1;
+  font-weight: 600;
+  letter-spacing: 6px;
+  color: #f5f7fb;
+}
+
+.subtitle {
+  margin: 28px 0 0;
+  font-size: 16px;
+  line-height: 1.45;
+  letter-spacing: 1px;
+  color: #909da2;
+  text-align: center;
+}
+
+.password-dots {
+  margin-top: 92px;
+  width: auto;
+  display: flex;
+  justify-content: flex-start;
+  column-gap: 119px;
+  align-items: center;
+}
+
+.dot {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  border: 1.5px solid rgba(239, 244, 255, 0.78);
+  background: rgba(255, 255, 255, 0.01);
+}
+
+.dot-filled {
+  background: rgba(239, 244, 255, 0.92);
+  border-color: rgba(239, 244, 255, 0.92);
+}
+
+.keypad {
+  margin-top: 104px;
+  width: 857px;
+  display: grid;
+  grid-template-rows: repeat(4, 99.7px);
+  row-gap: 24px;
+}
+
+.key-row {
+  display: grid;
+  grid-template-columns: repeat(3, 271px);
+  column-gap: 22px;
+}
+
+.key {
+  height: 99.7px;
+  border: none;
+  border-radius: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(90deg, #222b39 0%, #232b37 100%);
+  color: #f2f4f8;
+  font-family: 'Bahnschrift', 'Segoe UI', sans-serif;
+  font-size: 36px;
+  font-weight: 700;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.key-placeholder {
+  color: rgba(182, 190, 206, 0.14);
+}
+
+.key:disabled {
+  cursor: default;
+  opacity: 0.85;
+}
+
+.delete-icon {
+  width: 36px;
+  height: 36px;
+  display: block;
+  object-fit: contain;
+}
+
+.action-row {
+  margin-top: auto;
+  width: 858px;
+  display: grid;
+  grid-template-columns: repeat(2, 418px);
+  column-gap: 22px;
+}
+
+.action-btn {
+  height: 99.7px;
+  border: none;
+  border-radius: 16px;
+  font-family: 'Microsoft YaHei', 'PingFang SC', sans-serif;
+  font-size: 24px;
+  font-weight: 400;
+  letter-spacing: 2px;
+  color: #f5f8ff;
+  cursor: pointer;
+}
+
+.action-skip {
+  background: linear-gradient(90deg, #232c3a 0%, #252d3a 100%);
+}
+
+.action-confirm {
+  background: #22599b;
+  color: rgba(241, 246, 255, 0.56);
+}
+
+.action-confirm:disabled {
+  cursor: default;
+}
+
+.action-confirm-enabled {
+  color: #f1f6ff;
+}
