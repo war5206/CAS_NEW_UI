@@ -43,12 +43,12 @@ function SavedCostDisplay({ value = '000222.7' }) {
       <div className="saved-cost-header">
         <div className="saved-cost-label-wrap">
           <img src={saveMoneyIcon} alt="" aria-hidden="true" className="saved-cost-money-icon" />
-          <div className="saved-cost-label">{'\u5df2\u8282\u7701\u8d39\u7528'}</div>
+          <div className="saved-cost-label">{'已节省费用'}</div>
         </div>
-        <div className="saved-cost-unit">{'\uff08\u5143\uff09'}</div>
+        <div className="saved-cost-unit">{'（元）'}</div>
       </div>
 
-      <div className={`saved-cost-digits${sizeLevelClass}`} aria-label={'\u5df2\u8282\u7701\u8d39\u7528\u6570\u503c'}>
+      <div className={`saved-cost-digits${sizeLevelClass}`} aria-label={'已节省费用数值'}>
         {displayChars.map((char, index) =>
           char === '.' ? (
             <span key={`dot-${index}`} className="saved-cost-dot" aria-hidden="true">

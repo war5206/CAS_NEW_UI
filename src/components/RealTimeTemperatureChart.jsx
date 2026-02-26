@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react'
 import * as echarts from 'echarts'
+import { useDeferredVisible } from '../hooks/useDeferredVisible'
 
 const xAxisData = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9']
 const supplyData = [42, 43, 44, 38, 37, 42, 43, 40, 36, 35]
@@ -10,16 +11,17 @@ const SUPPLY_COLOR = '#F04E2A'
 const RETURN_COLOR = '#F1BF3F'
 const TARGET_COLOR = '#36DC64'
 const LEGEND_ITEMS = [
-  { label: '\u4f9b\u6c34\u6e29\u5ea6', color: SUPPLY_COLOR },
-  { label: '\u56de\u6c34\u6e29\u5ea6', color: RETURN_COLOR },
-  { label: '\u76ee\u6807\u56de\u6c34\u6e29\u5ea6', color: TARGET_COLOR },
+  { label: '供水温度', color: SUPPLY_COLOR },
+  { label: '回水温度', color: RETURN_COLOR },
+  { label: '目标回水温度', color: TARGET_COLOR },
 ]
 
 function RealTimeTemperatureChart() {
   const chartRef = useRef(null)
+  const shouldInitChart = useDeferredVisible(chartRef)
 
   useEffect(() => {
-    if (!chartRef.current) {
+    if (!shouldInitChart || !chartRef.current) {
       return undefined
     }
 
@@ -31,9 +33,9 @@ function RealTimeTemperatureChart() {
         triggerOn: 'mousemove|click',
         formatter: (params) => {
           const rows = params
-            .map((item) => `${item.marker}${item.seriesName} ${item.value}\u2103`)
+            .map((item) => `${item.marker}${item.seriesName} ${item.value}℃`)
             .join('<br/>')
-          return `${params[0]?.axisValue}\u70b9<br/>${rows}`
+          return `${params[0]?.axisValue}点<br/>${rows}`
         },
         backgroundColor: 'rgba(18, 24, 38, 0.92)',
         borderColor: 'rgba(113, 145, 188, 0.45)',
@@ -93,7 +95,7 @@ function RealTimeTemperatureChart() {
       },
       series: [
         {
-          name: '\u4f9b\u6c34\u6e29\u5ea6',
+          name: '供水温度',
           type: 'line',
           smooth: true,
           showSymbol: false,
@@ -108,7 +110,7 @@ function RealTimeTemperatureChart() {
           },
         },
         {
-          name: '\u56de\u6c34\u6e29\u5ea6',
+          name: '回水温度',
           type: 'line',
           smooth: true,
           showSymbol: false,
@@ -123,7 +125,7 @@ function RealTimeTemperatureChart() {
           },
         },
         {
-          name: '\u76ee\u6807\u56de\u6c34\u6e29\u5ea6',
+          name: '目标回水温度',
           type: 'line',
           smooth: true,
           showSymbol: false,
@@ -149,7 +151,7 @@ function RealTimeTemperatureChart() {
       resizeObserver.disconnect()
       chart.dispose()
     }
-  }, [])
+  }, [shouldInitChart])
 
   return (
     <div className="home-temperature-chart-panel">

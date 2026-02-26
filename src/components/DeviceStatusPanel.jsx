@@ -2,29 +2,33 @@ import { useEffect, useRef, useState } from 'react'
 import * as echarts from 'echarts'
 import arrowRightSelected from '../assets/arrow-right-selected.svg'
 import arrowLeftSelected from '../assets/arrow-left-selected.svg'
+import { HEAT_PUMP_STATUS_SUMMARY } from '../config/homeHeatPumps'
+import { useDeferredVisible } from '../hooks/useDeferredVisible'
 
 const DEVICE_TABS = [
-  { id: 'heat-pump', label: '\u70ed\u6cf5\u673a\u7ec4' },
-  { id: 'loop-pump', label: '\u70ed\u6cf5\u5faa\u73af\u6c34\u6cf5' },
+  { id: 'heat-pump', label: '热泵机组' },
+  { id: 'loop-pump', label: '热泵循环水泵' },
 ]
 
 const HEAT_PUMP_DATA = [
-  { name: '\u8fd0\u884c', value: 18, color: ['#3B9EFF', '#1F5FB8'] },
-  { name: '\u5f85\u673a', value: 10, color: ['#F4CE52', '#A77A1F'] },
-  { name: '\u6545\u969c', value: 2, color: ['#FF671E', '#A93600'] },
+  { name: '运行', value: HEAT_PUMP_STATUS_SUMMARY.running, color: ['#3B9EFF', '#1F5FB8'] },
+  { name: '待机', value: HEAT_PUMP_STATUS_SUMMARY.shutdown, color: ['#9FAABD', '#69778E'] },
+  { name: '化霜', value: HEAT_PUMP_STATUS_SUMMARY.defrosting, color: ['#F4CE52', '#A77A1F'] },
+  { name: '故障', value: HEAT_PUMP_STATUS_SUMMARY.malfunction, color: ['#FF671E', '#A93600'] },
 ]
 
 const LOOP_PUMP_DATA = [
-  { name: '\u6c34\u6cf5\u4e00', status: '\u8fd0\u884c\u4e2d', tone: 'running' },
-  { name: '\u6c34\u6cf5\u4e8c', status: '\u5df2\u5173\u95ed', tone: 'off' },
-  { name: '\u6c34\u6cf5\u4e09', status: '\u6709\u6545\u969c', tone: 'fault' },
+  { name: '水泵一', status: '运行中', tone: 'running' },
+  { name: '水泵二', status: '已关闭', tone: 'off' },
+  { name: '水泵三', status: '有故障', tone: 'fault' },
 ]
 
 function HeatPumpStatusChart() {
   const chartRef = useRef(null)
+  const shouldInitChart = useDeferredVisible(chartRef)
 
   useEffect(() => {
-    if (!chartRef.current) {
+    if (!shouldInitChart || !chartRef.current) {
       return undefined
     }
 
@@ -108,7 +112,7 @@ function HeatPumpStatusChart() {
       resizeObserver.disconnect()
       chart.dispose()
     }
-  }, [])
+  }, [shouldInitChart])
 
   return <div ref={chartRef} className="home-heat-pump-chart" />
 }

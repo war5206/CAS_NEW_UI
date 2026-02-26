@@ -8,7 +8,7 @@ import iconMonitor from '../assets/cctv.svg'
 export const modules = [
   {
     id: 'home',
-    label: '主页',
+    label: '首页',
     path: 'home',
     icon: iconHome,
     sections: [],

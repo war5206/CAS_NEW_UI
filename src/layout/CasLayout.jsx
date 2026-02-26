@@ -6,7 +6,7 @@ import iconPower from '../assets/boot.svg'
 import iconHasAlert from '../assets/hasAlert.svg'
 import { buildTabPath, getModuleDefaultPath, getSectionDefaultPath, modules } from '../config/navigation'
 
-const WEEK_LABELS = ['\u5468\u65e5', '\u5468\u4e00', '\u5468\u4e8c', '\u5468\u4e09', '\u5468\u56db', '\u5468\u4e94', '\u5468\u516d']
+const WEEK_LABELS = ['周日', '周一', '周二', '周三', '周四', '周五', '周六']
 
 const formatDateTime = (date) => {
   const month = date.getMonth() + 1
@@ -16,12 +16,12 @@ const formatDateTime = (date) => {
   const minutes = String(date.getMinutes()).padStart(2, '0')
 
   return {
-    dateLabel: `${month}\u6708${day}\u65e5 ${week}`,
+    dateLabel: `${month}月${day}日 ${week}`,
     timeLabel: `${hours}:${minutes}`,
   }
 }
 
-function CasLayout({ routeInfo, children }) {
+function CasLayout({ routeInfo, children, homePageTitle }) {
   const [now, setNow] = useState(() => new Date())
   const activeModule = routeInfo.module
   const activeSection = routeInfo.section
@@ -34,7 +34,8 @@ function CasLayout({ routeInfo, children }) {
   }, [])
 
   const breadcrumbParts = useMemo(() => {
-    const items = [activeModule.breadcrumb ?? activeModule.label]
+    const rootLabel = activeModule.id === 'home' ? homePageTitle ?? '首页' : activeModule.breadcrumb ?? activeModule.label
+    const items = [rootLabel]
     if (activeSection) {
       items.push(activeSection.label)
     }
@@ -42,7 +43,7 @@ function CasLayout({ routeInfo, children }) {
       items.push(activeTab.label)
     }
     return items
-  }, [activeModule, activeSection, activeTab])
+  }, [activeModule, activeSection, activeTab, homePageTitle])
 
   const sectionList = activeModule.sections ?? []
   const tabList = activeSection?.tabs ?? []
@@ -55,7 +56,7 @@ function CasLayout({ routeInfo, children }) {
           <img src={casLogo} alt="CAS" />
         </div>
         <div className="avatar">
-          <img src={userAvatar} alt="\u7528\u6237\u5934\u50cf" />
+          <img src={userAvatar} alt="用户头像" />
         </div>
         <nav className="primary-nav">
           {modules.map((module) => (
@@ -69,7 +70,7 @@ function CasLayout({ routeInfo, children }) {
             </Link>
           ))}
         </nav>
-        <button type="button" className="power-button" aria-label="\u4e00\u952e\u5f00\u5173\u673a" title="\u4e00\u952e\u5f00\u5173\u673a">
+        <button type="button" className="power-button" aria-label="一键开关机" title="一键开关机">
           <img src={iconPower} alt="" aria-hidden="true" />
         </button>
       </aside>
