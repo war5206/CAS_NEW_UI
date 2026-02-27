@@ -4,6 +4,24 @@ import iconAlert from '../assets/alert.svg'
 import iconAnalysis from '../assets/analysis.svg'
 import iconOps from '../assets/ops.svg'
 import iconMonitor from '../assets/cctv.svg'
+import iconModeSelect from '../assets/modeSelect.svg'
+import iconModeSetting from '../assets/modeSetting.svg'
+import iconDeviceParam from '../assets/deviceParam.svg'
+import iconBasicSetting from '../assets/basicSetting.svg'
+import iconSystemAlert from '../assets/systemAlert.svg'
+import iconAlertTree from '../assets/alertTree.svg'
+import iconAlertAnalysis from '../assets/alertAnalysis.svg'
+import iconDataOverview from '../assets/dataOverview.svg'
+import iconElectricStatistic from '../assets/electricStatistic.svg'
+import iconWaterStatistic from '../assets/waterStatistic.svg'
+import iconHeatStatistic from '../assets/heatStatistic.svg'
+import iconCoolStatistic from '../assets/coolStatistic.svg'
+import iconExpenseAnalysis from '../assets/expenseAnalysis.svg'
+import iconSystemManagement from '../assets/systemManagement.svg'
+import iconDeviceManagement from '../assets/deviceManagement.svg'
+import iconDocManagement from '../assets/docManagement.svg'
+import iconSystemInstruction from '../assets/systemInstruction.svg'
+import iconDetectorInstruction from '../assets/detectorInstruction.svg'
 
 export const modules = [
   {
@@ -125,6 +143,33 @@ export const modules = [
     sections: [],
   },
 ]
+
+const sectionIconMap = {
+  'mode-select': iconModeSelect,
+  'mode-setting': iconModeSetting,
+  'device-params': iconDeviceParam,
+  'base-setting': iconBasicSetting,
+  'system-alarm': iconSystemAlert,
+  'fault-tree': iconAlertTree,
+  'alarm-analysis': iconAlertAnalysis,
+  'data-overview': iconDataOverview,
+  power: iconElectricStatistic,
+  water: iconWaterStatistic,
+  heat: iconHeatStatistic,
+  cold: iconCoolStatistic,
+  cost: iconExpenseAnalysis,
+  'system-management': iconSystemManagement,
+  'device-management': iconDeviceManagement,
+  archive: iconDocManagement,
+  manual: iconSystemInstruction,
+  'sensor-manual': iconDetectorInstruction,
+}
+
+for (const module of modules) {
+  for (const section of module.sections ?? []) {
+    section.icon = sectionIconMap[section.id]
+  }
+}
 
 export const buildModulePath = (module) => `/${module.path}`
 

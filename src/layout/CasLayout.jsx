@@ -122,7 +122,8 @@ function CasLayout({ routeInfo, children, homePageTitle }) {
                       to={getSectionDefaultPath(activeModule, section)}
                       className={`secondary-item${section.id === activeSection?.id ? ' is-active' : ''}`}
                     >
-                      <span>{section.label}</span>
+                      {section.icon ? <img className="secondary-item-icon" src={section.icon} alt="" aria-hidden="true" /> : null}
+                      <span className="secondary-item-label">{section.label}</span>
                     </NavLink>
                   ))}
                 </div>
