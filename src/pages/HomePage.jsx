@@ -1,16 +1,16 @@
 import { useEffect, useState } from 'react'
-import systemMap from '../assets/system.png'
-import modeStatusIcon from '../assets/modeStatus.svg'
-import costAnalysisIcon from '../assets/costAnalysis.svg'
-import temperatureIcon from '../assets/temperature.svg'
-import deviceStatusIcon from '../assets/deviceStatus.svg'
-import avatarA from '../assets/A.png'
-import rmbIcon from '../assets/rmb.svg'
-import modeArrowRight from '../assets/modeStatusArrowRight.svg'
-import modeDivider from '../assets/modeStatusDivider.svg'
-import heatingIcon from '../assets/heating-active.svg'
-import intelligentIcon from '../assets/intelligent.svg'
-import backIcon from '../assets/back.svg'
+import systemMap from '../assets/home/system.png'
+import modeStatusIcon from '../assets/home/modeStatus.svg'
+import costAnalysisIcon from '../assets/home/costAnalysis.svg'
+import temperatureIcon from '../assets/home/temperature.svg'
+import deviceStatusIcon from '../assets/home/deviceStatus.svg'
+import avatarA from '../assets/home/A.png'
+import rmbIcon from '../assets/home/rmb.svg'
+import modeArrowRight from '../assets/home/modeStatusArrowRight.svg'
+import modeDivider from '../assets/home/modeStatusDivider.svg'
+import heatingIcon from '../assets/device/heating-active.svg'
+import weatherCompensationIcon from '../assets/home/weather-compensation.svg'
+import backIcon from '../assets/layout/back.svg'
 import HomeWidget from '../components/HomeWidget'
 import HomeHeatPumpOverview from '../components/HomeHeatPumpOverview'
 import HomeTerminalBuildingOverview from '../components/HomeTerminalBuildingOverview'
@@ -271,7 +271,7 @@ function HomePage({ onActivePageChange }) {
                     <img src={modeArrowRight} alt="" aria-hidden="true" className="home-mode-row-icon" />
                     <div className="home-mode-icon-group">
                       <img src={heatingIcon} alt="" aria-hidden="true" className="home-mode-state-icon" />
-                      <img src={intelligentIcon} alt="" aria-hidden="true" className="home-mode-state-icon" />
+                      <img src={weatherCompensationIcon} alt="" aria-hidden="true" className="home-mode-state-icon" />
                     </div>
                   </div>
                 </div>

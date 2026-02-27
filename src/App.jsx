@@ -5,6 +5,7 @@ import { createPageEntries, createRedirectEntries } from './config/navigation'
 import CasLayout from './layout/CasLayout'
 import HomePage from './pages/HomePage'
 import ModulePage from './pages/ModulePage'
+import PlaygroundPage from './pages/PlaygroundPage'
 
 const pageEntries = createPageEntries()
 const redirectEntries = createRedirectEntries()
@@ -29,6 +30,7 @@ function AppRoutes({ homePageTitle, onHomePageTitleChange }) {
       <Routes>
         <Route path="/" element={<Navigate to={HOME_PATH} replace />} />
         <Route path={HOME_PATH} element={null} />
+        <Route path="/playground" element={<PlaygroundPage />} />
         {redirectEntries.map((entry) => (
           <Route key={`redirect-${entry.from}`} path={entry.from} element={<Navigate to={entry.to} replace />} />
         ))}

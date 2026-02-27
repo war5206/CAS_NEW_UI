@@ -1,5 +1,39 @@
+import HeatPumpLoopPumpPage from './HeatPumpLoopPumpPage'
+import TerminalLoopPumpPage from './TerminalLoopPumpPage'
+import HeatTracePage from './HeatTracePage'
+import ConstantPressurePumpPage from './ConstantPressurePumpPage'
+import DrainValvePage from './DrainValvePage'
+import ReliefValvePage from './ReliefValvePage'
+
 function ModulePage({ routeInfo }) {
   const { module, section, tab } = routeInfo
+  const isDeviceParamsSection = module.id === 'settings' && section?.id === 'device-params'
+
+  if (isDeviceParamsSection) {
+    if (tab?.id === 'hp-loop-pump') {
+      return <HeatPumpLoopPumpPage />
+    }
+
+    if (tab?.id === 'terminal-loop-pump') {
+      return <TerminalLoopPumpPage />
+    }
+
+    if (tab?.id === 'heat-trace') {
+      return <HeatTracePage />
+    }
+
+    if (tab?.id === 'constant-pressure-pump') {
+      return <ConstantPressurePumpPage />
+    }
+
+    if (tab?.id === 'drain-valve') {
+      return <DrainValvePage />
+    }
+
+    if (tab?.id === 'relief-valve') {
+      return <ReliefValvePage />
+    }
+  }
 
   return (
     <div className="placeholder-card module-placeholder">

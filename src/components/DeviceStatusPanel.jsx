@@ -1,7 +1,7 @@
-import { useEffect, useRef, useState } from 'react'
+﻿import { useEffect, useRef, useState } from 'react'
 import * as echarts from 'echarts'
-import arrowRightSelected from '../assets/arrow-right-selected.svg'
-import arrowLeftSelected from '../assets/arrow-left-selected.svg'
+import arrowRightSelected from '../assets/device/arrow-right-selected.svg'
+import arrowLeftSelected from '../assets/device/arrow-left-selected.svg'
 import { HEAT_PUMP_STATUS_SUMMARY } from '../config/homeHeatPumps'
 import { useDeferredVisible } from '../hooks/useDeferredVisible'
 
@@ -95,7 +95,7 @@ function HeatPumpStatusChart() {
               position: 'top',
               color: '#FFFFFF',
               fontSize: 22,
-              fontFamily: 'Bahnschrift, Segoe UI, sans-serif',
+              fontFamily: 'Alibaba PuHuiTi 2.0, sans-serif',
               formatter: ({ value }) => String(value).padStart(2, '0'),
             },
           })),
@@ -174,3 +174,4 @@ function DeviceStatusPanel() {
 }
 
 export default DeviceStatusPanel
+

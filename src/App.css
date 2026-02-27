@@ -20,7 +20,7 @@
   grid-template-columns: 120px 1fr;
   background: #0e0e14;
   color: #e9f1ff;
-  font-family: 'Microsoft YaHei', 'PingFang SC', 'Segoe UI', sans-serif;
+  font-family: 'Alibaba PuHuiTi 2.0', sans-serif;
 }
 
 .side-nav {
@@ -230,6 +230,14 @@
   grid-template-columns: 240px 1fr;
 }
 
+.content.has-secondary.is-module-layout {
+  column-gap: 0;
+}
+
+.content.has-secondary.is-module-layout .stage-body--module > :not(.stage-tabs) {
+  margin-left: 24px;
+}
+
 .secondary-nav {
   background: rgba(255, 255, 255, 0.02);
   border-radius: 24px 0 0 24px;
@@ -314,29 +322,22 @@
 
 .tabs {
   display: flex;
-  gap: 12px;
+  gap: 57px;
   flex-wrap: wrap;
+  background: rgba(255, 255, 255, 0.02);
+  padding-left: 42px;
 }
 
 .tab-item {
-  background: var(--main-module-bg);
-  color: rgba(223, 232, 250, 0.78);
-  border-radius: 999px;
-  padding: 10px 18px;
+  color: rgba(255, 255, 255, 0.60);
+  padding: 22px 0;
   text-decoration: none;
-  font-size: 14px;
+  font-size: 20px;
   cursor: pointer;
-  transition: all 0.2s ease;
 }
 
 .tab-item.is-active {
-  background: linear-gradient(120deg, rgba(35, 86, 142, 0.9), rgba(28, 62, 100, 0.9));
-  color: #ffffff;
-  box-shadow: 0 10px 18px rgba(15, 28, 49, 0.35);
-}
-
-.tab-item:hover {
-  transform: translateY(-1px);
+  border-bottom: 4px solid var(---, #197CDF);
 }
 
 .stage-body {
@@ -348,7 +349,7 @@
 
 .stage-body--module {
   flex-direction: column;
-  gap: 16px;
+  /* gap: 16px; */
 }
 
 .stage-meta {
@@ -361,7 +362,7 @@
 }
 
 .stage-breadcrumb {
-  margin-left: 0;
+  margin-left: 24px;
   padding: 0;
   height: auto;
 }
@@ -374,11 +375,7 @@
 }
 
 .placeholder-card {
-  background: var(--main-module-bg);
-  border-radius: 22px;
-  padding: 22px;
-  border: 1px solid rgba(255, 255, 255, 0.05);
-  box-shadow: inset 0 0 30px rgba(20, 40, 64, 0.3);
+  padding: 24px 0 0 8px;
 }
 
 .placeholder-title {
@@ -579,7 +576,7 @@
 
 .home-system-value {
   color: #00cbff;
-  font-family: 'Bahnschrift', 'Segoe UI', sans-serif;
+  font-family: 'Alibaba PuHuiTi 2.0', sans-serif;
   font-size: 1.16em;
   font-weight: 600;
 }
@@ -616,7 +613,7 @@
   height: 1.42em;
   padding: 0 0.28em;
   border-radius: 0.38em;
-  font-family: 'Bahnschrift', 'Segoe UI', sans-serif;
+  font-family: 'Alibaba PuHuiTi 2.0', sans-serif;
   font-size: 1.12em;
   line-height: 1.42em;
   text-align: center;
@@ -914,7 +911,7 @@
   left: 0;
   right: 0;
   text-align: center;
-  font-family: 'Bahnschrift', 'Segoe UI', sans-serif;
+  font-family: 'Alibaba PuHuiTi 2.0', sans-serif;
   font-size: 20px;
   line-height: 1;
   letter-spacing: 1px;
@@ -1308,7 +1305,7 @@
   font-size: 20px;
   font-weight: 500;
   line-height: 1;
-  font-family: 'Bahnschrift', 'Segoe UI', sans-serif;
+  font-family: 'Alibaba PuHuiTi 2.0', sans-serif;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -1379,7 +1376,7 @@
 
 .home-building-room-no {
   color: rgba(246, 249, 255, 0.94);
-  font-family: 'Bahnschrift', 'Segoe UI', sans-serif;
+  font-family: 'Alibaba PuHuiTi 2.0', sans-serif;
   font-size: 24px;
   font-weight: 700;
   line-height: 1;
@@ -1574,7 +1571,7 @@
 }
 
 .home-widget-mode .home-widget-content {
-  background: url('./assets/modeStatusBg.png') center / cover no-repeat;
+  background: url('./assets/home/modeStatusBg.png') center / cover no-repeat;
 }
 
 .home-widget-cost .home-widget-content {
@@ -1706,7 +1703,7 @@
   background: rgba(32, 40, 56, 0.85);
   border: 1px solid rgba(73, 134, 196, 0.45);
   box-shadow: inset 0 0 12px rgba(56, 109, 174, 0.25);
-  font-family: 'Bahnschrift', 'Segoe UI', sans-serif;
+  font-family: 'Alibaba PuHuiTi 2.0', sans-serif;
   font-size: 32px;
   line-height: 1;
   letter-spacing: 1px;
@@ -1745,7 +1742,7 @@
   justify-content: center;
   width: 8px;
   height: 47px;
-  font-family: 'Bahnschrift', 'Segoe UI', sans-serif;
+  font-family: 'Alibaba PuHuiTi 2.0', sans-serif;
   font-size: 42px;
   line-height: 1;
   color: #53b8ff;
@@ -1828,7 +1825,7 @@
 }
 
 .home-cost-item-number {
-  font-family: 'Bahnschrift', 'Segoe UI', sans-serif;
+  font-family: 'Alibaba PuHuiTi 2.0', sans-serif;
   color: #fff;
   font-size: 16px;
   font-weight: 500;
@@ -2022,6 +2019,10 @@
     grid-template-columns: 1fr;
   }
 
+  .content.has-secondary.is-module-layout .stage-body--module > :not(.stage-tabs) {
+    margin-left: 0;
+  }
+
   .home-screen {
     grid-template-columns: 1fr;
     padding-right: 0;
@@ -2202,3 +2203,4 @@
   }
 
 }
+

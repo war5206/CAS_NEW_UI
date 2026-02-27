@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, NavLink } from 'react-router-dom'
-import casLogo from '../assets/cas-logo.png'
-import userAvatar from '../assets/user_avatar.svg'
-import iconPower from '../assets/boot.svg'
-import iconHasAlert from '../assets/hasAlert.svg'
+import casLogo from '../assets/brand/cas-logo.png'
+import userAvatar from '../assets/layout/user_avatar.svg'
+import iconPower from '../assets/layout/boot.svg'
+import iconHasAlert from '../assets/layout/hasAlert.svg'
 import { buildTabPath, getModuleDefaultPath, getSectionDefaultPath, modules } from '../config/navigation'
 
 const WEEK_LABELS = ['周日', '周一', '周二', '周三', '周四', '周五', '周六']
@@ -109,7 +109,7 @@ function CasLayout({ routeInfo, children, homePageTitle }) {
           </header>
         ) : null}
 
-        <div className={`content${showSecondaryNav ? ' has-secondary' : ''}`}>
+        <div className={`content${showSecondaryNav ? ' has-secondary' : ''}${!isHomeLayout ? ' is-module-layout' : ''}`}>
           {showSecondaryNav ? (
             <aside className={`secondary-nav${isHomeLayout ? '' : ' is-module-layout'}`}>
               {!isHomeLayout ? <div className="secondary-alert-wrap">{alertIndicator}</div> : null}

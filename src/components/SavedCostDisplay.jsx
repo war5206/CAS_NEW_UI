@@ -1,4 +1,4 @@
-import saveMoneyIcon from '../assets/saveMoney.png'
+﻿import saveMoneyIcon from '../assets/home/saveMoney.png'
 
 const MIN_INTEGER_DIGITS = 6
 
@@ -66,3 +66,4 @@ function SavedCostDisplay({ value = '000222.7' }) {
 }
 
 export default SavedCostDisplay
+

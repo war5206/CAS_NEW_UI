@@ -1,16 +1,16 @@
-import { useEffect, useMemo, useState } from 'react'
+﻿import { useEffect, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
-import hpRunningIcon from '../assets/hp-running.svg'
-import hpMalfunctionIcon from '../assets/hp-malfunction.svg'
-import hpDefrostingIcon from '../assets/hp-defrosting.svg'
-import hpShutdownIcon from '../assets/hp-shutdown.svg'
-import hpNullIcon from '../assets/hp-null.svg'
-import hpModalRunningIcon from '../assets/hp-modal-running.svg'
-import hpModalMalfunctionIcon from '../assets/hp-modal-malfunction.svg'
-import hpModalDefrostingIcon from '../assets/hp-modal-defrosting.svg'
-import hpModalShutdownIcon from '../assets/hp-modal-shutdown.svg'
-import micoeInfiniteLogo from '../assets/micoe-infinite.png'
-import backIcon from '../assets/back.svg'
+import hpRunningIcon from '../assets/heat-pump/hp-running.svg'
+import hpMalfunctionIcon from '../assets/heat-pump/hp-malfunction.svg'
+import hpDefrostingIcon from '../assets/heat-pump/hp-defrosting.svg'
+import hpShutdownIcon from '../assets/heat-pump/hp-shutdown.svg'
+import hpNullIcon from '../assets/heat-pump/hp-null.svg'
+import hpModalRunningIcon from '../assets/heat-pump/hp-modal-running.svg'
+import hpModalMalfunctionIcon from '../assets/heat-pump/hp-modal-malfunction.svg'
+import hpModalDefrostingIcon from '../assets/heat-pump/hp-modal-defrosting.svg'
+import hpModalShutdownIcon from '../assets/heat-pump/hp-modal-shutdown.svg'
+import micoeInfiniteLogo from '../assets/brand/micoe-infinite.png'
+import backIcon from '../assets/layout/back.svg'
 import {
   HEAT_PUMP_DETAIL_LABEL,
   HEAT_PUMP_GRID_COLS,
@@ -230,7 +230,7 @@ function HomeHeatPumpOverview({onBack}) {
                   onClick={() => setActivePump(null)}
                   aria-label={HEAT_PUMP_OVERVIEW_TEXT.CLOSE}
                 >
-                  {'×'}
+                  {'脳'}
                 </button>
               </div>
 
@@ -288,7 +288,7 @@ function HomeHeatPumpOverview({onBack}) {
                   onClick={closeOverviewModal}
                   aria-label={HEAT_PUMP_OVERVIEW_TEXT.CLOSE}
                 >
-                  {'×'}
+                  {'脳'}
                 </button>
               </div>
 
@@ -346,3 +346,4 @@ function HomeHeatPumpOverview({onBack}) {
 }
 
 export default HomeHeatPumpOverview
+
