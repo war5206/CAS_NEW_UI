@@ -26,6 +26,7 @@ function CasLayout({ routeInfo, children, homePageTitle }) {
   const activeModule = routeInfo.module
   const activeSection = routeInfo.section
   const activeTab = routeInfo.tab
+  const isHomeLayout = activeModule.id === 'home'
 
   useEffect(() => {
     const updateTime = () => setNow(new Date())
@@ -47,7 +48,31 @@ function CasLayout({ routeInfo, children, homePageTitle }) {
 
   const sectionList = activeModule.sections ?? []
   const tabList = activeSection?.tabs ?? []
+  const showSecondaryNav = sectionList.length > 0 || !isHomeLayout
+  const hasTabs = tabList.length > 0
   const { dateLabel, timeLabel } = formatDateTime(now)
+  const alertIndicator = (
+    <div className="alert-indicator" title="hasAlert">
+      <img src={iconHasAlert} alt="hasAlert" />
+    </div>
+  )
+
+  const breadcrumb = (
+    <div className="breadcrumb">
+      {breadcrumbParts.map((item, index) => (
+        <span key={`${item}-${index}`} className={`crumb${index === breadcrumbParts.length - 1 ? ' current' : ''}`}>
+          {item}
+        </span>
+      ))}
+    </div>
+  )
+
+  const dateTime = (
+    <div className="date-time">
+      <span className="date-label">{dateLabel}</span>
+      <span className="time-label">{timeLabel}</span>
+    </div>
+  )
 
   return (
     <div className="app">
@@ -75,44 +100,38 @@ function CasLayout({ routeInfo, children, homePageTitle }) {
         </button>
       </aside>
 
-      <div className="main">
-        <header className="top-bar">
-          <div className="alert-indicator" title="hasAlert">
-            <img src={iconHasAlert} alt="hasAlert" />
-          </div>
-          <div className="breadcrumb">
-            {breadcrumbParts.map((item, index) => (
-              <span key={`${item}-${index}`} className={`crumb${index === breadcrumbParts.length - 1 ? ' current' : ''}`}>
-                {item}
-              </span>
-            ))}
-          </div>
-          <div className="date-time">
-            <span className="date-label">{dateLabel}</span>
-            <span className="time-label">{timeLabel}</span>
-          </div>
-        </header>
+      <div className={`main${isHomeLayout ? '' : ' is-module-layout'}`}>
+        {isHomeLayout ? (
+          <header className="top-bar">
+            {alertIndicator}
+            {breadcrumb}
+            {dateTime}
+          </header>
+        ) : null}
 
-        <div className={`content${sectionList.length ? ' has-secondary' : ''}`}>
-          {sectionList.length ? (
-            <aside className="secondary-nav">
+        <div className={`content${showSecondaryNav ? ' has-secondary' : ''}`}>
+          {showSecondaryNav ? (
+            <aside className={`secondary-nav${isHomeLayout ? '' : ' is-module-layout'}`}>
+              {!isHomeLayout ? <div className="secondary-alert-wrap">{alertIndicator}</div> : null}
               <div className="secondary-title">{activeModule.breadcrumb ?? activeModule.label}</div>
-              <div className="secondary-list">
-                {sectionList.map((section) => (
-                  <NavLink
-                    key={section.id}
-                    to={getSectionDefaultPath(activeModule, section)}
-                    className={`secondary-item${section.id === activeSection?.id ? ' is-active' : ''}`}
-                  >
-                    <span>{section.label}</span>
-                  </NavLink>
-                ))}
-              </div>
+              {sectionList.length ? (
+                <div className="secondary-list">
+                  {sectionList.map((section) => (
+                    <NavLink
+                      key={section.id}
+                      to={getSectionDefaultPath(activeModule, section)}
+                      className={`secondary-item${section.id === activeSection?.id ? ' is-active' : ''}`}
+                    >
+                      <span>{section.label}</span>
+                    </NavLink>
+                  ))}
+                </div>
+              ) : null}
             </aside>
           ) : null}
 
           <section className="stage">
-            {tabList.length ? (
+            {isHomeLayout && hasTabs ? (
               <div className="tabs">
                 {tabList.map((tab) => (
                   <NavLink
@@ -125,7 +144,34 @@ function CasLayout({ routeInfo, children, homePageTitle }) {
                 ))}
               </div>
             ) : null}
-            <div className="stage-body">{children}</div>
+            <div className={`stage-body${isHomeLayout ? '' : ' stage-body--module'}`}>
+              {!isHomeLayout ? (
+                <div className="stage-meta">
+                  <div className="breadcrumb stage-breadcrumb">
+                    {breadcrumbParts.map((item, index) => (
+                      <span key={`${item}-${index}`} className={`crumb${index === breadcrumbParts.length - 1 ? ' current' : ''}`}>
+                        {item}
+                      </span>
+                    ))}
+                  </div>
+                  {dateTime}
+                </div>
+              ) : null}
+              {!isHomeLayout && hasTabs ? (
+                <div className="tabs stage-tabs">
+                  {tabList.map((tab) => (
+                    <NavLink
+                      key={tab.id}
+                      to={buildTabPath(activeModule, activeSection, tab)}
+                      className={`tab-item${tab.id === activeTab?.id ? ' is-active' : ''}`}
+                    >
+                      {tab.label}
+                    </NavLink>
+                  ))}
+                </div>
+              ) : null}
+              <div className="stage-content">{children}</div>
+            </div>
           </section>
         </div>
       </div>
