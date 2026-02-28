@@ -11,28 +11,28 @@ function DrainValvePage() {
 
   return (
     <main className="device-param-page">
-      <FeatureInfoCard icon={drainValveIcon} iconAlt={'\u6392\u6c61\u9600'} title={'\u6392\u6c61\u9600'} selected />
-
       <section className="device-param-page__section">
-        <h3 className="device-param-page__title">{'\u53c2\u6570\u8bbe\u7f6e'}</h3>
+        <h3 className="device-param-page__title">{'参数设置'}</h3>
         <div className="device-param-page__rows">
           <LabeledSelectRow
-            label={'\u6392\u6c61\u65f6\u95f4\u70b9'}
-            description={'\u6392\u6c61\u7684\u65f6\u95f4\u8bbe\u5b9a'}
+            label={'排污时间点'}
+            description={'排污的时间设定'}
             value={drainTimePoint}
             onChange={setDrainTimePoint}
-            showIndicator
+            popupType="time"
             useModeCardControl
           />
           <LabeledSelectRow
-            label={'\u6392\u6c61\u5468\u671f\uff08\u5929\uff09'}
+            label={'排污周期（天）'}
             value={drainCycleDays}
+            suffix={'天'}
             onChange={setDrainCycleDays}
             useModeCardControl
           />
           <LabeledSelectRow
-            label={'\u6392\u6c61\u6301\u7eed\u65f6\u95f4\uff08\u79d2\uff09'}
+            label={'排污持续时间（秒）'}
             value={drainDurationSec}
+            suffix={'秒'}
             onChange={setDrainDurationSec}
             useModeCardControl
           />

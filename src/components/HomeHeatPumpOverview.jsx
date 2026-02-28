@@ -9,6 +9,7 @@ import hpModalRunningIcon from '../assets/heat-pump/hp-modal-running.svg'
 import hpModalMalfunctionIcon from '../assets/heat-pump/hp-modal-malfunction.svg'
 import hpModalDefrostingIcon from '../assets/heat-pump/hp-modal-defrosting.svg'
 import hpModalShutdownIcon from '../assets/heat-pump/hp-modal-shutdown.svg'
+import closeIcon from '../assets/icons/close.svg'
 import micoeInfiniteLogo from '../assets/brand/micoe-infinite.png'
 import backIcon from '../assets/layout/back.svg'
 import {
@@ -140,6 +141,14 @@ function HomeHeatPumpOverview({onBack}) {
     setIsOverviewModalOpen(false)
   }
 
+  const goToPrevOverviewPage = () => {
+    setOverviewPage((current) => Math.max(1, current - 1))
+  }
+
+  const goToNextOverviewPage = () => {
+    setOverviewPage((current) => Math.min(totalOverviewPages, current + 1))
+  }
+
   return (
     <>
       <div className="home-hp-overview">
@@ -230,7 +239,7 @@ function HomeHeatPumpOverview({onBack}) {
                   onClick={() => setActivePump(null)}
                   aria-label={HEAT_PUMP_OVERVIEW_TEXT.CLOSE}
                 >
-                  {'脳'}
+                  <img src={closeIcon} alt="" aria-hidden="true" className="home-hp-modal-close-icon" />
                 </button>
               </div>
 
@@ -288,7 +297,7 @@ function HomeHeatPumpOverview({onBack}) {
                   onClick={closeOverviewModal}
                   aria-label={HEAT_PUMP_OVERVIEW_TEXT.CLOSE}
                 >
-                  {'脳'}
+                  <img src={closeIcon} alt="" aria-hidden="true" className="home-hp-modal-close-icon" />
                 </button>
               </div>
 
@@ -334,6 +343,27 @@ function HomeHeatPumpOverview({onBack}) {
                       ))}
                     </tbody>
                   </table>
+                </div>
+                <div className="home-hp-summary-pagination">
+                  <button
+                    type="button"
+                    className="home-hp-summary-page-button"
+                    onClick={goToPrevOverviewPage}
+                    disabled={overviewPage <= 1}
+                  >
+                    {HEAT_PUMP_OVERVIEW_TEXT.PREV_PAGE}
+                  </button>
+                  <span className="home-hp-summary-page-indicator">
+                    {`${HEAT_PUMP_OVERVIEW_TEXT.PAGE_PREFIX}${overviewPage}${HEAT_PUMP_OVERVIEW_TEXT.PAGE_SUFFIX}`}
+                  </span>
+                  <button
+                    type="button"
+                    className="home-hp-summary-page-button"
+                    onClick={goToNextOverviewPage}
+                    disabled={overviewPage >= totalOverviewPages}
+                  >
+                    {HEAT_PUMP_OVERVIEW_TEXT.NEXT_PAGE}
+                  </button>
                 </div>
               </div>
             </div>

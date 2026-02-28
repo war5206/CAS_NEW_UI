@@ -1,5 +1,6 @@
 import HeatPumpLoopPumpPage from './HeatPumpLoopPumpPage'
 import TerminalLoopPumpPage from './TerminalLoopPumpPage'
+import HeatPumpPage from './HeatPumpPage'
 import HeatTracePage from './HeatTracePage'
 import ConstantPressurePumpPage from './ConstantPressurePumpPage'
 import DrainValvePage from './DrainValvePage'
@@ -16,6 +17,10 @@ function ModulePage({ routeInfo }) {
 
     if (tab?.id === 'terminal-loop-pump') {
       return <TerminalLoopPumpPage />
+    }
+
+    if (tab?.id === 'heat-pump') {
+      return <HeatPumpPage />
     }
 
     if (tab?.id === 'heat-trace') {

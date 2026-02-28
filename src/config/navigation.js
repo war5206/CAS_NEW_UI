@@ -57,7 +57,7 @@ export const modules = [
         path: 'device-params',
         tabs: [
           { id: 'hp-loop-pump', label: '热泵循环泵', path: 'heat-pump-loop-pump' },
-          { id: 'terminal-loop-pump', label: '末端循环泵', path: 'terminal-loop-pump' },
+          // { id: 'terminal-loop-pump', label: '末端循环泵', path: 'terminal-loop-pump' },
           { id: 'heat-pump', label: '热泵', path: 'heat-pump' },
           { id: 'heat-trace', label: '伴热带', path: 'heat-trace' },
           { id: 'constant-pressure-pump', label: '定压泵', path: 'constant-pressure-pump' },

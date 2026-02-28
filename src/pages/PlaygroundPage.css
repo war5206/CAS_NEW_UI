@@ -134,6 +134,35 @@
   border-radius: 0 4px 4px 0;
 }
 
+.playground-picker-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 360px));
+  gap: 14px;
+}
+
+.playground-picker-card {
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 14px;
+  background: linear-gradient(180deg, rgba(35, 44, 60, 0.95), rgba(25, 32, 46, 0.95));
+  padding: 16px 18px;
+  color: #f3f7ff;
+  text-align: left;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.playground-picker-card__title {
+  color: rgba(190, 205, 228, 0.92);
+  font-size: 15px;
+}
+
+.playground-picker-card__value {
+  font-size: 22px;
+  line-height: 1.1;
+}
+
 @media (max-width: 900px) {
   .playground-page {
     padding: 16px;
@@ -165,6 +194,10 @@
   }
 
   .playground-mode-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .playground-picker-grid {
     grid-template-columns: 1fr;
   }
 }

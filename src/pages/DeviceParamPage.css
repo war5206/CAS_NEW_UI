@@ -8,14 +8,10 @@
   color: #ffffff;
 }
 
-.device-param-page__section {
-  margin-top: 22px;
-}
-
 .device-param-page__title {
   margin: 0;
-  color: #909da2;
-  font-size: 36px;
+  color: #909DA2;
+  font-size: 20px;
   font-weight: 400;
   line-height: 1.2;
 }

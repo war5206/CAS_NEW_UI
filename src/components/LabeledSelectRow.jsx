@@ -1,19 +1,39 @@
-import { useEffect, useMemo, useState } from 'react'
-import deleteIcon from '../assets/common/delete.svg'
+import { useState } from 'react'
 import ModeOptionCard from './ModeOptionCard'
+import NumericKeypadModal from './NumericKeypadModal'
+import TimePickerModal from './TimePickerModal'
 import './SettingCards.css'
-
-const KEYPAD_KEYS = ['1', '2', '3', '4', '5', '6', '7', '8', '9', '.', '0', 'delete']
 
 function sanitizeText(value) {
   return value == null ? '' : String(value).trim()
 }
 
-function normalizeDraftValue(value) {
-  if (!value) {
-    return '0'
+function resolveKeypadTitle(label) {
+  if (typeof label === 'string') {
+    return sanitizeText(label) || '输入'
   }
-  return value.endsWith('.') ? value.slice(0, -1) : value
+  return '输入'
+}
+
+const TIME_HOURS = Array.from({ length: 24 }, (_, index) => index)
+const TIME_MINUTES = Array.from({ length: 60 }, (_, index) => index)
+
+function parseTimeValue(value) {
+  const parsed = sanitizeText(value).match(/^(\d{1,2}):(\d{1,2})$/)
+  if (!parsed) {
+    return [0, 0]
+  }
+
+  const hours = Number.parseInt(parsed[1], 10)
+  const minutes = Number.parseInt(parsed[2], 10)
+  const safeHours = Number.isFinite(hours) ? Math.min(Math.max(hours, 0), 23) : 0
+  const safeMinutes = Number.isFinite(minutes) ? Math.min(Math.max(minutes, 0), 59) : 0
+
+  return [safeHours, safeMinutes]
+}
+
+function formatTwoDigits(value) {
+  return String(value).padStart(2, '0')
 }
 
 function LabeledSelectRow({
@@ -27,15 +47,15 @@ function LabeledSelectRow({
   disabled = false,
   showIndicator = false,
   useModeCardControl = false,
+  popupType = 'keyboard',
   className = '',
 }) {
-  const [isKeyboardOpen, setIsKeyboardOpen] = useState(false)
-  const [draftValue, setDraftValue] = useState('')
+  const [isModalOpen, setIsModalOpen] = useState(false)
   const currentValue = sanitizeText(value)
+  const resolvedPopupType = popupType === 'time' ? 'time' : 'keyboard'
   const suffixText = sanitizeText(suffix)
   const rowClassName = ['labeled-select-row', disabled ? 'is-disabled' : '', className].filter(Boolean).join(' ')
   const displayValue = currentValue || '0'
-  const keypadDisplayValue = useMemo(() => sanitizeText(draftValue) || '0', [draftValue])
   const modeCardLabel = suffixText ? (
     <span className="labeled-select-row__mode-label">
       <span className="labeled-select-row__mode-value">{displayValue}</span>
@@ -45,58 +65,18 @@ function LabeledSelectRow({
     displayValue
   )
 
-  useEffect(() => {
-    if (!isKeyboardOpen) {
-      return undefined
-    }
-
-    const handleEscape = (event) => {
-      if (event.key === 'Escape') {
-        setIsKeyboardOpen(false)
-      }
-    }
-
-    window.addEventListener('keydown', handleEscape)
-    return () => window.removeEventListener('keydown', handleEscape)
-  }, [isKeyboardOpen])
-
   const openKeyboard = () => {
     if (disabled) {
       return
     }
-    setDraftValue(currentValue)
-    setIsKeyboardOpen(true)
+    setIsModalOpen(true)
   }
 
   const closeKeyboard = () => {
-    setIsKeyboardOpen(false)
+    setIsModalOpen(false)
   }
 
-  const handleKeyPress = (key) => {
-    setDraftValue((previous) => {
-      const next = sanitizeText(previous)
-
-      if (key === 'delete') {
-        return next.slice(0, -1)
-      }
-
-      if (key === '.') {
-        if (next.includes('.')) {
-          return next
-        }
-        return next ? `${next}.` : '0.'
-      }
-
-      if (next === '0') {
-        return key
-      }
-
-      return `${next}${key}`
-    })
-  }
-
-  const handleConfirm = () => {
-    const nextValue = normalizeDraftValue(sanitizeText(draftValue))
+  const handleConfirm = (nextValue) => {
     if (typeof onChange === 'function') {
       onChange(nextValue)
     }
@@ -128,8 +108,8 @@ function LabeledSelectRow({
               onClick={openKeyboard}
               disabled={disabled}
               aria-label={label}
-              aria-haspopup="dialog"
-              aria-expanded={isKeyboardOpen}
+              aria-haspopup={resolvedPopupType === 'time' ? 'listbox' : 'dialog'}
+              aria-expanded={isModalOpen}
             >
               <span className="labeled-select-row__trigger-value">{displayValue}</span>
               {suffixText ? <span className="labeled-select-row__trigger-suffix">{suffixText}</span> : null}
@@ -138,70 +118,29 @@ function LabeledSelectRow({
         </div>
       </div>
 
-      {isKeyboardOpen ? (
-        <div className="labeled-select-keypad-backdrop" role="presentation" onClick={closeKeyboard}>
-          <section
-            className="labeled-select-keypad"
-            role="dialog"
-            aria-modal="true"
-            aria-label={'\u8f93\u5165'}
-            onClick={(event) => event.stopPropagation()}
-          >
-            <header className="labeled-select-keypad__header">
-              <h3 className="labeled-select-keypad__title">{'\u8f93\u5165'}</h3>
-              <button
-                type="button"
-                className="labeled-select-keypad__close"
-                onClick={closeKeyboard}
-                aria-label={'\u5173\u95ed'}
-              >
-                {'\u00d7'}
-              </button>
-            </header>
-
-            <div className="labeled-select-keypad__body">
-              <div className="labeled-select-keypad__display">{keypadDisplayValue}</div>
-
-              <div className="labeled-select-keypad__grid">
-                {KEYPAD_KEYS.map((key) => {
-                  const isDelete = key === 'delete'
-                  const keyClassName = `labeled-select-keypad__key${isDelete ? ' is-delete' : ''}`
-
-                  return (
-                    <button
-                      key={key}
-                      type="button"
-                      className={keyClassName}
-                      onClick={() => handleKeyPress(key)}
-                      aria-label={isDelete ? '\u5220\u9664' : key}
-                    >
-                      {isDelete ? (
-                        <img
-                          src={deleteIcon}
-                          alt=""
-                          aria-hidden="true"
-                          className="labeled-select-keypad__key-icon"
-                        />
-                      ) : (
-                        key
-                      )}
-                    </button>
-                  )
-                })}
-              </div>
-
-              <div className="labeled-select-keypad__actions">
-                <button type="button" className="labeled-select-keypad__action is-cancel" onClick={closeKeyboard}>
-                  {'\u53d6\u6d88'}
-                </button>
-                <button type="button" className="labeled-select-keypad__action is-confirm" onClick={handleConfirm}>
-                  {'\u786e\u5b9a'}
-                </button>
-              </div>
-            </div>
-          </section>
-        </div>
-      ) : null}
+      {resolvedPopupType === 'time' ? (
+        <TimePickerModal
+          isOpen={isModalOpen}
+          columns={[
+            { key: 'hour', options: TIME_HOURS, formatter: (next) => formatTwoDigits(next) },
+            { key: 'minute', options: TIME_MINUTES, formatter: (next) => formatTwoDigits(next) },
+          ]}
+          value={parseTimeValue(currentValue)}
+          onClose={closeKeyboard}
+          onConfirm={(nextValue) => {
+            const [hour = 0, minute = 0] = Array.isArray(nextValue) ? nextValue : []
+            handleConfirm(`${formatTwoDigits(hour)}:${formatTwoDigits(minute)}`)
+          }}
+        />
+      ) : (
+        <NumericKeypadModal
+          isOpen={isModalOpen}
+          initialValue={currentValue}
+          title={resolveKeypadTitle(label)}
+          onClose={closeKeyboard}
+          onConfirm={handleConfirm}
+        />
+      )}
     </>
   )
 }

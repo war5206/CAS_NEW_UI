@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useLocation } from 'react-router-dom'
 import systemMap from '../assets/home/system.png'
 import modeStatusIcon from '../assets/home/modeStatus.svg'
 import costAnalysisIcon from '../assets/home/costAnalysis.svg'
@@ -86,12 +87,19 @@ const HOME_TEXT = {
 }
 
 function HomePage({ onActivePageChange }) {
+  const location = useLocation()
   const [activePage, setActivePage] = useState(HOME_PAGE_VIEW.DASHBOARD)
   const [isSystemImageLoaded, setIsSystemImageLoaded] = useState(false)
 
   useEffect(() => {
     onActivePageChange?.(HOME_PAGE_TITLE_MAP[activePage] ?? HOME_PAGE_TITLE_MAP[HOME_PAGE_VIEW.DASHBOARD])
   }, [activePage, onActivePageChange])
+
+  useEffect(() => {
+    if (location.pathname === '/home' || location.pathname === '/home/') {
+      setActivePage(HOME_PAGE_VIEW.DASHBOARD)
+    }
+  }, [location.pathname])
 
   const goBackHome = () => setActivePage(HOME_PAGE_VIEW.DASHBOARD)
   const goToHeatPumpOverview = () => setActivePage(HOME_PAGE_VIEW.HEAT_PUMP_OVERVIEW)

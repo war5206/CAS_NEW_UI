@@ -14,35 +14,41 @@ function HeatPumpLoopPumpPage() {
     <main className="hp-loop-pump-page">
       <FeatureInfoCard
         icon={waterPumpIcon}
-        iconAlt={'\u6c34\u6cf5'}
-        title={'\u6c34\u6cf5\u95f4\u9694\u5faa\u73af\u8282\u80fd\u529f\u80fd'}
-        description={'\u5f00\u542f\u65f6\uff0c\u6c34\u6cf5\u6309\u7167\u95f4\u9694\u542f/\u505c\u7684\u8282\u80fd\u65b9\u5f0f\u8fd0\u884c'}
+        iconAlt={'水泵'}
+        title={'水泵间隔循环节能功能'}
+        description={'开启时，水泵按照间隔启/停的节能方式运行'}
         selected={isIntervalSavingEnabled}
         onClick={() => setIsIntervalSavingEnabled((previous) => !previous)}
       />
 
-      <section className="hp-loop-pump-page__rows">
-        <h3 className="hp-loop-pump-page__section-title">{'\u5faa\u73af\u8bbe\u7f6e'}</h3>
+      <section className={`hp-loop-pump-page__rows${!isIntervalSavingEnabled ? ' is-disabled' : ''}`}>
+        <h3 className="hp-loop-pump-page__section-title">{'循环设置'}</h3>
         <div className="hp-loop-pump-page__row-list">
           <LabeledSelectRow
-            label={'\u5faa\u73af\u6cf5\u95f4\u9694\u542f\u52a8\u65f6\u95f4\uff08\u5206\u949f\uff09'}
-            description={'\u8282\u80fd\u529f\u80fd\u5f00\u542f\u540e\uff0c\u6240\u6709\u673a\u7ec4\u505c\u673a\u540e\u5faa\u73af\u6cf5\u6301\u7eed\u8fd0\u884c\u65f6\u95f4'}
+            label={'循环泵间隔启动时间（分钟）'}
+            description={'节能功能开启后，所有机组停机后循环泵持续运行时间'}
             value={startMinutes}
+            suffix={'分钟'}
             onChange={setStartMinutes}
+            disabled={!isIntervalSavingEnabled}
             useModeCardControl
           />
           <LabeledSelectRow
-            label={'\u5faa\u73af\u6cf5\u95f4\u9694\u505c\u6b62\u65f6\u95f4\uff08\u5206\u949f\uff09'}
-            description={'\u8282\u80fd\u529f\u80fd\u5f00\u542f\u540e\uff0c\u5faa\u73af\u6cf5\u6301\u7eed\u505c\u6b62\u65f6\u95f4'}
+            label={'循环泵间隔停止时间（分钟）'}
+            description={'节能功能开启后，循环泵持续停止时间'}
             value={stopMinutes}
+            suffix={'分钟'}
             onChange={setStopMinutes}
+            disabled={!isIntervalSavingEnabled}
             useModeCardControl
           />
           <LabeledSelectRow
-            label={'\u70ed\u6cf5\u5faa\u73af\u8f6e\u503c\u65f6\u95f4\uff08\u5929\uff09'}
-            description={'\u5faa\u73af\u6cf5\u4e3b\u5907\u76f8\u4e92\u5207\u6362\u7684\u65f6\u95f4'}
+            label={'热泵循环轮值时间（天）'}
+            description={'循环泵主备相互切换的时间'}
             value={rotationDays}
+            suffix={'天'}
             onChange={setRotationDays}
+            disabled={!isIntervalSavingEnabled}
             useModeCardControl
           />
         </div>

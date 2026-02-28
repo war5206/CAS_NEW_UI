@@ -10,19 +10,17 @@ function ReliefValvePage() {
 
   return (
     <main className="device-param-page">
-      <FeatureInfoCard icon={pressureReliefValveIcon} iconAlt={'\u6cc4\u538b\u9600'} title={'\u6cc4\u538b\u9600'} selected />
-
       <section className="device-param-page__section">
-        <h3 className="device-param-page__title">{'\u53c2\u6570\u8bbe\u7f6e'}</h3>
+        <h3 className="device-param-page__title">{'参数设置'}</h3>
         <div className="device-param-page__rows">
           <LabeledSelectRow
-            label={'\u6cc4\u538b\u8865\u6c34\u542f\u52a8\u538b\u529b\u8bbe\u5b9a\uff08kPa\uff09'}
+            label={'泄压补水启动压力设定（kPa）'}
             value={startPressure}
             suffix="kPa"
             onChange={setStartPressure}
           />
           <LabeledSelectRow
-            label={'\u6cc4\u538b\u8865\u6c34\u505c\u6b62\u538b\u529b\u8bbe\u5b9a\uff08kPa\uff09'}
+            label={'泄压补水停止压力设定（kPa）'}
             value={stopPressure}
             suffix="kPa"
             onChange={setStopPressure}

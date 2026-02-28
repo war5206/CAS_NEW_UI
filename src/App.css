@@ -173,7 +173,7 @@
   gap: 14px;
   font-size: 20px;
   font-weight: 400;
-  color: #ffffff;
+  color: rgba(255, 255, 255, 0.6);
   white-space: nowrap;
   flex: 0 0 auto;
 }
@@ -185,8 +185,12 @@
 }
 
 .crumb::after {
-  content: '>';
-  color: rgba(230, 236, 247, 0.35);
+  content: '';
+  width: 16px;
+  height: 16px;
+  display: inline-block;
+  flex: 0 0 16px;
+  background: url('./assets/icons/bread-arrow-right.svg') center / contain no-repeat;
 }
 
 .crumb.current {
@@ -195,7 +199,7 @@
 }
 
 .crumb.current::after {
-  content: '';
+  display: none;
 }
 
 .date-time {
@@ -1003,19 +1007,18 @@
   border-radius: 16px;
   overflow: hidden;
   border: 1px solid rgba(92, 116, 153, 0.55);
-  background:
-    linear-gradient(180deg, rgba(163, 197, 230, 0) 60.19%, rgba(163, 197, 230, 0.05) 100%),
-    linear-gradient(69deg, rgba(255, 255, 255, 0.05) 0%, rgba(255, 255, 255, 0) 98.35%),
-    #1d2533;
   box-shadow: 0 18px 44px rgba(5, 9, 20, 0.55);
   display: flex;
   flex-direction: column;
+  background: linear-gradient(180deg, rgba(163, 197, 230, 0.00) 60.19%, rgba(163, 197, 230, 0.05) 100%),
+  linear-gradient(69deg, rgba(255, 255, 255, 0.05) 0%, rgba(255, 255, 255, 0.00) 98.35%),
+  #0d0e0f;
 }
 
 .home-hp-summary-modal .home-hp-modal-header {
   height: 72px;
   padding: 0 30px;
-  background: rgba(255, 255, 255, 0.08);
+  background: rgb(73 64 64 / 8%);
 }
 
 .home-hp-summary-modal .home-hp-modal-title {
@@ -1044,12 +1047,21 @@
 }
 
 .home-hp-modal-close {
+  width: 44px;
+  height: 44px;
   border: none;
   background: transparent;
-  color: rgba(246, 248, 255, 0.9);
-  font-size: 44px;
-  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
   cursor: pointer;
+}
+
+.home-hp-modal-close-icon {
+  width: 22px;
+  height: 22px;
+  display: block;
 }
 
 .home-hp-modal-body {
@@ -2203,4 +2215,3 @@
   }
 
 }
-

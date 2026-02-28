@@ -52,7 +52,7 @@ function AppRoutes({ homePageTitle, onHomePageTitleChange }) {
 }
 
 function App() {
-  const [homePageTitle, setHomePageTitle] = useState('\u9996\u9875')
+  const [homePageTitle, setHomePageTitle] = useState('首页')
 
   return (
     <BrowserRouter>

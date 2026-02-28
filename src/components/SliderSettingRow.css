@@ -1,0 +1,197 @@
+.slider-setting-row {
+  width: min(100%, 1367px);
+  padding: 4px 0 0;
+}
+
+.slider-setting-row__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.slider-setting-row__header.is-input-hidden {
+  justify-content: flex-start;
+}
+
+.slider-setting-row__label {
+  color: #ffffff;
+  font-size: 20px;
+  line-height: 1.1;
+  font-weight: 500;
+}
+
+.slider-setting-row__input {
+  min-width: 104px;
+  height: 40px;
+  padding: 10px 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 40px;
+  background: #0F1319;
+  color: #ffffff;
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.slider-setting-row__input-suffix {
+  font-size: 16px;
+  line-height: 1;
+  opacity: 0.9;
+}
+
+.slider-setting-row__slider-wrap {
+  width: 100%;
+  margin-top: 10px;
+}
+
+.slider-setting-row__range-text {
+  margin-top: 2px;
+  padding: 0 4px;
+  color: rgba(255, 255, 255, 0.55);
+  font-size: 17px;
+  font-weight: 500;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.slider-setting-row__slider-track-wrap {
+  --thumb-size: 44px;
+  --slider-ratio: 0;
+  --pill-gap: 16px;
+  --pill-width: 51px;
+  --thumb-center: calc((100% - var(--thumb-size)) * var(--slider-ratio) + (var(--thumb-size) / 2));
+  position: relative;
+  overflow: visible;
+  flex: 1;
+  min-width: 0;
+}
+
+.slider-setting-row__slider {
+  width: 100%;
+  height: 40px;
+  margin: 0;
+  border-radius: 57px;
+  outline: none;
+  appearance: none;
+  background: transparent;
+  border: none;
+  touch-action: none;
+}
+
+.slider-setting-row__slider::-webkit-slider-thumb {
+  appearance: none;
+  width: 44px;
+  height: 44px;
+  margin-top: -2px;
+  border-radius: 27px;
+  background: #f5f9ff;
+  border: 1px solid #197cdf;
+  box-shadow: 0 0 10px 0 #197cdf;
+  cursor: pointer;
+}
+
+.slider-setting-row__slider::-webkit-slider-runnable-track {
+  height: 40px;
+  border-radius: 57px;
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  background-color: #0f1319;
+  background-image: linear-gradient(#2983d7, #2983d7);
+  background-repeat: no-repeat;
+  background-size: var(--thumb-center) 100%;
+}
+
+.slider-setting-row__slider::-moz-range-track {
+  height: 40px;
+  border-radius: 57px;
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  background: #0f1319;
+}
+
+.slider-setting-row__slider::-moz-range-progress {
+  height: 40px;
+  border-radius: 57px;
+  background: #2983d7;
+}
+
+.slider-setting-row__slider::-moz-range-thumb {
+  width: 44px;
+  height: 44px;
+  border-radius: 27px;
+  background: #f5f9ff;
+  border: 1px solid #197cdf;
+  box-shadow: 0 0 10px 0 #197cdf;
+  cursor: pointer;
+}
+
+.slider-setting-row__value-pill {
+  position: absolute;
+  top: 44%;
+  left: calc(var(--thumb-center) + (var(--thumb-size) / 2) + var(--pill-gap));
+  transform: translateY(-50%);
+  width: var(--pill-width);
+  height: 30px;
+  padding: 4px 16px;
+  box-sizing: border-box;
+  border-radius: 15px;
+  background: linear-gradient(180deg, #3090ee 0%, #1f78cf 100%);
+  color: #f7fbff;
+  font-size: 16px;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+
+@media (max-width: 900px) {
+  .slider-setting-row__label {
+    font-size: 20px;
+  }
+
+  .slider-setting-row__input {
+    min-width: 72px;
+    height: 40px;
+    padding: 10px 0;
+    font-size: 26px;
+  }
+
+  .slider-setting-row__slider-wrap {
+    --thumb-size: 44px;
+    --pill-width: 51px;
+    --pill-gap: 10px;
+    margin-top: 10px;
+  }
+
+  .slider-setting-row__range-text {
+    margin-top: 6px;
+    font-size: 11px;
+  }
+
+  .slider-setting-row__slider {
+    height: 40px;
+    border-radius: 57px;
+  }
+
+  .slider-setting-row__slider::-webkit-slider-thumb {
+    width: 44px;
+    height: 44px;
+  }
+
+  .slider-setting-row__slider::-moz-range-thumb {
+    width: 44px;
+    height: 44px;
+  }
+
+  .slider-setting-row__value-pill {
+    height: 30px;
+    padding: 4px 16px;
+    border-radius: 15px;
+    font-size: 16px;
+  }
+}

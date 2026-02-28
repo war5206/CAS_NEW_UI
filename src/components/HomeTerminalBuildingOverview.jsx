@@ -19,14 +19,14 @@ const TERMINAL_TYPE = {
 }
 
 const ROOM_MODE_LABEL = {
-  [ROOM_MODE.HEATING]: '渚涙殩',
-  [ROOM_MODE.COOLING]: '鍒跺喎',
+  [ROOM_MODE.HEATING]: '供暖',
+  [ROOM_MODE.COOLING]: '制冷',
 }
 
 const TERMINAL_LABEL = {
-  [TERMINAL_TYPE.FAN_COIL]: '椋庢満鐩樼',
+  [TERMINAL_TYPE.FAN_COIL]: '风机盘管',
   [TERMINAL_TYPE.RADIATOR]: '暖气片',
-  [TERMINAL_TYPE.FLOOR_HEATING]: '鍦版殩',
+  [TERMINAL_TYPE.FLOOR_HEATING]: '地暖',
 }
 
 const MODE_ICON_MAP = {
@@ -100,18 +100,18 @@ function HomeTerminalBuildingOverview() {
         </div>
 
         <section className="home-building-master-row">
-          <h2 className="home-building-master-title">鎬绘帶</h2>
+          <h2 className="home-building-master-title">总控</h2>
           <button
             type="button"
             className={`home-building-switch home-building-switch--master${isMasterOn ? ' is-on' : ''}`}
             onClick={toggleMaster}
-            aria-label={isMasterOn ? '鍏抽棴鎬绘帶' : '寮€鍚€绘帶'}
+            aria-label={isMasterOn ? '关闭总控' : '开启总控'}
           >
             <span className="home-building-switch-thumb" />
           </button>
         </section>
 
-        <section className="home-building-room-grid" aria-label="妤煎眰鎴块棿">
+        <section className="home-building-room-grid" aria-label="楼层房间">
           {rooms.map((room, index) => {
             const modeIcon = MODE_ICON_MAP[room.mode]?.[room.isOn ? 'on' : 'off']
             const terminalIcon = TERMINAL_ICON_MAP[room.terminal]
