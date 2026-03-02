@@ -5,10 +5,17 @@ import HeatTracePage from './HeatTracePage'
 import ConstantPressurePumpPage from './ConstantPressurePumpPage'
 import DrainValvePage from './DrainValvePage'
 import ReliefValvePage from './ReliefValvePage'
+import ModeSelectPage from './ModeSelectPage'
+import ClimateCompensationPage from './ClimateCompensationPage'
 
 function ModulePage({ routeInfo }) {
   const { module, section, tab } = routeInfo
+  const isModeSelectSection = module.id === 'settings' && section?.id === 'mode-select'
   const isDeviceParamsSection = module.id === 'settings' && section?.id === 'device-params'
+
+  if (isModeSelectSection) {
+    return <ModeSelectPage />
+  }
 
   if (isDeviceParamsSection) {
     if (tab?.id === 'hp-loop-pump') {
@@ -38,6 +45,13 @@ function ModulePage({ routeInfo }) {
     if (tab?.id === 'relief-valve') {
       return <ReliefValvePage />
     }
+  }
+
+  const isModeSettingClimatePage =
+    module.id === 'settings' && section?.id === 'mode-setting' && tab?.id === 'climate'
+
+  if (isModeSettingClimatePage) {
+    return <ClimateCompensationPage />
   }
 
   return (
