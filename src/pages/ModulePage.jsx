@@ -5,10 +5,16 @@ import HeatTracePage from './HeatTracePage'
 import ConstantPressurePumpPage from './ConstantPressurePumpPage'
 import DrainValvePage from './DrainValvePage'
 import ReliefValvePage from './ReliefValvePage'
+import ModeSelectPage from './ModeSelectPage'
 
 function ModulePage({ routeInfo }) {
   const { module, section, tab } = routeInfo
+  const isModeSelectSection = module.id === 'settings' && section?.id === 'mode-select'
   const isDeviceParamsSection = module.id === 'settings' && section?.id === 'device-params'
+
+  if (isModeSelectSection) {
+    return <ModeSelectPage />
+  }
 
   if (isDeviceParamsSection) {
     if (tab?.id === 'hp-loop-pump') {
