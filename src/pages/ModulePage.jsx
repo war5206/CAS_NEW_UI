@@ -7,6 +7,7 @@ import DrainValvePage from './DrainValvePage'
 import ReliefValvePage from './ReliefValvePage'
 import ModeSelectPage from './ModeSelectPage'
 import ClimateCompensationPage from './ClimateCompensationPage'
+import SmartTimerPage from './SmartTimerPage'
 
 function ModulePage({ routeInfo }) {
   const { module, section, tab } = routeInfo
@@ -52,6 +53,13 @@ function ModulePage({ routeInfo }) {
 
   if (isModeSettingClimatePage) {
     return <ClimateCompensationPage />
+  }
+
+  const isModeSettingSmartTimerPage =
+    module.id === 'settings' && section?.id === 'mode-setting' && tab?.id === 'timer'
+
+  if (isModeSettingSmartTimerPage) {
+    return <SmartTimerPage />
   }
 
   return (
