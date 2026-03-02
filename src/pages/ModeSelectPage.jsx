@@ -1,6 +1,28 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import FeatureInfoCard from '../components/FeatureInfoCard'
 import ModeOptionCard from '../components/ModeOptionCard'
+import SelectDropdown from '../components/SelectDropdown'
+import manualModeIcon from '../assets/manual-mode.svg'
+import heatingActiveIcon from '../assets/device/heating-active.svg'
+import heatingInactiveIcon from '../assets/device/heating-inactive.svg'
+import coolingActiveIcon from '../assets/device/cooling-active.svg'
+import coolingInactiveIcon from '../assets/device/cooling-inactive.svg'
+import climateStatusIcon from '../assets/mode-select-weather.svg'
+import timerStatusIcon from '../assets/mode-select-time-setting.svg'
+import timerStatusIconActive from '../assets/mode-select-time-setting-active.svg'
+import startStopStatusIcon from '../assets/mode-select-start-stop.svg'
+import peakStatusIcon from '../assets/mode-select-peak-valley-regulation.svg'
+import couplingStatusIcon from '../assets/mode-select-couple-energy.svg'
+import protectionStatusIcon from '../assets/mode-select-heat-pump-protect.svg'
+import protectionStatusIconActive from '../assets/mode-select-heat-pump-protect-active.svg'
+import heatPumpShutdownIcon from '../assets/heat-pump/hp-shutdown.svg'
+import waterPumpIcon from '../assets/water-pump.svg'
+import heatTracingIcon from '../assets/heat-tracing.svg'
+import constantPressurePumpIcon from '../assets/constant-pressure-pump.svg'
+import pressureReliefValveIcon from '../assets/pressure-relief-valve.svg'
+import drainValveIcon from '../assets/drain-value.svg'
+import { getStoredClimateMode, setStoredClimateMode } from '../utils/climateModeState'
 import './ModeSelectPage.css'
 
 function SmartModeIcon() {
@@ -12,110 +34,24 @@ function SmartModeIcon() {
   )
 }
 
-function HandModeIcon() {
-  return (
-    <svg viewBox="0 0 32 32" className="mode-select-page__feature-icon" aria-hidden="true">
-      <path d="M8.5 17.2c-1.6-1.5-1.9-3.9-.5-5.5 1.3-1.5 3.6-1.7 5.2-.4l.6.5V8.9c0-1.4 1.1-2.5 2.5-2.5s2.5 1.1 2.5 2.5v3.8h.8c1.3 0 2.4 1.1 2.4 2.4v1.3h.7c1.2 0 2.2 1 2.2 2.2v1.7c0 3.8-2.9 6.9-6.6 7.2-2.3.2-4.5-.7-6.1-2.2l-3.7-3.6Z" />
-    </svg>
-  )
-}
-
-function HeatingIcon() {
-  return (
-    <svg viewBox="0 0 56 56" className="mode-select-page__temp-icon is-heating" aria-hidden="true">
-      <circle cx="28" cy="28" r="10" />
-      <path d="M28 8v6M28 42v6M8 28h6M42 28h6M13.5 13.5l4.3 4.3M38.2 38.2l4.3 4.3M42.5 13.5l-4.3 4.3M17.8 38.2l-4.3 4.3" />
-    </svg>
-  )
-}
-
-function CoolingIcon() {
-  return (
-    <svg viewBox="0 0 56 56" className="mode-select-page__temp-icon is-cooling" aria-hidden="true">
-      <path d="M28 8v40M13 16l30 24M43 16 13 40M28 8l6 6M28 8l-6 6M28 48l6-6M28 48l-6-6" />
-    </svg>
-  )
-}
-
-function LeafIcon() {
-  return (
-    <svg viewBox="0 0 24 24" className="mode-select-page__status-icon" aria-hidden="true">
-      <path d="M20 5c-6.6 0-11.2 2.5-13.7 7.4-.9 1.8-1.2 3.9-.9 5.9 2.2.4 4.4 0 6.4-1.1 4.8-2.6 7.1-7.2 8.2-12.2Z" />
-      <path d="M7 17c2.6-1.1 4.8-2.9 6.6-5.3" />
-    </svg>
-  )
-}
-
-function ClockIcon() {
-  return (
-    <svg viewBox="0 0 24 24" className="mode-select-page__status-icon" aria-hidden="true">
-      <circle cx="12" cy="12" r="8.5" />
-      <path d="M12 7.2v5.1l3.4 2" />
-    </svg>
-  )
-}
-
-function TimerIcon() {
-  return (
-    <svg viewBox="0 0 24 24" className="mode-select-page__status-icon" aria-hidden="true">
-      <path d="M9 3.5h6M12 6v2.1" />
-      <circle cx="12" cy="13.3" r="7.2" />
-      <path d="M12 13.3 15.3 10.9" />
-    </svg>
-  )
-}
-
-function WaveIcon() {
-  return (
-    <svg viewBox="0 0 24 24" className="mode-select-page__status-icon" aria-hidden="true">
-      <path d="M2.5 8.2c1.8 0 1.8 1.7 3.6 1.7s1.8-1.7 3.6-1.7 1.8 1.7 3.6 1.7 1.8-1.7 3.6-1.7 1.8 1.7 3.6 1.7" />
-      <path d="M2.5 13.8c1.8 0 1.8 1.7 3.6 1.7s1.8-1.7 3.6-1.7 1.8 1.7 3.6 1.7 1.8-1.7 3.6-1.7 1.8 1.7 3.6 1.7" />
-    </svg>
-  )
-}
-
-function CouplingIcon() {
-  return (
-    <svg viewBox="0 0 24 24" className="mode-select-page__status-icon" aria-hidden="true">
-      <circle cx="6.5" cy="12" r="3.2" />
-      <circle cx="17.5" cy="7.2" r="3.2" />
-      <circle cx="17.5" cy="16.8" r="3.2" />
-      <path d="M9.4 10.6 14.5 8.3M9.4 13.4l5.1 2.3" />
-    </svg>
-  )
-}
-
-function ShieldIcon() {
-  return (
-    <svg viewBox="0 0 24 24" className="mode-select-page__status-icon" aria-hidden="true">
-      <path d="M12 3.3 5.6 6v5.2c0 4.2 2.6 7.9 6.4 9.5 3.8-1.6 6.4-5.3 6.4-9.5V6L12 3.3Z" />
-      <path d="M9.1 12.4 11 14.3l4-4" />
-    </svg>
-  )
-}
-
-function HeatPumpBoardIcon() {
-  return (
-    <svg viewBox="0 0 44 44" className="mode-select-page__manual-device-icon" aria-hidden="true">
-      <rect x="1.8" y="4" width="40.4" height="34" rx="4.8" />
-      <rect x="5.8" y="8" width="14.3" height="13.8" rx="1.8" />
-      <rect x="23.9" y="8" width="14.3" height="13.8" rx="1.8" />
-      <rect x="5.8" y="24.6" width="14.3" height="9.4" rx="1.5" />
-      <rect x="23.9" y="24.6" width="14.3" height="9.4" rx="1.5" />
-      <path d="M11 11.5h4M11 14.1h4M11 16.8h4M28.9 11.5h4M28.9 14.1h4M28.9 16.8h4" />
-      <path d="M4.5 16.5h-2.2M41.8 16.5H39.5M14.7 40.2h14.6" />
-    </svg>
-  )
-}
-
 const FEATURE_OPTIONS = [
   { id: 'smart', title: '智能模式', description: '自动调节', icon: <SmartModeIcon /> },
-  { id: 'manual', title: '手动模式', description: '手动调节', icon: <HandModeIcon /> },
+  { id: 'manual', title: '手动模式', description: '手动调节', icon: manualModeIcon },
 ]
 
 const TEMPERATURE_OPTIONS = [
-  { id: 'heating', label: '制热', icon: <HeatingIcon /> },
-  { id: 'cooling', label: '制冷', icon: <CoolingIcon /> },
+  {
+    id: 'heating',
+    label: '制热',
+    activeIcon: heatingActiveIcon,
+    inactiveIcon: heatingInactiveIcon,
+  },
+  {
+    id: 'cooling',
+    label: '制冷',
+    activeIcon: coolingActiveIcon,
+    inactiveIcon: coolingInactiveIcon,
+  },
 ]
 
 const MODE_SETTING_CARDS = [
@@ -124,81 +60,175 @@ const MODE_SETTING_CARDS = [
     title: '气候补偿',
     subtitle: '定温模式',
     description: '开启时，根据环境温度不同自动调节回水目标温度，关闭时，固定温度运行',
-    icon: LeafIcon,
+    statusIcon: climateStatusIcon,
+    routePath: '/settings/mode-setting/climate-compensation',
   },
   {
     id: 'start-stop',
     title: '智能启停',
     description: '热泵自动启停参数',
-    icon: ClockIcon,
+    statusIcon: startStopStatusIcon,
+    routePath: '/settings/mode-setting/smart-start-stop',
   },
   {
     id: 'timer',
     title: '智能定时',
     description: '可选择全天候运行和定时',
-    icon: TimerIcon,
+    statusIcon: timerStatusIcon,
+    statusIconActive: timerStatusIconActive,
+    routePath: '/settings/mode-setting/smart-timer',
   },
   {
     id: 'peak',
     title: '峰谷调节',
     description: '开启时，根据环境温度不同自动调节回水目标温度，关闭时，固定温度运行',
-    icon: WaveIcon,
+    statusIcon: peakStatusIcon,
+    routePath: '/settings/mode-setting/peak-valley',
   },
   {
     id: 'coupling',
     title: '耦合能源',
     description: '开启时，耦合能源参与系统的运行',
-    icon: CouplingIcon,
+    statusIcon: couplingStatusIcon,
+    routePath: '/settings/mode-setting/coupling-energy',
   },
   {
     id: 'protection',
     title: '热泵长时间运行防护',
     description: '可选择全天候运行和定时',
-    icon: ShieldIcon,
+    statusIcon: protectionStatusIcon,
+    statusIconActive: protectionStatusIconActive,
   },
 ]
 
 const INITIAL_CARD_SWITCH_STATE = {
   climate: true,
   'start-stop': true,
-  timer: false,
+  timer: true,
   peak: true,
   coupling: true,
-  protection: false,
+  protection: true,
 }
 
-const MANUAL_DEVICE_LIST = Array.from({ length: 16 }, (_, index) => ({
-  id: `hp-${index + 1}`,
-  label: '热泵八',
-}))
+const MANUAL_TYPE_OPTIONS = [
+  { value: 'heat-pump', label: '热泵' },
+  { value: 'heat-pump-loop-pump', label: '热泵循环泵' },
+  { value: 'heating-tape', label: '伴热带' },
+  { value: 'drain-valve', label: '排污阀' },
+  { value: 'relief-valve', label: '泄压阀' },
+  { value: 'constant-pressure-water-pump', label: '定压补水泵' },
+]
 
-function ModeSettingCard({ title, subtitle, description, isEnabled, onToggle, StatusIcon }) {
-  const stateText = isEnabled ? '已开启' : '已关闭'
-  const stateColor = isEnabled ? '#197CDF' : 'rgba(255, 255, 255, 0.60)'
+function createStatusList(count, initialStatus = 0) {
+  return Array.from({ length: count }, () => (initialStatus === 1 ? 1 : 0))
+}
+
+const MANUAL_DEVICE_CONFIG = {
+  'heat-pump': { idPrefix: 'hp', labelPrefix: '热泵', statusList: createStatusList(33, 0) },
+  'heat-pump-loop-pump': { idPrefix: 'loop-pump', labelPrefix: '水泵', statusList: createStatusList(3, 0) },
+  'heating-tape': { idPrefix: 'heating-tape', labelPrefix: '伴热带', statusList: createStatusList(1, 0) },
+  'drain-valve': { idPrefix: 'drain-valve', labelPrefix: '排污阀', statusList: createStatusList(1, 0) },
+  'relief-valve': { idPrefix: 'relief-valve', labelPrefix: '泄压阀', statusList: createStatusList(1, 0) },
+  'constant-pressure-water-pump': {
+    idPrefix: 'constant-pressure-water-pump',
+    labelPrefix: '定压补水泵',
+    statusList: createStatusList(2, 0),
+  },
+}
+
+const MANUAL_DEVICE_ICON_MAP = {
+  'heat-pump': heatPumpShutdownIcon,
+  'heat-pump-loop-pump': waterPumpIcon,
+  'heating-tape': heatTracingIcon,
+  'constant-pressure-water-pump': constantPressurePumpIcon,
+  'relief-valve': pressureReliefValveIcon,
+  'drain-valve': drainValveIcon,
+}
+
+function buildManualDeviceStatusMap() {
+  return Object.fromEntries(
+    Object.entries(MANUAL_DEVICE_CONFIG).map(([type, config]) => {
+      const statusMap = Object.fromEntries(
+        config.statusList.map((status, index) => [`${config.idPrefix}-${index + 1}`, status === 1 ? 1 : 0]),
+      )
+      return [type, statusMap]
+    }),
+  )
+}
+
+function buildManualDeviceList(deviceType, deviceStatusByType) {
+  const config = MANUAL_DEVICE_CONFIG[deviceType] ?? MANUAL_DEVICE_CONFIG['heat-pump']
+  const statusMap = deviceStatusByType[deviceType] ?? {}
+
+  return config.statusList.map((defaultStatus, index) => {
+    const id = `${config.idPrefix}-${index + 1}`
+    const status = statusMap[id] === 1 ? 1 : defaultStatus
+    return {
+      id,
+      status,
+      label: config.statusList.length === 1 ? config.labelPrefix : `${config.labelPrefix}${index + 1}`,
+    }
+  })
+}
+
+function ModeSettingCard({
+  id,
+  title,
+  subtitle,
+  description,
+  isEnabled,
+  onToggle,
+  statusIcon,
+  statusIconActive,
+  onArrowClick,
+  hasTargetPage,
+}) {
+  const isClimateCard = id === 'climate'
+  const isConstantMode = isClimateCard && !isEnabled
+  const stateText = isClimateCard ? (isEnabled ? '气候补偿开启' : '定温模式开启') : isEnabled ? '已开启' : '已关闭'
+  const stateColor = isEnabled || isConstantMode ? '#197CDF' : 'rgba(255, 255, 255, 0.60)'
+  const currentStatusIcon = isEnabled && statusIconActive ? statusIconActive : statusIcon
+  const switchClassName = `mode-select-page__switch${isEnabled ? ' is-on' : ''}${isConstantMode ? ' is-blue' : ''}`
+  const statusClassName = [
+    'mode-select-page__setting-status',
+    isEnabled || isConstantMode ? ' is-on' : ' is-off',
+  ].join('')
+  const titleClassName = `mode-select-page__setting-title${isClimateCard ? ' is-climate' : ''}${isConstantMode ? ' is-constant' : ''}`
 
   return (
     <article className="mode-select-page__setting-card">
-      <button type="button" className="mode-select-page__setting-arrow" aria-label={`${title}详情`}>
+      <button
+        type="button"
+        className={`mode-select-page__setting-arrow${hasTargetPage ? '' : ' is-disabled'}`}
+        aria-label={`${title}详情`}
+        onClick={onArrowClick}
+        disabled={!hasTargetPage}
+      >
         <svg viewBox="0 0 16 16" aria-hidden="true">
           <path d="M5 2.5 10.5 8 5 13.5" />
         </svg>
       </button>
 
-      <h3 className="mode-select-page__setting-title">
-        {title}
-        {subtitle ? <span className="mode-select-page__setting-subtitle"> / {subtitle}</span> : null}
+      <h3 className={titleClassName}>
+        <span className="mode-select-page__setting-title-main">{title}</span>
+        {subtitle ? (
+          <>
+            <span className="mode-select-page__setting-subtitle-sep"> / </span>
+            <span className="mode-select-page__setting-subtitle">{subtitle}</span>
+          </>
+        ) : null}
       </h3>
       <p className="mode-select-page__setting-desc">{description}</p>
 
       <div className="mode-select-page__setting-footer">
-        <span className="mode-select-page__setting-status" style={{ color: stateColor }}>
-          <StatusIcon />
+        <span className={statusClassName} style={{ color: stateColor }}>
+          <img src={currentStatusIcon} alt="" aria-hidden="true" className="mode-select-page__status-icon" />
           <span>{stateText}</span>
         </span>
 
         <button
           type="button"
-          className={`mode-select-page__switch${isEnabled ? ' is-on' : ''}`}
+          className={switchClassName}
           aria-label={`${title}${isEnabled ? '关闭' : '开启'}`}
           aria-pressed={isEnabled}
           onClick={onToggle}
@@ -211,16 +241,57 @@ function ModeSettingCard({ title, subtitle, description, isEnabled, onToggle, St
 }
 
 function ModeSelectPage() {
+  const navigate = useNavigate()
   const [featureMode, setFeatureMode] = useState('smart')
   const [temperatureMode, setTemperatureMode] = useState('heating')
-  const [settingState, setSettingState] = useState(INITIAL_CARD_SWITCH_STATE)
-  const [selectedManualDevice, setSelectedManualDevice] = useState('hp-4')
+  const [settingState, setSettingState] = useState(() => ({
+    ...INITIAL_CARD_SWITCH_STATE,
+    climate: getStoredClimateMode() === 'climate',
+  }))
+  const [manualDeviceType, setManualDeviceType] = useState(MANUAL_TYPE_OPTIONS[0].value)
+  const [manualDeviceStatusByType, setManualDeviceStatusByType] = useState(() => buildManualDeviceStatusMap())
 
   const toggleSetting = (id) => {
     setSettingState((current) => ({
       ...current,
-      [id]: !current[id],
+      [id]:
+        id === 'climate'
+          ? (() => {
+              const nextClimateOn = !current[id]
+              setStoredClimateMode(nextClimateOn ? 'climate' : 'constant')
+              return nextClimateOn
+            })()
+          : !current[id],
     }))
+  }
+
+  const settingCards = useMemo(
+    () =>
+      MODE_SETTING_CARDS.map((item) => ({
+        ...item,
+        hasTargetPage: Boolean(item.routePath),
+      })),
+    [],
+  )
+
+  const manualDeviceList = useMemo(
+    () => buildManualDeviceList(manualDeviceType, manualDeviceStatusByType),
+    [manualDeviceType, manualDeviceStatusByType],
+  )
+  const manualDeviceIcon = MANUAL_DEVICE_ICON_MAP[manualDeviceType] ?? heatPumpShutdownIcon
+
+  const toggleManualDeviceStatus = (deviceId) => {
+    setManualDeviceStatusByType((prev) => {
+      const typeStatusMap = prev[manualDeviceType] ?? {}
+      const currentStatus = typeStatusMap[deviceId] === 1 ? 1 : 0
+      return {
+        ...prev,
+        [manualDeviceType]: {
+          ...typeStatusMap,
+          [deviceId]: currentStatus === 1 ? 0 : 1,
+        },
+      }
+    })
   }
 
   return (
@@ -243,15 +314,18 @@ function ModeSelectPage() {
       <section className="mode-select-page__section">
         <h2 className="mode-select-page__section-title">冷热模式</h2>
         <div className="mode-select-page__temperature-grid">
-          {TEMPERATURE_OPTIONS.map((item) => (
-            <ModeOptionCard
-              key={item.id}
-              icon={item.icon}
-              label={item.label}
-              selected={temperatureMode === item.id}
-              onClick={() => setTemperatureMode(item.id)}
-            />
-          ))}
+          {TEMPERATURE_OPTIONS.map((item) => {
+            const selected = temperatureMode === item.id
+            return (
+              <ModeOptionCard
+                key={item.id}
+                icon={selected ? item.activeIcon : item.inactiveIcon}
+                label={item.label}
+                selected={selected}
+                onClick={() => setTemperatureMode(item.id)}
+              />
+            )
+          })}
         </div>
       </section>
 
@@ -259,42 +333,51 @@ function ModeSelectPage() {
         <section className="mode-select-page__section">
           <h2 className="mode-select-page__section-title">模式调节</h2>
           <div className="mode-select-page__setting-grid">
-            {MODE_SETTING_CARDS.map((item) => (
+            {settingCards.map((item) => (
               <ModeSettingCard
                 key={item.id}
+                id={item.id}
                 title={item.title}
                 subtitle={item.subtitle}
                 description={item.description}
                 isEnabled={Boolean(settingState[item.id])}
                 onToggle={() => toggleSetting(item.id)}
-                StatusIcon={item.icon}
+                statusIcon={item.statusIcon}
+                statusIconActive={item.statusIconActive}
+                hasTargetPage={item.hasTargetPage}
+                onArrowClick={item.routePath ? () => navigate(item.routePath) : undefined}
               />
             ))}
           </div>
         </section>
       ) : (
         <section className="mode-select-page__section mode-select-page__manual-section">
-          <button type="button" className="mode-select-page__manual-type-trigger" aria-label="选择设备类型">
-            <span>热泵</span>
-            <svg viewBox="0 0 16 16" aria-hidden="true">
-              <path d="M5 2.5 10.5 8 5 13.5" />
-            </svg>
-          </button>
+          <SelectDropdown
+            className="mode-select-page__manual-type-select"
+            triggerClassName="mode-select-page__manual-type-trigger"
+            dropdownClassName="mode-select-page__manual-type-dropdown"
+            optionClassName="mode-select-page__manual-type-option"
+            options={MANUAL_TYPE_OPTIONS}
+            value={manualDeviceType}
+            onChange={setManualDeviceType}
+            triggerAriaLabel="选择设备类型"
+            listAriaLabel="设备类型列表"
+          />
 
           <p className="mode-select-page__manual-tip">手动开关，单机触碰控制设备开关，蓝色代表开启，灰色代表关闭</p>
 
           <div className="mode-select-page__manual-device-grid" aria-label="手动设备列表">
-            {MANUAL_DEVICE_LIST.map((device) => {
-              const isActive = device.id === selectedManualDevice
+            {manualDeviceList.map((device) => {
+              const isActive = device.status === 1
               return (
                 <button
                   key={device.id}
                   type="button"
                   className={`mode-select-page__manual-device${isActive ? ' is-active' : ''}`}
                   aria-pressed={isActive}
-                  onClick={() => setSelectedManualDevice(device.id)}
+                  onClick={() => toggleManualDeviceStatus(device.id)}
                 >
-                  <HeatPumpBoardIcon />
+                  <img src={manualDeviceIcon} alt="" aria-hidden="true" className="mode-select-page__manual-device-icon" />
                   <span className="mode-select-page__manual-device-label">{device.label}</span>
                 </button>
               )

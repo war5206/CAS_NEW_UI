@@ -1,6 +1,7 @@
-﻿import { useEffect, useRef, useState } from 'react'
+import { useState } from 'react'
 import FeatureInfoCard from '../components/FeatureInfoCard'
 import SliderSettingRow from '../components/SliderSettingRow'
+import SelectDropdown from '../components/SelectDropdown'
 import groupControlIcon from '../assets/heat-pump/heat-pump-group-control.svg'
 import malfunctionIcon from '../assets/heat-pump/hp-modal-malfunction.svg'
 import checkMarkIcon from '../assets/icons/check-mark.svg'
@@ -41,8 +42,6 @@ const DETAIL_METRICS = [
 function HeatPumpPage() {
   const [isGroupControlEnabled, setIsGroupControlEnabled] = useState(true)
   const [selectedHeatPumpId, setSelectedHeatPumpId] = useState(1)
-  const [isPumpSelectorOpen, setIsPumpSelectorOpen] = useState(false)
-  const pumpPickerRef = useRef(null)
   const [parameters, setParameters] = useState({
     heatingTemp: '5',
     coolingTemp: '5',
@@ -59,31 +58,6 @@ function HeatPumpPage() {
     }))
   }
 
-  useEffect(() => {
-    if (isGroupControlEnabled) {
-      setIsPumpSelectorOpen(false)
-    }
-  }, [isGroupControlEnabled])
-
-  useEffect(() => {
-    if (!isPumpSelectorOpen) {
-      return undefined
-    }
-
-    const handlePointerDownOutside = (event) => {
-      if (!pumpPickerRef.current?.contains(event.target)) {
-        setIsPumpSelectorOpen(false)
-      }
-    }
-
-    document.addEventListener('pointerdown', handlePointerDownOutside)
-    return () => {
-      document.removeEventListener('pointerdown', handlePointerDownOutside)
-    }
-  }, [isPumpSelectorOpen])
-
-  const selectedHeatPumpLabel =
-    HEAT_PUMP_OPTIONS.find((item) => item.id === selectedHeatPumpId)?.label ?? HEAT_PUMP_OPTIONS[0].label
   const detailTitle = !isGroupControlEnabled ? `热泵${selectedHeatPumpId}详细参数` : '热泵详细参数'
   const stateLabel = !isGroupControlEnabled ? `热泵${selectedHeatPumpId}状态` : '热泵状态'
   const parameterTitle = !isGroupControlEnabled ? `热泵${selectedHeatPumpId}参数设置` : '参数设置'
@@ -101,47 +75,23 @@ function HeatPumpPage() {
 
       {!isGroupControlEnabled ? (
         <section className="heat-pump-page__detail-section">
-          <div className="heat-pump-page__pump-picker" ref={pumpPickerRef}>
-            <button
-              type="button"
-              className={`heat-pump-page__pump-selector${isPumpSelectorOpen ? ' is-open' : ''}`}
-              aria-label="选择热泵"
-              aria-expanded={isPumpSelectorOpen}
-              onClick={() => setIsPumpSelectorOpen((prev) => !prev)}
-            >
-              <span>{selectedHeatPumpLabel}</span>
-            </button>
-
-            <div
-              className={`heat-pump-page__pump-dropdown${isPumpSelectorOpen ? ' is-open' : ''}`}
-              role="listbox"
-              aria-label="热泵列表"
-              aria-hidden={!isPumpSelectorOpen}
-            >
-              {HEAT_PUMP_OPTIONS.map((item) => {
-                const isSelected = item.id === selectedHeatPumpId
-                return (
-                  <button
-                    key={item.id}
-                    type="button"
-                    role="option"
-                    aria-selected={isSelected}
-                    className={`heat-pump-page__pump-option${isSelected ? ' is-selected' : ''}`}
-                    onClick={() => {
-                      setSelectedHeatPumpId(item.id)
-                      setIsPumpSelectorOpen(false)
-                    }}
-                  >
-                    <span>{item.label}</span>
-                    {isSelected ? (
-                      <span className="heat-pump-page__pump-option-check" aria-hidden="true">
-                        <img src={checkMarkIcon} alt="" />
-                      </span>
-                    ) : null}
-                  </button>
-                )
-              })}
-            </div>
+          <div className="heat-pump-page__pump-picker">
+            <SelectDropdown
+              className="heat-pump-page__pump-select"
+              triggerClassName="heat-pump-page__pump-selector"
+              dropdownClassName="heat-pump-page__pump-dropdown"
+              optionClassName="heat-pump-page__pump-option"
+              showSelectedCheck
+              selectedCheckIcon={checkMarkIcon}
+              options={HEAT_PUMP_OPTIONS.map((item) => ({
+                value: item.id,
+                label: item.label,
+              }))}
+              value={selectedHeatPumpId}
+              onChange={setSelectedHeatPumpId}
+              triggerAriaLabel="选择热泵"
+              listAriaLabel="热泵列表"
+            />
           </div>
 
           <h3 className="heat-pump-page__section-title">{detailTitle}</h3>

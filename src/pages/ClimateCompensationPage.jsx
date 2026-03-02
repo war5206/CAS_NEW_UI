@@ -7,6 +7,7 @@ import thermometerIcon from '../assets/thermometer.svg'
 import modeSettingIcon from '../assets/navigation/modeSetting.svg'
 import deviceParamIcon from '../assets/navigation/deviceParam.svg'
 import { useDeferredVisible } from '../hooks/useDeferredVisible'
+import { getStoredClimateMode, setStoredClimateMode } from '../utils/climateModeState'
 import './ClimateCompensationPage.css'
 
 const levelLabels = Array.from({ length: 16 }, (_, index) => String(index + 1))
@@ -17,7 +18,7 @@ const actualSupplyData = [36, 30, 39, 37, 20, 31, 40, 37, 32, 27, 31, 23]
 const actualReturnData = [16, 25, 19, 24, 28, 32, 24, 17, 22, 31, 23, 27]
 
 function ClimateCompensationPage() {
-  const [selectedMode, setSelectedMode] = useState('climate')
+  const [selectedMode, setSelectedMode] = useState(() => getStoredClimateMode())
   const adjustMode = '智能调节'
   const [regulateType, setRegulateType] = useState('人工调节')
   const [terminalLinked, setTerminalLinked] = useState(true)
@@ -25,6 +26,10 @@ function ClimateCompensationPage() {
   const [constantReturnTemp, setConstantReturnTemp] = useState('10')
   const chartRef = useRef(null)
   const shouldInitChart = useDeferredVisible(chartRef)
+
+  useEffect(() => {
+    setStoredClimateMode(selectedMode)
+  }, [selectedMode])
 
   useEffect(() => {
     if (selectedMode !== 'climate' || !shouldInitChart || !chartRef.current) {
