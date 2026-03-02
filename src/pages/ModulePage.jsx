@@ -7,6 +7,7 @@ import DrainValvePage from './DrainValvePage'
 import ReliefValvePage from './ReliefValvePage'
 import ModeSelectPage from './ModeSelectPage'
 import ClimateCompensationPage from './ClimateCompensationPage'
+import SmartStartStopPage from './SmartStartStopPage'
 
 function ModulePage({ routeInfo }) {
   const { module, section, tab } = routeInfo
@@ -49,9 +50,15 @@ function ModulePage({ routeInfo }) {
 
   const isModeSettingClimatePage =
     module.id === 'settings' && section?.id === 'mode-setting' && tab?.id === 'climate'
+  const isModeSettingStartStopPage =
+    module.id === 'settings' && section?.id === 'mode-setting' && tab?.id === 'start-stop'
 
   if (isModeSettingClimatePage) {
     return <ClimateCompensationPage />
+  }
+
+  if (isModeSettingStartStopPage) {
+    return <SmartStartStopPage />
   }
 
   return (
