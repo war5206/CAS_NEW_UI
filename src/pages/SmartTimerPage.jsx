@@ -30,11 +30,14 @@ const PLAN_LIST = [
     name: '方案一',
     enabled: true,
     weekdays: [
-      { label: '周一 周二 周三 周四', segments: [
-        { label: '气候补偿智能调节', color: 'blue', width: 13 },
-        { label: '定温模式35℃', color: 'yellow', width: 13 },
-        { label: '气候补偿智能调节', color: 'blue', width: 74 },
-      ] },
+      {
+        label: '周一 周二 周三 周四',
+        segments: [
+          { label: '气候补偿智能调节', color: 'blue', width: 13 },
+          { label: '定温模式35℃', color: 'yellow', width: 13 },
+          { label: '气候补偿智能调节', color: 'blue', width: 74 },
+        ],
+      },
       { label: '周五 周六 周日', empty: true },
     ],
   },
@@ -45,6 +48,8 @@ const PLAN_LIST = [
     weekdays: [{ label: '周一 周二 周三 周四 周五 周六 周日', empty: true }],
   },
 ]
+
+const WEEK_DAYS = ['周一', '周二', '周三', '周四', '周五', '周六', '周日']
 
 function SmartTimerPage() {
   const [selectedMode, setSelectedMode] = useState('smart')
@@ -88,9 +93,7 @@ function SmartTimerPage() {
                 <header className="smart-timer-page__plan-header">
                   <div className="smart-timer-page__plan-title-wrap">
                     <h4>{plan.name}</h4>
-                    <button type="button" className="smart-timer-page__edit-btn" onClick={() => setShowEditor(true)}>
-                      ✎
-                    </button>
+                    <button type="button" className="smart-timer-page__edit-btn">✎</button>
                   </div>
                   <button type="button" className={`smart-timer-page__switch${plan.enabled ? ' is-on' : ''}`}>
                     <span className="smart-timer-page__switch-thumb" />
@@ -103,7 +106,15 @@ function SmartTimerPage() {
                       <div className="smart-timer-page__weekday">{weekday.label}</div>
                       <div className="smart-timer-page__timeline-meta">
                         <span>0:00</span>
-                        {weekday.empty ? <span>24:00</span> : <><span>6:00</span><span>15:00</span><span>24:00</span></>}
+                        {weekday.empty ? (
+                          <span>24:00</span>
+                        ) : (
+                          <>
+                            <span>6:00</span>
+                            <span>15:00</span>
+                            <span>24:00</span>
+                          </>
+                        )}
                       </div>
                       {weekday.empty ? (
                         <div className="smart-timer-page__empty-bar">暂无设置</div>
@@ -134,15 +145,72 @@ function SmartTimerPage() {
           <section className="smart-timer-page__modal" onClick={(event) => event.stopPropagation()}>
             <header className="smart-timer-page__modal-header">
               <h3>新增定时</h3>
-              <button type="button" onClick={() => setShowEditor(false)}>×</button>
+              <button type="button" className="smart-timer-page__modal-close" onClick={() => setShowEditor(false)}>
+                ×
+              </button>
             </header>
+
             <div className="smart-timer-page__modal-body">
-              <div className="smart-timer-page__modal-row">方案一 <button type="button" className="smart-timer-page__switch is-on"><span className="smart-timer-page__switch-thumb" /></button></div>
-              <div className="smart-timer-page__modal-row is-large">周期：周一 周二 周三 周四 周五 周六 周日</div>
-              <div className="smart-timer-page__modal-row is-large">定时段：00:00 - 08:00 气候补偿智能调节</div>
+              <div className="smart-timer-page__editor-title-row">
+                <span>方案一</span>
+                <button type="button" className="smart-timer-page__switch is-on" aria-pressed="true">
+                  <span className="smart-timer-page__switch-thumb" />
+                </button>
+              </div>
+
+              <div className="smart-timer-page__editor-panel">
+                <div className="smart-timer-page__editor-panel-head">
+                  <span>周期</span>
+                  <button type="button" className="smart-timer-page__circle-icon">−</button>
+                </div>
+
+                <div className="smart-timer-page__weekday-btns">
+                  {WEEK_DAYS.map((day, index) => (
+                    <button key={day} type="button" className={`smart-timer-page__weekday-btn${index <= 3 ? ' is-active' : ''}`}>
+                      {day}
+                    </button>
+                  ))}
+                </div>
+
+                <div className="smart-timer-page__editor-subtitle">定时段</div>
+
+                <div className="smart-timer-page__timer-row">
+                  <span className="smart-timer-page__time-input">00:00</span>
+                  <span className="smart-timer-page__dash">−</span>
+                  <span className="smart-timer-page__time-input">08:00</span>
+                  <button type="button" className="smart-timer-page__mode-select">气候补偿智能调节</button>
+                  <button type="button" className="smart-timer-page__circle-icon">−</button>
+                </div>
+
+                <div className="smart-timer-page__timer-row">
+                  <span className="smart-timer-page__time-input">08:00</span>
+                  <span className="smart-timer-page__dash">−</span>
+                  <span className="smart-timer-page__time-input">18:00</span>
+                  <button type="button" className="smart-timer-page__mode-select">定温模式</button>
+                  <button type="button" className="smart-timer-page__circle-icon">−</button>
+                </div>
+
+                <div className="smart-timer-page__temp-row">
+                  <span>请输入温度 (0-50)</span>
+                  <span>℃</span>
+                </div>
+
+                <div className="smart-timer-page__timer-row">
+                  <span className="smart-timer-page__time-input">18:00</span>
+                  <span className="smart-timer-page__dash">−</span>
+                  <span className="smart-timer-page__time-input">24:00</span>
+                  <button type="button" className="smart-timer-page__mode-select">气候补偿智能调节</button>
+                  <button type="button" className="smart-timer-page__circle-icon is-plus">＋</button>
+                </div>
+              </div>
+
+              <button type="button" className="smart-timer-page__add-period">⊕ 新增周期</button>
+
               <div className="smart-timer-page__modal-actions">
                 <button type="button" className="smart-timer-page__modal-btn is-danger">删除方案</button>
-                <button type="button" className="smart-timer-page__modal-btn is-primary" onClick={() => setShowEditor(false)}>确定</button>
+                <button type="button" className="smart-timer-page__modal-btn is-primary" onClick={() => setShowEditor(false)}>
+                  确定
+                </button>
               </div>
             </div>
           </section>
