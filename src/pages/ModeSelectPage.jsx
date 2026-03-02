@@ -1,8 +1,9 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import FeatureInfoCard from '../components/FeatureInfoCard'
 import ModeOptionCard from '../components/ModeOptionCard'
 import SelectDropdown from '../components/SelectDropdown'
+import ToggleSwitch from '../components/ToggleSwitch'
 import manualModeIcon from '../assets/manual-mode.svg'
 import heatingActiveIcon from '../assets/device/heating-active.svg'
 import heatingInactiveIcon from '../assets/device/heating-inactive.svg'
@@ -23,6 +24,7 @@ import constantPressurePumpIcon from '../assets/constant-pressure-pump.svg'
 import pressureReliefValveIcon from '../assets/pressure-relief-valve.svg'
 import drainValveIcon from '../assets/drain-value.svg'
 import { getStoredClimateMode, setStoredClimateMode } from '../utils/climateModeState'
+import { getStoredTemperatureMode, setStoredTemperatureMode } from '../utils/temperatureModeState'
 import './ModeSelectPage.css'
 
 function SmartModeIcon() {
@@ -188,7 +190,6 @@ function ModeSettingCard({
   const stateText = isClimateCard ? (isEnabled ? '气候补偿开启' : '定温模式开启') : isEnabled ? '已开启' : '已关闭'
   const stateColor = isEnabled || isConstantMode ? '#197CDF' : 'rgba(255, 255, 255, 0.60)'
   const currentStatusIcon = isEnabled && statusIconActive ? statusIconActive : statusIcon
-  const switchClassName = `mode-select-page__switch${isEnabled ? ' is-on' : ''}${isConstantMode ? ' is-blue' : ''}`
   const statusClassName = [
     'mode-select-page__setting-status',
     isEnabled || isConstantMode ? ' is-on' : ' is-off',
@@ -226,15 +227,13 @@ function ModeSettingCard({
           <span>{stateText}</span>
         </span>
 
-        <button
-          type="button"
-          className={switchClassName}
-          aria-label={`${title}${isEnabled ? '关闭' : '开启'}`}
-          aria-pressed={isEnabled}
-          onClick={onToggle}
-        >
-          <span className="mode-select-page__switch-thumb" />
-        </button>
+        <ToggleSwitch
+          checked={isEnabled}
+          onToggle={onToggle}
+          forceOnStyle={isConstantMode}
+          ariaLabel={`${title}${isEnabled ? '关闭' : '开启'}`}
+          className="mode-select-page__switch"
+        />
       </div>
     </article>
   )
@@ -243,7 +242,7 @@ function ModeSettingCard({
 function ModeSelectPage() {
   const navigate = useNavigate()
   const [featureMode, setFeatureMode] = useState('smart')
-  const [temperatureMode, setTemperatureMode] = useState('heating')
+  const [temperatureMode, setTemperatureMode] = useState(() => getStoredTemperatureMode())
   const [settingState, setSettingState] = useState(() => ({
     ...INITIAL_CARD_SWITCH_STATE,
     climate: getStoredClimateMode() === 'climate',
@@ -264,6 +263,10 @@ function ModeSelectPage() {
           : !current[id],
     }))
   }
+
+  useEffect(() => {
+    setStoredTemperatureMode(temperatureMode)
+  }, [temperatureMode])
 
   const settingCards = useMemo(
     () =>
