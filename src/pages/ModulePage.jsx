@@ -5,6 +5,7 @@ import HeatTracePage from './HeatTracePage'
 import ConstantPressurePumpPage from './ConstantPressurePumpPage'
 import DrainValvePage from './DrainValvePage'
 import ReliefValvePage from './ReliefValvePage'
+import ClimateCompensationPage from './ClimateCompensationPage'
 
 function ModulePage({ routeInfo }) {
   const { module, section, tab } = routeInfo
@@ -38,6 +39,13 @@ function ModulePage({ routeInfo }) {
     if (tab?.id === 'relief-valve') {
       return <ReliefValvePage />
     }
+  }
+
+  const isModeSettingClimatePage =
+    module.id === 'settings' && section?.id === 'mode-setting' && tab?.id === 'climate'
+
+  if (isModeSettingClimatePage) {
+    return <ClimateCompensationPage />
   }
 
   return (
