@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { BrowserRouter, Navigate, Route, Routes, useLocation } from 'react-router-dom'
 import './App.css'
 import { createPageEntries, createRedirectEntries } from './config/navigation'
@@ -6,6 +6,20 @@ import CasLayout from './layout/CasLayout'
 import HomePage from './pages/HomePage'
 import ModulePage from './pages/ModulePage'
 import PlaygroundPage from './pages/PlaygroundPage'
+
+const DESIGN_WIDTH = 1920
+const DESIGN_HEIGHT = 1080
+const MAX_SCALE = 1
+
+function getScreenScale() {
+  if (typeof window === 'undefined') {
+    return 1
+  }
+
+  const scaleX = window.innerWidth / DESIGN_WIDTH
+  const scaleY = window.innerHeight / DESIGN_HEIGHT
+  return Math.min(scaleX, scaleY, MAX_SCALE)
+}
 
 const pageEntries = createPageEntries()
 const redirectEntries = createRedirectEntries()
@@ -53,11 +67,46 @@ function AppRoutes({ homePageTitle, onHomePageTitleChange }) {
 
 function App() {
   const [homePageTitle, setHomePageTitle] = useState('首页')
+  const [screenScale, setScreenScale] = useState(getScreenScale)
+
+  useEffect(() => {
+    let frameId = 0
+
+    const handleResize = () => {
+      window.cancelAnimationFrame(frameId)
+      frameId = window.requestAnimationFrame(() => {
+        setScreenScale(getScreenScale())
+      })
+    }
+
+    window.addEventListener('resize', handleResize)
+    return () => {
+      window.cancelAnimationFrame(frameId)
+      window.removeEventListener('resize', handleResize)
+    }
+  }, [])
+
+  const stageStyle = useMemo(
+    () => ({
+      '--screen-scale': String(screenScale),
+      '--screen-design-width': `${DESIGN_WIDTH}px`,
+      '--screen-design-height': `${DESIGN_HEIGHT}px`,
+      width: `${Math.round(DESIGN_WIDTH * screenScale)}px`,
+      height: `${Math.round(DESIGN_HEIGHT * screenScale)}px`,
+    }),
+    [screenScale],
+  )
 
   return (
-    <BrowserRouter>
-      <AppRoutes homePageTitle={homePageTitle} onHomePageTitleChange={setHomePageTitle} />
-    </BrowserRouter>
+    <div className="screen-adapter">
+      <div className="screen-adapter-shell" style={stageStyle}>
+        <div className="screen-adapter-stage">
+          <BrowserRouter>
+            <AppRoutes homePageTitle={homePageTitle} onHomePageTitleChange={setHomePageTitle} />
+          </BrowserRouter>
+        </div>
+      </div>
+    </div>
   )
 }
 
