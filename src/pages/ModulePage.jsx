@@ -8,6 +8,7 @@ import ReliefValvePage from './ReliefValvePage'
 import ModeSelectPage from './ModeSelectPage'
 import ClimateCompensationPage from './ClimateCompensationPage'
 import CouplingEnergyPage from './CouplingEnergyPage'
+import SmartTimerPage from './SmartTimerPage'
 
 function ModulePage({ routeInfo }) {
   const { module, section, tab } = routeInfo
@@ -53,6 +54,13 @@ function ModulePage({ routeInfo }) {
 
   if (isModeSettingClimatePage) {
     return <ClimateCompensationPage />
+  }
+
+  const isModeSettingTimerPage =
+    module.id === 'settings' && section?.id === 'mode-setting' && tab?.id === 'timer'
+
+  if (isModeSettingTimerPage) {
+    return <SmartTimerPage />
   }
 
   const isModeSettingCouplingPage =
