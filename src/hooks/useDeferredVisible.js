@@ -23,44 +23,67 @@ export const useDeferredVisible = (targetRef) => {
       return undefined
     }
 
-    const targetNode = targetRef.current
-    if (!targetNode) {
-      return undefined
-    }
-
+    let frameId = null
+    let visibilityObserver = null
     let cancelIdleSchedule = null
+    let isCancelled = false
+
     const startInitialization = () => {
-      cancelIdleSchedule = scheduleWhenIdle(() => setIsReady(true))
+      cancelIdleSchedule = scheduleWhenIdle(() => {
+        if (!isCancelled) {
+          setIsReady(true)
+        }
+      })
     }
 
-    if (typeof window.IntersectionObserver !== 'function') {
-      startInitialization()
-      return () => {
-        cancelIdleSchedule?.()
+    const connectWhenTargetReady = () => {
+      if (isCancelled) {
+        return
       }
-    }
 
-    const visibilityObserver = new window.IntersectionObserver(
-      (entries) => {
-        const isVisible = entries.some((entry) => entry.isIntersecting || entry.intersectionRatio > 0)
-        if (!isVisible) {
+      const targetNode = targetRef.current
+      if (!targetNode) {
+        if (typeof window === 'undefined') {
+          startInitialization()
           return
         }
 
-        visibilityObserver.disconnect()
-        startInitialization()
-      },
-      { threshold: 0.01 },
-    )
+        frameId = window.requestAnimationFrame(connectWhenTargetReady)
+        return
+      }
 
-    visibilityObserver.observe(targetNode)
+      if (typeof window.IntersectionObserver !== 'function') {
+        startInitialization()
+        return
+      }
+
+      visibilityObserver = new window.IntersectionObserver(
+        (entries) => {
+          const isVisible = entries.some((entry) => entry.isIntersecting || entry.intersectionRatio > 0)
+          if (!isVisible) {
+            return
+          }
+
+          visibilityObserver?.disconnect()
+          startInitialization()
+        },
+        { threshold: 0.01 },
+      )
+
+      visibilityObserver.observe(targetNode)
+    }
+
+    connectWhenTargetReady()
 
     return () => {
-      visibilityObserver.disconnect()
+      isCancelled = true
+      if (frameId !== null) {
+        window.cancelAnimationFrame(frameId)
+      }
+      visibilityObserver?.disconnect()
       cancelIdleSchedule?.()
     }
   }, [isReady, targetRef])
 
   return isReady
 }
-

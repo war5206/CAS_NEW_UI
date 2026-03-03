@@ -9,6 +9,7 @@ import thermometerIcon from '../assets/thermometer.svg'
 import regulationModeIcon from '../assets/regulation-mode.svg'
 import gearSettingIcon from '../assets/gear-setting.svg'
 import checkMarkIcon from '../assets/icons/check-mark.svg'
+import closeIcon from '../assets/icons/close.svg'
 import weatherCompensateDividerIcon from '../assets/weather-compensate-divider.svg'
 import weatherCompensateCurveIcon from '../assets/weather-compensate-curve.svg'
 import { useDeferredVisible } from '../hooks/useDeferredVisible'
@@ -51,6 +52,8 @@ const COOLING_CURVE_TEMP_MIN = 0
 const COOLING_CURVE_TEMP_MAX = 40
 const CURVE_Y_LABEL_STEP = 5
 const CURVE_PAGE_SIZE = 20
+const ADVANCED_CURVE_MAX_COUNT = 4
+const ADVANCED_CURVE_LABELS = ['曲线一', '曲线二', '曲线三', '曲线四']
 
 function createCurveXAxisList(min, max) {
   return Array.from({ length: max - min + 1 }, (_, index) => min + index)
@@ -69,6 +72,13 @@ function clampCurveTemp(value, tempMin, tempMax) {
   return Math.min(tempMax, Math.max(tempMin, value))
 }
 
+function cloneAdvancedCurves(curves) {
+  return curves.map((curve) => ({
+    ...curve,
+    values: [...curve.values],
+  }))
+}
+
 function ClimateCompensationPage() {
   const [selectedMode, setSelectedMode] = useState(() => getStoredClimateMode())
   const [regulateType, setRegulateType] = useState(REGULATION_OPTIONS[0].value)
@@ -77,6 +87,7 @@ function ClimateCompensationPage() {
   const [indoorTempSetting, setIndoorTempSetting] = useState('10')
   const [levelValue, setLevelValue] = useState(8)
   const [curvePageIndex, setCurvePageIndex] = useState(0)
+  const [advancedCurvePageIndex, setAdvancedCurvePageIndex] = useState(0)
   const [temperatureMode] = useState(() => getStoredTemperatureMode())
   const isCoolingTemperatureMode = temperatureMode === 'cooling'
   const curveXAxisMin = isCoolingTemperatureMode ? COOLING_CURVE_X_MIN : HEATING_CURVE_X_MIN
@@ -90,6 +101,14 @@ function ClimateCompensationPage() {
   )
   const curveYGridLineCount = curveYLabels.length - 1
   const [curveValues, setCurveValues] = useState(() => createInitialCurveValues(curveTempMin, curveTempMax, curveXAxisList))
+  const [isAdvancedModalOpen, setIsAdvancedModalOpen] = useState(false)
+  const [advancedEnabled, setAdvancedEnabled] = useState(true)
+  const [advancedCurves, setAdvancedCurves] = useState([])
+  const [activeAdvancedCurveId, setActiveAdvancedCurveId] = useState(null)
+  const [nextAdvancedCurveId, setNextAdvancedCurveId] = useState(1)
+  const [draftAdvancedEnabled, setDraftAdvancedEnabled] = useState(true)
+  const [draftAdvancedCurves, setDraftAdvancedCurves] = useState([])
+  const [draftActiveAdvancedCurveId, setDraftActiveAdvancedCurveId] = useState(null)
   const [constantReturnTemp, setConstantReturnTemp] = useState('10')
   const chartRef = useRef(null)
   const shouldInitChart = useDeferredVisible(chartRef)
@@ -106,6 +125,20 @@ function ClimateCompensationPage() {
         index,
         outdoorTemp,
         value: curveValues[index],
+      }
+    },
+  )
+  const activeDraftAdvancedCurve = draftAdvancedCurves.find((curve) => curve.id === draftActiveAdvancedCurveId) ?? null
+  const hasDraftAdvancedCurve = Boolean(activeDraftAdvancedCurve)
+  const safeAdvancedCurvePageIndex = Math.min(advancedCurvePageIndex, Math.max(0, curveTotalPages - 1))
+  const advancedCurveStartIndex = safeAdvancedCurvePageIndex * CURVE_PAGE_SIZE
+  const visibleDraftCurveItems = curveXAxisList.slice(advancedCurveStartIndex, advancedCurveStartIndex + CURVE_PAGE_SIZE).map(
+    (outdoorTemp, localIndex) => {
+      const index = advancedCurveStartIndex + localIndex
+      return {
+        index,
+        outdoorTemp,
+        value: activeDraftAdvancedCurve?.values[index] ?? null,
       }
     },
   )
@@ -170,13 +203,160 @@ function ClimateCompensationPage() {
     dragArea.addEventListener('pointercancel', handlePointerEnd)
   }
 
+  const updateDraftCurveValue = (index, nextValue) => {
+    if (!activeDraftAdvancedCurve) {
+      return
+    }
+
+    setDraftAdvancedCurves((previous) =>
+      previous.map((curve) => {
+        if (curve.id !== activeDraftAdvancedCurve.id) {
+          return curve
+        }
+
+        const safeNextValue = clampCurveTemp(nextValue, curveTempMin, curveTempMax)
+        if (curve.values[index] === safeNextValue) {
+          return curve
+        }
+
+        const nextValues = [...curve.values]
+        nextValues[index] = safeNextValue
+        return {
+          ...curve,
+          values: nextValues,
+        }
+      }),
+    )
+  }
+
+  const handleAdvancedCurveBarPointerDown = (index) => (event) => {
+    if (!draftAdvancedEnabled || !activeDraftAdvancedCurve) {
+      return
+    }
+
+    if (event.button !== 0) {
+      return
+    }
+
+    const dragArea = event.currentTarget
+    const rect = dragArea.getBoundingClientRect()
+    const updateByClientY = (clientY) => {
+      updateDraftCurveValue(index, resolveCurveValueByPointer(clientY, rect))
+    }
+
+    updateByClientY(event.clientY)
+
+    if (!dragArea.setPointerCapture) {
+      return
+    }
+
+    dragArea.setPointerCapture(event.pointerId)
+    const handlePointerMove = (moveEvent) => {
+      updateByClientY(moveEvent.clientY)
+    }
+
+    const handlePointerEnd = () => {
+      if (dragArea.hasPointerCapture?.(event.pointerId)) {
+        dragArea.releasePointerCapture(event.pointerId)
+      }
+      dragArea.removeEventListener('pointermove', handlePointerMove)
+      dragArea.removeEventListener('pointerup', handlePointerEnd)
+      dragArea.removeEventListener('pointercancel', handlePointerEnd)
+    }
+
+    dragArea.addEventListener('pointermove', handlePointerMove)
+    dragArea.addEventListener('pointerup', handlePointerEnd)
+    dragArea.addEventListener('pointercancel', handlePointerEnd)
+  }
+
+  const openAdvancedModal = () => {
+    const fallbackActiveId = activeAdvancedCurveId ?? advancedCurves[0]?.id ?? null
+    setDraftAdvancedEnabled(advancedEnabled)
+    setDraftAdvancedCurves(cloneAdvancedCurves(advancedCurves))
+    setDraftActiveAdvancedCurveId(fallbackActiveId)
+    setAdvancedCurvePageIndex(0)
+    setIsAdvancedModalOpen(true)
+  }
+
+  const closeAdvancedModal = () => {
+    setIsAdvancedModalOpen(false)
+  }
+
+  const handleAddAdvancedCurve = () => {
+    if (draftAdvancedCurves.length >= ADVANCED_CURVE_MAX_COUNT) {
+      return
+    }
+
+    const nextCurve = {
+      id: nextAdvancedCurveId,
+      values: curveXAxisList.map(() => curveTempMin),
+    }
+
+    setNextAdvancedCurveId((previous) => previous + 1)
+    setDraftAdvancedCurves((previous) => [...previous, nextCurve])
+    setDraftActiveAdvancedCurveId(nextCurve.id)
+  }
+
+  const handleDeleteAdvancedCurve = () => {
+    if (!activeDraftAdvancedCurve) {
+      return
+    }
+
+    const currentIndex = draftAdvancedCurves.findIndex((curve) => curve.id === activeDraftAdvancedCurve.id)
+    const nextCurves = draftAdvancedCurves.filter((curve) => curve.id !== activeDraftAdvancedCurve.id)
+    const nextActiveId =
+      nextCurves[currentIndex]?.id ??
+      nextCurves[currentIndex - 1]?.id ??
+      null
+
+    setDraftAdvancedCurves(nextCurves)
+    setDraftActiveAdvancedCurveId(nextActiveId)
+    setAdvancedCurvePageIndex(0)
+  }
+
+  const handleConfirmAdvancedCurve = () => {
+    const nextCurves = cloneAdvancedCurves(draftAdvancedCurves)
+    const fallbackActiveId = draftActiveAdvancedCurveId ?? nextCurves[0]?.id ?? null
+    const nextActiveCurve = nextCurves.find((curve) => curve.id === fallbackActiveId) ?? null
+
+    setAdvancedEnabled(draftAdvancedEnabled)
+    setAdvancedCurves(nextCurves)
+    setActiveAdvancedCurveId(fallbackActiveId)
+
+    if (draftAdvancedEnabled && nextActiveCurve) {
+      setCurveValues([...nextActiveCurve.values])
+    }
+
+    setIsAdvancedModalOpen(false)
+  }
+
   useEffect(() => {
     setStoredClimateMode(selectedMode)
   }, [selectedMode])
 
   useEffect(() => {
+    if (!isAdvancedModalOpen) {
+      return undefined
+    }
+
+    const handleEscape = (event) => {
+      if (event.key === 'Escape') {
+        closeAdvancedModal()
+      }
+    }
+
+    window.addEventListener('keydown', handleEscape)
+    return () => window.removeEventListener('keydown', handleEscape)
+  }, [isAdvancedModalOpen])
+
+  useEffect(() => {
     if (selectedMode !== 'climate' || regulateType === 'custom' || !shouldInitChart || !chartRef.current) {
       return undefined
+    }
+
+    const existingChart = echarts.getInstanceByDom(chartRef.current)
+    if (existingChart) {
+      existingChart.dispose()
     }
 
     const chart = echarts.init(chartRef.current)
@@ -276,14 +456,17 @@ function ClimateCompensationPage() {
 
     const resizeObserver = new ResizeObserver(() => chart.resize())
     resizeObserver.observe(chartRef.current)
+    const frameId = window.requestAnimationFrame(() => chart.resize())
 
     return () => {
+      window.cancelAnimationFrame(frameId)
       resizeObserver.disconnect()
       chart.dispose()
     }
   }, [selectedMode, regulateType, shouldInitChart])
 
   return (
+    <>
     <main className="climate-page">
       <section className="climate-page__mode-grid">
         <FeatureInfoCard
@@ -389,7 +572,7 @@ function ClimateCompensationPage() {
                   <h3 className="climate-page__panel-title">气候补偿曲线</h3>
                 </div>
                 <div className="climate-page__curve-actions">
-                  <button type="button" className="climate-page__curve-action-btn">高级调节</button>
+                  <button type="button" className="climate-page__curve-action-btn" onClick={openAdvancedModal}>高级调节</button>
                 </div>
               </div>
 
@@ -532,6 +715,166 @@ function ClimateCompensationPage() {
         </section>
       )}
     </main>
+    {isAdvancedModalOpen ? (
+      <div className="climate-page__advanced-modal-backdrop" role="presentation" onClick={closeAdvancedModal}>
+        <section
+          className={`climate-page__advanced-modal${isCoolingTemperatureMode ? ' is-cooling' : ''}`}
+          role="dialog"
+          aria-modal="true"
+          aria-label="高级调节"
+          onClick={(event) => event.stopPropagation()}
+        >
+          <header className="climate-page__advanced-modal-header">
+            <h3 className="climate-page__advanced-modal-title">高级调节</h3>
+            <button type="button" className="climate-page__advanced-modal-close" aria-label="关闭" onClick={closeAdvancedModal}>
+              <img src={closeIcon} alt="" aria-hidden="true" />
+            </button>
+          </header>
+
+          <div className="climate-page__advanced-modal-body">
+            <div className="climate-page__advanced-switch-row">
+              <span>高级调节</span>
+              <ToggleSwitch
+                checked={draftAdvancedEnabled}
+                onToggle={() => setDraftAdvancedEnabled((previous) => !previous)}
+                className="climate-page__advanced-switch"
+                ariaLabel={`高级调节${draftAdvancedEnabled ? '关闭' : '开启'}`}
+              />
+            </div>
+
+            <div className={`climate-page__advanced-editor${!draftAdvancedEnabled ? ' is-disabled' : ''}`}>
+              <div className="climate-page__advanced-tabs-row">
+                <div className="climate-page__advanced-tabs">
+                  {draftAdvancedCurves.length > 0 ? (
+                    draftAdvancedCurves.map((curve, index) => (
+                      <button
+                        key={curve.id}
+                        type="button"
+                        className={`climate-page__advanced-tab${curve.id === draftActiveAdvancedCurveId ? ' is-active' : ''}`}
+                        onClick={() => setDraftActiveAdvancedCurveId(curve.id)}
+                        disabled={!draftAdvancedEnabled}
+                      >
+                        {ADVANCED_CURVE_LABELS[index] ?? `曲线${index + 1}`}
+                      </button>
+                    ))
+                  ) : (
+                    <button type="button" className="climate-page__advanced-tab is-empty" disabled>
+                      空
+                    </button>
+                  )}
+                </div>
+                <button
+                  type="button"
+                  className="climate-page__advanced-add-btn"
+                  onClick={handleAddAdvancedCurve}
+                  disabled={!draftAdvancedEnabled || draftAdvancedCurves.length >= ADVANCED_CURVE_MAX_COUNT}
+                >
+                  <span className="climate-page__advanced-add-icon" aria-hidden="true">+</span>
+                  新增
+                </button>
+              </div>
+
+              <div className="climate-page__curve-y-title">目标温度℃</div>
+
+              <div className={`climate-page__curve-board climate-page__curve-board--advanced${isCoolingTemperatureMode ? ' is-cooling' : ''}`}>
+                <div className="climate-page__curve-y-axis">
+                  {curveYLabels.map((label, index) => (
+                    <span
+                      key={`advanced-${label}`}
+                      style={{ '--curve-label-ratio': index / (curveYLabels.length - 1) }}
+                    >
+                      {label}
+                    </span>
+                  ))}
+                </div>
+
+                <div className="climate-page__curve-plot" style={{ '--curve-grid-line-count': curveYGridLineCount }}>
+                  <div className="climate-page__curve-grid" aria-hidden="true" />
+                  {!draftAdvancedEnabled ? <div className="climate-page__curve-mask" aria-hidden="true" /> : null}
+                  <div className="climate-page__curve-columns">
+                    {visibleDraftCurveItems.map((item) => (
+                      <div key={`advanced-${item.outdoorTemp}`} className="climate-page__curve-column">
+                        <div
+                          className={`climate-page__curve-bar-area${!draftAdvancedEnabled || !hasDraftAdvancedCurve ? ' is-disabled' : ''}`}
+                          onPointerDown={handleAdvancedCurveBarPointerDown(item.index)}
+                          role="slider"
+                          aria-label={`${item.outdoorTemp}℃室外温度对应目标温度`}
+                          aria-valuemin={curveTempMin}
+                          aria-valuemax={curveTempMax}
+                          aria-valuenow={item.value ?? curveTempMin}
+                          aria-disabled={!draftAdvancedEnabled || !hasDraftAdvancedCurve}
+                        >
+                          {item.value != null ? (
+                            <div
+                              className="climate-page__curve-bar"
+                              style={{
+                                '--bar-height': `${((item.value - curveTempMin) / (curveTempMax - curveTempMin)) * 100}%`,
+                              }}
+                            >
+                              <span className="climate-page__curve-bar-value">{item.value}</span>
+                            </div>
+                          ) : null}
+                        </div>
+                        <span className="climate-page__curve-x-label">{item.outdoorTemp}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+              <div className="climate-page__curve-x-title">环境温度℃</div>
+              <div className="climate-page__curve-pagination climate-page__curve-pagination--advanced">
+                <button
+                  type="button"
+                  className="climate-page__curve-page-btn"
+                  onClick={() => setAdvancedCurvePageIndex((prev) => Math.max(0, prev - 1))}
+                  disabled={safeAdvancedCurvePageIndex === 0}
+                >
+                  上一页
+                </button>
+                <button
+                  type="button"
+                  className="climate-page__curve-page-btn"
+                  onClick={() => setAdvancedCurvePageIndex((prev) => Math.min(curveTotalPages - 1, prev + 1))}
+                  disabled={safeAdvancedCurvePageIndex === curveTotalPages - 1}
+                >
+                  下一页
+                </button>
+              </div>
+            </div>
+
+            {hasDraftAdvancedCurve ? (
+              <div className="climate-page__advanced-actions">
+                <button
+                  type="button"
+                  className="climate-page__advanced-action-btn is-delete"
+                  onClick={handleDeleteAdvancedCurve}
+                >
+                  删除曲线
+                </button>
+                <button
+                  type="button"
+                  className="climate-page__advanced-action-btn is-confirm"
+                  onClick={handleConfirmAdvancedCurve}
+                >
+                  确定
+                </button>
+              </div>
+            ) : (
+              <div className="climate-page__advanced-actions climate-page__advanced-actions--single">
+                <button
+                  type="button"
+                  className="climate-page__advanced-action-btn is-cancel"
+                  onClick={closeAdvancedModal}
+                >
+                  取消
+                </button>
+              </div>
+            )}
+          </div>
+        </section>
+      </div>
+    ) : null}
+    </>
   )
 }
 

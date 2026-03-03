@@ -82,7 +82,6 @@ function SelectDropdown({
       moved: false,
     }
     blockNextOptionClickRef.current = false
-    menuRef.current.setPointerCapture?.(event.pointerId)
   }
 
   const handleMenuPointerMove = (event) => {
@@ -109,10 +108,6 @@ function SelectDropdown({
     const dragState = dragStateRef.current
     if (!dragState.active || dragState.pointerId !== event.pointerId) {
       return
-    }
-
-    if (menuRef.current?.hasPointerCapture?.(event.pointerId)) {
-      menuRef.current.releasePointerCapture(event.pointerId)
     }
 
     if (dragState.moved) {
