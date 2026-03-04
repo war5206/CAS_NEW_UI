@@ -8,6 +8,8 @@ import ReliefValvePage from './ReliefValvePage'
 import ModeSelectPage from './ModeSelectPage'
 import ClimateCompensationPage from './ClimateCompensationPage'
 import CouplingEnergyPage from './CouplingEnergyPage'
+import SmartStartStopPage from './SmartStartStopPage'
+import PeakValleyPage from './PeakValleyPage'
 
 function ModulePage({ routeInfo }) {
   const { module, section, tab } = routeInfo
@@ -53,6 +55,20 @@ function ModulePage({ routeInfo }) {
 
   if (isModeSettingClimatePage) {
     return <ClimateCompensationPage />
+  }
+
+  const isModeSettingStartStopPage =
+    module.id === 'settings' && section?.id === 'mode-setting' && tab?.id === 'start-stop'
+
+  if (isModeSettingStartStopPage) {
+    return <SmartStartStopPage />
+  }
+
+  const isModeSettingPeakValleyPage =
+    module.id === 'settings' && section?.id === 'mode-setting' && tab?.id === 'peak'
+
+  if (isModeSettingPeakValleyPage) {
+    return <PeakValleyPage />
   }
 
   const isModeSettingCouplingPage =
