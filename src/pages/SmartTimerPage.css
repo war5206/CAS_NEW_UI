@@ -1,0 +1,898 @@
+.smart-timer-page {
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  overflow: auto;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  padding: 20px 24px 28px 0;
+  box-sizing: border-box;
+  color: #ffffff;
+}
+
+.smart-timer-page::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+}
+
+.smart-timer-page__mode-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 487px));
+  width: min(1040px, 100%);
+}
+
+.smart-timer-page__mode-card.feature-info-card {
+  width: 100%;
+  border-radius: 0;
+}
+
+.smart-timer-page__mode-grid > .smart-timer-page__mode-card:first-child {
+  border-radius: 16px 0 0 16px;
+}
+
+.smart-timer-page__mode-grid > .smart-timer-page__mode-card:last-child {
+  border-radius: 0 16px 16px 0;
+}
+
+.smart-timer-page__mode-grid > .smart-timer-page__mode-card + .smart-timer-page__mode-card {
+  margin-left: -2px;
+}
+
+.smart-timer-page__mode-grid > .smart-timer-page__mode-card.is-selected {
+  z-index: 1;
+}
+
+.smart-timer-page__plans-section {
+  margin-top: 24px;
+}
+
+.smart-timer-page__section-title {
+  margin: 0;
+  color: #909da2;
+  font-size: 20px;
+  font-weight: 400;
+  line-height: 1.2;
+}
+
+.smart-timer-page__add-plan-btn {
+  margin-top: 24px;
+  height: 60px;
+  border: none;
+  border-radius: 20px;
+  background: #197cdf;
+  color: #f3f8ff;
+  font-size: 20px;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  cursor: pointer;
+  padding: 0px 32px;
+}
+
+.smart-timer-page__add-plan-btn img {
+  width: 24px;
+  height: 24px;
+  display: block;
+}
+
+.smart-timer-page__plan-tip {
+  margin: 24px 0 0;
+  font-size: 16px;
+  line-height: 1.4;
+  color: #b9cae4;
+}
+
+.smart-timer-page__plan-tip-key.is-climate {
+  color: #4ca7ff;
+}
+
+.smart-timer-page__plan-tip-key.is-constant {
+  color: #f3b53b;
+}
+
+.smart-timer-page__plan-tip-separator {
+  margin: 0 4px;
+}
+
+.smart-timer-page__plan-list {
+  margin-top: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  padding-bottom: 8px;
+}
+
+.smart-timer-page__empty-card {
+  min-height: 140px;
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: #22262d;
+  color: rgba(206, 216, 232, 0.88);
+  font-size: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.smart-timer-page__plan-card {
+  border-radius: 16px;
+  background: #22262d;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  padding: 32px;
+}
+
+.smart-timer-page__plan-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+}
+
+.smart-timer-page__plan-title-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 16px;
+  min-width: 0;
+}
+
+.smart-timer-page__plan-title {
+  margin: 0;
+  color: #ffffff;
+  font-size: 24px;
+  font-weight: 500;
+  line-height: 1;
+}
+
+.smart-timer-page__plan-edit-btn {
+  width: 40px;
+  height: 40px;
+  border: none;
+  border-radius: 10px;
+  background: #3b4655;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  cursor: pointer;
+}
+
+.smart-timer-page__plan-edit-btn img {
+  width: 24px;
+  height: 24px;
+  display: block;
+}
+
+.smart-timer-page__plan-switch {
+  --toggle-width: 60px;
+  --toggle-height: 34px;
+  --toggle-padding: 2px;
+  --toggle-thumb-size: 30px;
+  --toggle-thumb-shift: 26px;
+}
+
+.smart-timer-page__plan-body {
+  margin-top: 35px;
+  display: flex;
+  flex-direction: column;
+  gap: 26px;
+}
+
+.smart-timer-page__cycle-block {
+  --timeline-gap: 6px;
+  --timeline-track-height: 72px;
+  --timeline-lower-extra-offset: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--timeline-gap);
+}
+
+.smart-timer-page__cycle-block.has-lower-ticks {
+  padding-bottom: 34px;
+}
+
+.smart-timer-page__cycle-days {
+  color: #ffffff;
+  font-size: 20px;
+  line-height: 1;
+  width: fit-content;
+}
+
+.smart-timer-page__timeline-ticks {
+  position: relative;
+  height: 20px;
+  margin-top: 6px;
+  z-index: 2;
+  overflow: visible;
+}
+
+.smart-timer-page__timeline-tick {
+  position: absolute;
+  bottom: 0;
+  color: #ffffff;
+  font-size: 16px;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.smart-timer-page__timeline-tick.is-start {
+  transform: translateX(0);
+}
+
+.smart-timer-page__timeline-tick.is-end {
+  transform: translateX(-100%);
+}
+
+.smart-timer-page__timeline-tick.is-middle {
+  width: 0;
+  transform: translateX(0);
+  height: 1em;
+  white-space: normal;
+}
+
+.smart-timer-page__timeline-tick.is-middle .smart-timer-page__timeline-tick-hour {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  transform: translateX(calc(-100% - 2px));
+  white-space: nowrap;
+}
+
+.smart-timer-page__timeline-tick.is-middle .smart-timer-page__timeline-tick-colon {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  transform: translateX(-50%);
+  white-space: nowrap;
+}
+
+.smart-timer-page__timeline-tick.is-middle .smart-timer-page__timeline-tick-minute {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  transform: translateX(2px);
+  white-space: nowrap;
+}
+
+.smart-timer-page__timeline-tick.is-lower {
+  bottom: calc(-1 * (var(--timeline-track-height) + var(--timeline-gap) + var(--timeline-lower-extra-offset)));
+}
+
+.smart-timer-page__timeline-track {
+  position: relative;
+  z-index: 1;
+  height: var(--timeline-track-height);
+  border-radius: 8px;
+  overflow: hidden;
+  background: #323845;
+  display: block;
+}
+
+.smart-timer-page__timeline-track.is-empty {
+  background: #323845;
+}
+
+.smart-timer-page__timeline-segment {
+  position: absolute;
+  top: 0;
+  height: 100%;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #edf5ff;
+  font-size: 18px;
+  line-height: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  padding: 0 10px;
+  container-type: inline-size;
+}
+
+.smart-timer-page__timeline-segment > span {
+  display: none;
+}
+
+@container (min-width: 8em) {
+  .smart-timer-page__timeline-segment.is-constant > span {
+    display: block;
+  }
+}
+
+@container (min-width: 9.5em) {
+  .smart-timer-page__timeline-segment.is-climate > span {
+    display: block;
+  }
+}
+
+.smart-timer-page__timeline-segment.has-divider {
+  box-shadow: inset 1px 0 0 rgba(238, 245, 255, 0.75);
+}
+
+.smart-timer-page__timeline-segment.is-climate {
+  background: #2a7fd4;
+}
+
+.smart-timer-page__timeline-segment.is-constant {
+  background: #e29f18;
+}
+
+.smart-timer-page__timeline-segment.is-empty {
+  background: #323845;
+  color: rgba(188, 198, 214, 0.9);
+}
+
+.smart-timer-page__editor-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 170;
+  background: rgba(2, 6, 12, 0.78);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+}
+
+.smart-timer-page__editor-modal {
+  width: min(930px, 100%);
+  max-height: 100%;
+  border-radius: 16px;
+  overflow: hidden;
+  border: 1px solid rgba(93, 132, 197, 0.24);
+  box-shadow: 0 30px 80px rgba(0, 0, 0, 0.56);
+  background:
+    linear-gradient(180deg, rgba(163, 197, 230, 0.00) 60.19%, rgba(163, 197, 230, 0.05) 100%),
+    linear-gradient(69deg, rgba(255, 255, 255, 0.05) 0%, rgba(255, 255, 255, 0.00) 98.35%),
+    #0d0e0f;
+  display: flex;
+  flex-direction: column;
+}
+
+.smart-timer-page__editor-header {
+  height: 76px;
+  flex-shrink: 0;
+  background: rgba(255, 255, 255, 0.055);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 28px 0 34px;
+}
+
+.smart-timer-page__editor-title {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 500;
+  color: #f4f8ff;
+}
+
+.smart-timer-page__editor-close {
+  width: 36px;
+  height: 36px;
+  border: none;
+  background: transparent;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  cursor: pointer;
+}
+
+.smart-timer-page__editor-close img {
+  width: 22px;
+  height: 22px;
+  display: block;
+}
+
+.smart-timer-page__editor-body {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  padding: 16px 34px 24px;
+}
+
+.smart-timer-page__editor-body::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+}
+
+.smart-timer-page__editor-plan-row {
+  min-height: 95px;
+  border-radius: 16px;
+  background: #22262d;
+  padding: 0 32px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.smart-timer-page__editor-plan-name {
+  color: #f7fbff;
+  font-size: 24px;
+  line-height: 1;
+}
+
+.smart-timer-page__editor-switch {
+  --toggle-width: 60px;
+  --toggle-height: 34px;
+  --toggle-padding: 2px;
+  --toggle-thumb-size: 30px;
+  --toggle-thumb-shift: 26px;
+}
+
+.smart-timer-page__editor-cycle-list {
+  margin-top: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.smart-timer-page__editor-cycle {
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.02);
+  padding: 24px;
+}
+
+.smart-timer-page__editor-cycle-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.smart-timer-page__editor-cycle-title {
+  margin: 0;
+  color: #ffffff;
+  font-size: 20px;
+  font-weight: 400;
+  line-height: 1;
+}
+
+.smart-timer-page__cycle-remove-btn {
+  width: 32px;
+  height: 32px;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.smart-timer-page__cycle-remove-btn img {
+  width: 32px;
+  height: 32px;
+  display: block;
+}
+
+.smart-timer-page__cycle-remove-btn:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.smart-timer-page__weekday-list {
+  margin-top: 24px;
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.smart-timer-page__weekday-btn {
+  height: 60px;
+  border: none;
+  border-radius: 8px;
+  background: #222833;
+  color: #ffffff;
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.smart-timer-page__weekday-btn.is-active {
+  background: #2a7fd4;
+}
+
+.smart-timer-page__weekday-btn.is-disabled,
+.smart-timer-page__weekday-btn:disabled {
+  background: #1a1f28;
+  color: rgba(255, 255, 255, 0.38);
+  cursor: not-allowed;
+}
+
+.smart-timer-page__period-title {
+  margin: 24px 0 0;
+  color: #ffffff;
+  font-size: 20px;
+  font-weight: 400;
+  line-height: 1;
+}
+
+.smart-timer-page__period-list {
+  margin-top: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.smart-timer-page__period-item {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.smart-timer-page__period-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 28px minmax(0, 1fr) minmax(0, 1.25fr) 32px;
+  align-items: center;
+  column-gap: 16px;
+}
+
+.smart-timer-page__period-time {
+  height: 60px;
+  border: none;
+  border-radius: 16px;
+  background: #222a37;
+  color: #f2f7ff;
+  font-size: 20px;
+  line-height: 1;
+  padding: 16px 24px;
+  display: inline-flex;
+  align-items: center;
+  cursor: pointer;
+}
+
+.smart-timer-page__period-time:disabled {
+  background: #1b2230;
+  color: rgba(242, 247, 255, 0.45);
+  cursor: not-allowed;
+}
+
+.smart-timer-page__period-dash {
+  color: #eff5ff;
+  font-size: 28px;
+  line-height: 1;
+  text-align: center;
+}
+
+.smart-timer-page__period-select {
+  width: 100%;
+  --select-trigger-height: 60px;
+  --select-trigger-radius: 16px;
+  --select-trigger-font-size: 20px;
+  --select-trigger-padding-x: 20px;
+  --select-arrow-right: 20px;
+  --select-arrow-size: 8px;
+  --select-arrow-stroke: 2px;
+  --select-menu-radius: 16px;
+  --select-menu-padding: 10px;
+  --select-option-height: 52px;
+  --select-option-radius: 10px;
+  --select-option-font-size: 20px;
+  --select-option-padding-x: 16px;
+}
+
+.smart-timer-page__period-select-trigger {
+  border: none;
+  background: #222a37;
+  color: #f2f7ff;
+}
+
+.smart-timer-page__period-select-trigger::after {
+  width: 16px;
+  height: 16px;
+  border: none;
+  transform: translateY(-50%);
+  background: url('../assets/icons/arrow-down.svg') center / contain no-repeat;
+}
+
+.smart-timer-page__period-select-trigger.is-open::after {
+  transform: translateY(-50%);
+}
+
+.smart-timer-page__period-select-dropdown {
+  z-index: 210;
+}
+
+.smart-timer-page__period-action {
+  width: 32px;
+  height: 32px;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  cursor: pointer;
+}
+
+.smart-timer-page__period-action img {
+  width: 32px;
+  height: 32px;
+  display: block;
+}
+
+.smart-timer-page__period-action:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.smart-timer-page__period-temperature {
+  position: relative;
+  width: 763px;
+}
+
+.smart-timer-page__period-temperature input {
+  width: 100%;
+  height: 64px;
+  border: none;
+  border-radius: 16px;
+  background: #222a37;
+  color: #f2f7ff;
+  font-size: 20px;
+  line-height: 1;
+  padding: 0 68px 0 20px;
+  cursor: pointer;
+}
+
+.smart-timer-page__period-temperature input::placeholder {
+  color: rgba(197, 209, 224, 0.72);
+}
+
+.smart-timer-page__period-temperature span {
+  position: absolute;
+  right: 20px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #f2f7ff;
+  font-size: 20px;
+  line-height: 1;
+}
+
+.smart-timer-page__add-cycle-btn {
+  margin-top: 20px;
+  width: 100%;
+  height: 66px;
+  border: none;
+  border-radius: 16px;
+  background: #222a36;
+  color: #1c8eea;
+  font-size: 20px;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 14px;
+  padding: 0 30px;
+  cursor: pointer;
+}
+
+.smart-timer-page__add-cycle-btn img {
+  width: 24px;
+  height: 24px;
+  display: block;
+}
+
+.smart-timer-page__add-cycle-btn:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.smart-timer-page__editor-actions {
+  margin-top: 24px;
+  display: flex;
+  justify-content: center;
+  gap: 68px;
+}
+
+.smart-timer-page__editor-action {
+  width: 198px;
+  height: 64px;
+  border: none;
+  border-radius: 16px;
+  color: #f4f8ff;
+  font-size: 20px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.smart-timer-page__editor-action.is-cancel {
+  background: #212a38;
+}
+
+.smart-timer-page__editor-action.is-delete {
+  background: #212a38;
+  color: #ff572d;
+}
+
+.smart-timer-page__editor-action.is-confirm {
+  background: linear-gradient(180deg, #2d8fe9 0%, #257cd4 100%);
+}
+
+@media (max-width: 1680px) {
+  .smart-timer-page__add-plan-btn,
+  .smart-timer-page__cycle-days,
+  .smart-timer-page__timeline-tick,
+  .smart-timer-page__timeline-segment,
+  .smart-timer-page__plan-title,
+  .smart-timer-page__editor-plan-name,
+  .smart-timer-page__weekday-btn,
+  .smart-timer-page__period-time,
+  .smart-timer-page__period-select,
+  .smart-timer-page__period-temperature input,
+  .smart-timer-page__period-temperature span,
+  .smart-timer-page__add-cycle-btn,
+  .smart-timer-page__editor-action {
+    font-size: 26px;
+  }
+}
+
+@media (max-width: 1200px) {
+  .smart-timer-page__mode-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .smart-timer-page__mode-grid > .smart-timer-page__mode-card:first-child,
+  .smart-timer-page__mode-grid > .smart-timer-page__mode-card:last-child {
+    border-radius: 16px;
+  }
+
+  .smart-timer-page__mode-grid > .smart-timer-page__mode-card + .smart-timer-page__mode-card {
+    margin: -2px 0 0;
+  }
+
+  .smart-timer-page__plan-title {
+    font-size: 30px;
+  }
+
+  .smart-timer-page__cycle-days {
+    font-size: 24px;
+  }
+
+  .smart-timer-page__timeline-tick {
+    font-size: 20px;
+  }
+
+  .smart-timer-page__timeline-segment {
+    font-size: 18px;
+  }
+
+  .smart-timer-page__editor-modal {
+    width: min(980px, 100%);
+  }
+
+  .smart-timer-page__weekday-list {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .smart-timer-page__period-row {
+    grid-template-columns: minmax(0, 1fr) 20px minmax(0, 1fr);
+    row-gap: 12px;
+  }
+
+  .smart-timer-page__period-select {
+    grid-column: 1 / span 2;
+  }
+
+  .smart-timer-page__period-action {
+    grid-column: 3;
+    justify-self: end;
+  }
+}
+
+@media (max-width: 900px) {
+  .smart-timer-page {
+    padding-right: 0;
+  }
+
+  .smart-timer-page__add-plan-btn {
+    width: 100%;
+    max-width: 320px;
+    font-size: 20px;
+  }
+
+  .smart-timer-page__plan-card {
+    padding: 16px;
+  }
+
+  .smart-timer-page__plan-title {
+    font-size: 24px;
+  }
+
+  .smart-timer-page__cycle-block {
+    --timeline-track-height: 58px;
+    --timeline-lower-extra-offset: 14px;
+  }
+
+  .smart-timer-page__cycle-block.has-lower-ticks {
+    padding-bottom: 30px;
+  }
+
+  .smart-timer-page__timeline-ticks {
+    height: 28px;
+  }
+
+  .smart-timer-page__timeline-tick {
+    font-size: 14px;
+  }
+
+  .smart-timer-page__timeline-track {
+    height: var(--timeline-track-height);
+  }
+
+  .smart-timer-page__timeline-segment {
+    font-size: 14px;
+    padding: 0 6px;
+  }
+
+  .smart-timer-page__editor-backdrop {
+    padding: 12px;
+  }
+
+  .smart-timer-page__editor-body {
+    padding: 14px;
+  }
+
+  .smart-timer-page__editor-plan-name {
+    font-size: 24px;
+  }
+
+  .smart-timer-page__editor-cycle {
+    padding: 14px;
+  }
+
+  .smart-timer-page__weekday-btn {
+    height: 52px;
+    font-size: 20px;
+  }
+
+  .smart-timer-page__period-time {
+    height: 56px;
+    border-radius: 12px;
+    font-size: 20px;
+    padding: 0 16px;
+  }
+
+  .smart-timer-page__period-select {
+    --select-trigger-height: 56px;
+    --select-trigger-radius: 12px;
+    --select-trigger-font-size: 20px;
+    --select-option-height: 46px;
+    --select-option-font-size: 18px;
+  }
+
+  .smart-timer-page__period-temperature input {
+    height: 56px;
+    border-radius: 12px;
+    font-size: 18px;
+  }
+
+  .smart-timer-page__period-temperature span {
+    font-size: 20px;
+  }
+
+  .smart-timer-page__add-cycle-btn {
+    height: 56px;
+    padding: 0 18px;
+    font-size: 20px;
+  }
+
+  .smart-timer-page__editor-actions {
+    gap: 16px;
+  }
+
+  .smart-timer-page__editor-action {
+    width: 100%;
+    max-width: 180px;
+    height: 52px;
+    border-radius: 12px;
+    font-size: 20px;
+  }
+}
