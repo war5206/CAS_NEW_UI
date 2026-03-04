@@ -10,6 +10,7 @@ import ClimateCompensationPage from './ClimateCompensationPage'
 import CouplingEnergyPage from './CouplingEnergyPage'
 import SmartStartStopPage from './SmartStartStopPage'
 import PeakValleyPage from './PeakValleyPage'
+import SmartTimerPage from './SmartTimerPage'
 
 function ModulePage({ routeInfo }) {
   const { module, section, tab } = routeInfo
@@ -69,6 +70,11 @@ function ModulePage({ routeInfo }) {
 
   if (isModeSettingPeakValleyPage) {
     return <PeakValleyPage />
+  const isModeSettingTimerPage =
+    module.id === 'settings' && section?.id === 'mode-setting' && tab?.id === 'timer'
+
+  if (isModeSettingTimerPage) {
+    return <SmartTimerPage />
   }
 
   const isModeSettingCouplingPage =
