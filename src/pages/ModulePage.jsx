@@ -70,6 +70,7 @@ function ModulePage({ routeInfo }) {
 
   if (isModeSettingPeakValleyPage) {
     return <PeakValleyPage />
+  }
   const isModeSettingTimerPage =
     module.id === 'settings' && section?.id === 'mode-setting' && tab?.id === 'timer'
 
