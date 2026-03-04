@@ -55,6 +55,8 @@ function TimePickerModal({
   value = [],
   cancelText = '取消',
   confirmText = '确定',
+  showBackdrop = true,
+  zIndex,
   onClose,
   onConfirm,
 }) {
@@ -279,8 +281,13 @@ function TimePickerModal({
     return null
   }
 
+  const backdropClassName = ['time-picker-modal-backdrop', showBackdrop ? '' : 'is-transparent']
+    .filter(Boolean)
+    .join(' ')
+  const backdropStyle = Number.isFinite(zIndex) ? { zIndex } : undefined
+
   return (
-    <div className="time-picker-modal-backdrop" role="presentation" onClick={onClose}>
+    <div className={backdropClassName} style={backdropStyle} role="presentation" onClick={onClose}>
       <section
         className="time-picker-modal"
         role="dialog"

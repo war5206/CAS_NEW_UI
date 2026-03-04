@@ -2,6 +2,8 @@ import { useState } from 'react'
 import FeatureInfoCard from '../components/FeatureInfoCard'
 import SelectDropdown from '../components/SelectDropdown'
 import TimePickerModal from '../components/TimePickerModal'
+import NumericKeypadModal from '../components/NumericKeypadModal'
+import AttentionModal from '../components/AttentionModal'
 import ToggleSwitch from '../components/ToggleSwitch'
 import intelligentTimeSettingIcon from '../assets/intelligent-time-setting.svg'
 import day24Icon from '../assets/24hour.svg'
@@ -15,7 +17,7 @@ import './SmartTimerPage.css'
 
 const TOTAL_DAY_MINUTES = 24 * 60
 const MAX_CYCLE_COUNT = 8
-const MAX_PERIOD_COUNT = 6
+const MAX_PERIOD_COUNT = 12
 
 const WEEKDAY_OPTIONS = [
   { value: 1, label: '周一' },
@@ -37,6 +39,12 @@ const TIME_MINUTES = Array.from({ length: 60 }, (_, index) => index)
 
 const DAY_ORDER_MAP = new Map(WEEKDAY_OPTIONS.map((item, index) => [item.value, index]))
 const DAY_LABEL_MAP = new Map(WEEKDAY_OPTIONS.map((item) => [item.value, item.label]))
+const PLAN_NAME_PREFIX = '\u65b9\u6848'
+const CHINESE_NUMERAL_DIGITS = ['\u96f6', '\u4e00', '\u4e8c', '\u4e09', '\u56db', '\u4e94', '\u516d', '\u4e03', '\u516b', '\u4e5d']
+const CHINESE_NUMERAL_MAP = new Map(CHINESE_NUMERAL_DIGITS.map((digit, index) => [digit, index]))
+const PLAN_LEGEND_CLIMATE = '\u84dd\u8272\u4e3a\u6c14\u5019\u8865\u507f\u667a\u80fd\u8c03\u8282'
+const PLAN_LEGEND_CONSTANT = '\u9ec4\u8272\u4e3a\u5b9a\u6e29\u6a21\u5f0f'
+const PLAN_LEGEND_SEPARATOR = '\uFF0C'
 
 const INITIAL_PLANS = [
   {
@@ -128,6 +136,39 @@ function parseTimeToMinutes(value) {
   return Math.min(TOTAL_DAY_MINUTES, hours * 60 + minutes)
 }
 
+function clampMinutesValue(value, minValue, maxValue) {
+  return Math.min(maxValue, Math.max(minValue, value))
+}
+
+function formatMinutesToTimeValue(minutes) {
+  const safeMinutes = Math.min(TOTAL_DAY_MINUTES, Math.max(0, minutes))
+  return normalizeTimeValue(formatTimelineTick(safeMinutes))
+}
+
+function normalizeCyclePeriods(periods) {
+  if (!Array.isArray(periods) || periods.length <= 0) {
+    return periods
+  }
+
+  const lastIndex = periods.length - 1
+  periods[0].start = '00:00'
+
+  for (let index = 0; index <= lastIndex; index += 1) {
+    if (index > 0) {
+      periods[index].start = normalizeTimeValue(periods[index - 1].end)
+    }
+
+    const startMinutes = parseTimeToMinutes(periods[index].start)
+    const minEndMinutes = startMinutes + 1
+    const maxEndMinutes = TOTAL_DAY_MINUTES - (lastIndex - index)
+    const rawEndMinutes = parseTimeToMinutes(periods[index].end)
+    const safeEndMinutes = clampMinutesValue(rawEndMinutes, minEndMinutes, maxEndMinutes)
+    periods[index].end = formatMinutesToTimeValue(safeEndMinutes)
+  }
+
+  return periods
+}
+
 function formatTimelineTick(minutes) {
   const safeMinutes = Math.min(TOTAL_DAY_MINUTES, Math.max(0, minutes))
   const hours = Math.floor(safeMinutes / 60)
@@ -139,6 +180,76 @@ function sortDays(days) {
   return [...new Set(days.filter((day) => DAY_ORDER_MAP.has(day)))].sort(
     (left, right) => DAY_ORDER_MAP.get(left) - DAY_ORDER_MAP.get(right),
   )
+}
+
+function isCyclePeriodsCompleteAndContinuous(cycle) {
+  const periods = Array.isArray(cycle?.periods) ? cycle.periods : []
+  if (periods.length <= 0) {
+    return false
+  }
+
+  let expectedStartMinutes = 0
+  for (let index = 0; index < periods.length; index += 1) {
+    const period = periods[index]
+    const startMinutes = parseTimeToMinutes(period.start)
+    const endMinutes = parseTimeToMinutes(period.end)
+
+    if (startMinutes !== expectedStartMinutes) {
+      return false
+    }
+    if (endMinutes <= startMinutes) {
+      return false
+    }
+
+    expectedStartMinutes = endMinutes
+  }
+
+  return expectedStartMinutes === TOTAL_DAY_MINUTES
+}
+
+function resolveInvalidCycleIndexes(cycles) {
+  return cycles.reduce((indexes, cycle, index) => {
+    if (!isCyclePeriodsCompleteAndContinuous(cycle)) {
+      indexes.push(index)
+    }
+    return indexes
+  }, [])
+}
+
+function resolveCyclesWithoutDays(cycles) {
+  return cycles.reduce((indexes, cycle, index) => {
+    if (!Array.isArray(cycle?.days) || cycle.days.length <= 0) {
+      indexes.push(index)
+    }
+    return indexes
+  }, [])
+}
+
+function resolveDuplicateCycleDays(cycles) {
+  const dayCountMap = new Map()
+  cycles.forEach((cycle) => {
+    cycle.days.forEach((day) => {
+      dayCountMap.set(day, (dayCountMap.get(day) ?? 0) + 1)
+    })
+  })
+
+  return [...dayCountMap.entries()].filter(([, count]) => count > 1).map(([day]) => day)
+}
+
+function areAllWeekdaysCovered(cycles) {
+  const selectedDays = new Set()
+  cycles.forEach((cycle) => {
+    if (!Array.isArray(cycle?.days)) {
+      return
+    }
+    cycle.days.forEach((day) => {
+      if (DAY_ORDER_MAP.has(day)) {
+        selectedDays.add(day)
+      }
+    })
+  })
+
+  return WEEKDAY_OPTIONS.every((weekday) => selectedDays.has(weekday.value))
 }
 
 function resolveCycleDayText(days) {
@@ -213,6 +324,8 @@ function buildTimelineSegments(periods) {
       {
         key: 'empty-all',
         type: 'empty',
+        startMinutes: 0,
+        endMinutes: TOTAL_DAY_MINUTES,
         duration: TOTAL_DAY_MINUTES,
         label: '暂无设置',
       },
@@ -233,6 +346,8 @@ function buildTimelineSegments(periods) {
       segments.push({
         key: `gap-${index}-${cursor}`,
         type: 'empty',
+        startMinutes: cursor,
+        endMinutes: start,
         duration: start - cursor,
         label: '',
       })
@@ -240,11 +355,18 @@ function buildTimelineSegments(periods) {
 
     const effectiveStart = Math.max(cursor, start)
     if (end > effectiveStart) {
+      const previousSegment = segments.length > 0 ? segments[segments.length - 1] : null
+      const showDivider =
+        previousSegment?.type === period.mode && previousSegment.type !== 'empty' && start <= cursor
+
       segments.push({
         key: `period-${period.id}`,
         type: period.mode,
+        startMinutes: effectiveStart,
+        endMinutes: end,
         duration: end - effectiveStart,
         label: resolvePeriodLabel(period),
+        showDivider,
       })
       cursor = end
     }
@@ -254,6 +376,8 @@ function buildTimelineSegments(periods) {
     segments.push({
       key: `tail-${cursor}`,
       type: 'empty',
+      startMinutes: cursor,
+      endMinutes: TOTAL_DAY_MINUTES,
       duration: TOTAL_DAY_MINUTES - cursor,
       label: '',
     })
@@ -277,6 +401,100 @@ function buildTimelineTicks(periods) {
   return [...points].sort((left, right) => left - right)
 }
 
+function parseChineseNumeralNumber(value) {
+  const text = String(value ?? '').trim()
+  if (!text) {
+    return null
+  }
+
+  if (text === '\u5341') {
+    return 10
+  }
+
+  const tenIndex = text.indexOf('\u5341')
+  if (tenIndex >= 0) {
+    const [tenPart, unitPart] = text.split('\u5341')
+    const tenValue = tenPart ? CHINESE_NUMERAL_MAP.get(tenPart) : 1
+    const unitValue = unitPart ? CHINESE_NUMERAL_MAP.get(unitPart) : 0
+
+    if (!Number.isFinite(tenValue) || !Number.isFinite(unitValue)) {
+      return null
+    }
+
+    return tenValue * 10 + unitValue
+  }
+
+  if (text.length === 1 && CHINESE_NUMERAL_MAP.has(text)) {
+    return CHINESE_NUMERAL_MAP.get(text)
+  }
+
+  return null
+}
+
+function formatNumberToChineseNumeral(value) {
+  if (!Number.isInteger(value) || value <= 0) {
+    return String(value)
+  }
+
+  if (value < 10) {
+    return CHINESE_NUMERAL_DIGITS[value]
+  }
+
+  if (value < 20) {
+    const unit = value % 10
+    return `\u5341${unit > 0 ? CHINESE_NUMERAL_DIGITS[unit] : ''}`
+  }
+
+  if (value < 100) {
+    const ten = Math.floor(value / 10)
+    const unit = value % 10
+    return `${CHINESE_NUMERAL_DIGITS[ten]}\u5341${unit > 0 ? CHINESE_NUMERAL_DIGITS[unit] : ''}`
+  }
+
+  return String(value)
+}
+
+function resolvePlanIndexFromName(name) {
+  const matched = String(name ?? '')
+    .trim()
+    .match(/^\u65b9\u6848(.+)$/)
+  if (!matched) {
+    return null
+  }
+
+  const suffix = matched[1].trim()
+  if (/^\d+$/.test(suffix)) {
+    const parsed = Number.parseInt(suffix, 10)
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : null
+  }
+
+  const parsedChineseNumber = parseChineseNumeralNumber(suffix)
+  return Number.isFinite(parsedChineseNumber) && parsedChineseNumber > 0 ? parsedChineseNumber : null
+}
+
+function resolveNextPlanNameByStyle(plans) {
+  const usedIndexes = new Set(plans.map((plan) => resolvePlanIndexFromName(plan.name)).filter((value) => Number.isFinite(value)))
+
+  const hasChineseNamedPlan = plans.some((plan) => {
+    const matched = String(plan?.name ?? '')
+      .trim()
+      .match(/^\u65b9\u6848(.+)$/)
+    if (!matched) {
+      return false
+    }
+    return Number.isFinite(parseChineseNumeralNumber(matched[1].trim()))
+  })
+
+  let index = 1
+  while (usedIndexes.has(index)) {
+    index += 1
+  }
+
+  const suffix = hasChineseNamedPlan ? formatNumberToChineseNumeral(index) : String(index)
+  return `${PLAN_NAME_PREFIX}${suffix}`
+}
+
+// eslint-disable-next-line no-unused-vars
 function resolveNextPlanName(plans) {
   const usedIndexes = new Set(
     plans
@@ -292,6 +510,55 @@ function resolveNextPlanName(plans) {
     index += 1
   }
   return `方案${index}`
+}
+
+function resolveLowerTickMinuteKeys(ticks) {
+  const lowerTickMinuteKeys = new Set()
+  if (!Array.isArray(ticks) || ticks.length <= 2) {
+    return lowerTickMinuteKeys
+  }
+
+  const isShortRange = (startMinutes, endMinutes) => {
+    const durationMinutes = endMinutes - startMinutes
+    const hourValue = Math.floor(endMinutes / 60)
+    const thresholdMinutes = hourValue < 10 ? 40 : 50
+    return durationMinutes < thresholdMinutes
+  }
+
+  let rangeIndex = 1
+  while (rangeIndex < ticks.length) {
+    const rangeStartMinutes = ticks[rangeIndex - 1]
+    const rangeEndMinutes = ticks[rangeIndex]
+
+    if (!isShortRange(rangeStartMinutes, rangeEndMinutes)) {
+      rangeIndex += 1
+      continue
+    }
+
+    let runStartRangeIndex = rangeIndex
+    let runEndRangeIndex = rangeIndex
+
+    while (
+      runEndRangeIndex + 1 < ticks.length &&
+      isShortRange(ticks[runEndRangeIndex], ticks[runEndRangeIndex + 1])
+    ) {
+      runEndRangeIndex += 1
+    }
+
+    for (let shortRangeIndex = runStartRangeIndex; shortRangeIndex <= runEndRangeIndex; shortRangeIndex += 1) {
+      const shouldLower = (shortRangeIndex - runStartRangeIndex) % 2 === 0
+      const tickMinutes = ticks[shortRangeIndex]
+
+      // Endpoints stay on top; only internal boundary ticks may be lowered.
+      if (shouldLower && tickMinutes > 0 && tickMinutes < TOTAL_DAY_MINUTES) {
+        lowerTickMinuteKeys.add(String(tickMinutes))
+      }
+    }
+
+    rangeIndex = runEndRangeIndex + 1
+  }
+
+  return lowerTickMinuteKeys
 }
 
 function SmartTimerPlanCard({ plan, onEdit, onToggle }) {
@@ -319,24 +586,43 @@ function SmartTimerPlanCard({ plan, onEdit, onToggle }) {
             const segments = buildTimelineSegments(cycle.periods)
             const ticks = buildTimelineTicks(cycle.periods)
             const isEmptyCycle = resolveValidPeriods(cycle.periods).length <= 0
+            const lowerTickKeys = resolveLowerTickMinuteKeys(ticks)
             return (
-              <section key={cycle.id} className="smart-timer-page__cycle-block">
+              <section
+                key={cycle.id}
+                className={`smart-timer-page__cycle-block${lowerTickKeys.size > 0 ? ' has-lower-ticks' : ''}`}
+              >
                 <div className={`smart-timer-page__cycle-days${isEmptyCycle ? ' is-chip' : ''}`}>{resolveCycleDayText(cycle.days)}</div>
 
                 <div className="smart-timer-page__timeline-ticks">
                   {ticks.map((tickMinutes) => {
                     const position = (tickMinutes / TOTAL_DAY_MINUTES) * 100
+                    const tickText = formatTimelineTick(tickMinutes)
+                    const [hourText = '0', minuteText = '00'] = tickText.split(':')
+                    const isStartTick = tickMinutes === 0
+                    const isEndTick = tickMinutes === TOTAL_DAY_MINUTES
+                    const isLowerTick = !isStartTick && !isEndTick && lowerTickKeys.has(String(tickMinutes))
                     const tickClassName = [
                       'smart-timer-page__timeline-tick',
-                      tickMinutes === 0 ? 'is-start' : '',
-                      tickMinutes === TOTAL_DAY_MINUTES ? 'is-end' : '',
+                      isStartTick ? 'is-start' : '',
+                      isEndTick ? 'is-end' : '',
+                      !isStartTick && !isEndTick ? 'is-middle' : '',
+                      isLowerTick ? 'is-lower' : '',
                     ]
                       .filter(Boolean)
                       .join(' ')
 
                     return (
                       <span key={`${cycle.id}-${tickMinutes}`} className={tickClassName} style={{ left: `${position}%` }}>
-                        {formatTimelineTick(tickMinutes)}
+                        {isStartTick || isEndTick ? (
+                          tickText
+                        ) : (
+                          <>
+                            <span className="smart-timer-page__timeline-tick-hour">{hourText}</span>
+                            <span className="smart-timer-page__timeline-tick-colon">:</span>
+                            <span className="smart-timer-page__timeline-tick-minute">{minuteText}</span>
+                          </>
+                        )}
                       </span>
                     )
                   })}
@@ -347,6 +633,7 @@ function SmartTimerPlanCard({ plan, onEdit, onToggle }) {
                     const segmentClassName = [
                       'smart-timer-page__timeline-segment',
                       `is-${segment.type}`,
+                      segment.showDivider ? 'has-divider' : '',
                     ]
                       .filter(Boolean)
                       .join(' ')
@@ -355,7 +642,10 @@ function SmartTimerPlanCard({ plan, onEdit, onToggle }) {
                       <div
                         key={`${cycle.id}-${segment.key}`}
                         className={segmentClassName}
-                        style={{ flexGrow: segment.duration, flexBasis: 0 }}
+                        style={{
+                          left: `${(segment.startMinutes / TOTAL_DAY_MINUTES) * 100}%`,
+                          width: `${(segment.duration / TOTAL_DAY_MINUTES) * 100}%`,
+                        }}
                       >
                         {segment.label ? <span>{segment.label}</span> : null}
                       </div>
@@ -373,7 +663,20 @@ function SmartTimerPlanCard({ plan, onEdit, onToggle }) {
 
 function SmartTimerPage() {
   const [pageMode, setPageMode] = useState('smart')
-  const [plans, setPlans] = useState(() => INITIAL_PLANS.map((plan) => createPlan(plan)))
+  const [plans, setPlans] = useState(() => {
+    const seededPlans = INITIAL_PLANS.map((plan) => createPlan(plan))
+    if (seededPlans.length <= 0) {
+      return []
+    }
+
+    const [firstPlan] = seededPlans
+    return [
+      {
+        ...firstPlan,
+        cycles: firstPlan.cycles.slice(0, 1),
+      },
+    ]
+  })
   const [editorState, setEditorState] = useState({
     isOpen: false,
     type: 'create',
@@ -381,8 +684,18 @@ function SmartTimerPage() {
     draftPlan: null,
   })
   const [timePickerTarget, setTimePickerTarget] = useState(null)
+  const [temperatureKeypadTarget, setTemperatureKeypadTarget] = useState(null)
+  const [attentionModalMessage, setAttentionModalMessage] = useState('')
   const draftPlan = editorState.draftPlan
   const isEditing = editorState.type === 'edit'
+
+  const showAttentionModal = (message) => {
+    setAttentionModalMessage(String(message ?? '').trim())
+  }
+
+  const closeAttentionModal = () => {
+    setAttentionModalMessage('')
+  }
 
   const closeEditor = () => {
     setEditorState({
@@ -392,10 +705,11 @@ function SmartTimerPage() {
       draftPlan: null,
     })
     setTimePickerTarget(null)
+    setTemperatureKeypadTarget(null)
   }
 
   const openCreateEditor = () => {
-    const nextName = resolveNextPlanName(plans)
+    const nextName = resolveNextPlanNameByStyle(plans)
     const draft = createPlan({
       name: nextName,
       enabled: true,
@@ -450,21 +764,31 @@ function SmartTimerPage() {
   }
 
   const handleToggleCycleDay = (cycleId, dayValue) => {
-    updateDraftPlan((draft) => ({
-      ...draft,
-      cycles: draft.cycles.map((cycle) => {
-        if (cycle.id !== cycleId) {
-          return cycle
-        }
+    updateDraftPlan((draft) => {
+      const usedByOtherCycles = new Set(
+        draft.cycles.filter((cycle) => cycle.id !== cycleId).flatMap((cycle) => cycle.days),
+      )
 
-        const shouldRemove = cycle.days.includes(dayValue)
-        const nextDays = shouldRemove ? cycle.days.filter((day) => day !== dayValue) : [...cycle.days, dayValue]
-        return {
-          ...cycle,
-          days: sortDays(nextDays),
-        }
-      }),
-    }))
+      return {
+        ...draft,
+        cycles: draft.cycles.map((cycle) => {
+          if (cycle.id !== cycleId) {
+            return cycle
+          }
+
+          const shouldRemove = cycle.days.includes(dayValue)
+          if (!shouldRemove && usedByOtherCycles.has(dayValue)) {
+            return cycle
+          }
+
+          const nextDays = shouldRemove ? cycle.days.filter((day) => day !== dayValue) : [...cycle.days, dayValue]
+          return {
+            ...cycle,
+            days: sortDays(nextDays),
+          }
+        }),
+      }
+    })
   }
 
   const handlePeriodFieldChange = (cycleId, periodId, field, value) => {
@@ -475,25 +799,62 @@ function SmartTimerPage() {
           return cycle
         }
 
-        return {
-          ...cycle,
-          periods: cycle.periods.map((period) => {
-            if (period.id !== periodId) {
-              return period
-            }
+        if (field === 'temperature') {
+          return {
+            ...cycle,
+            periods: cycle.periods.map((period) => {
+              if (period.id !== periodId) {
+                return period
+              }
 
-            if (field === 'temperature') {
               return {
                 ...period,
                 temperature: sanitizeTemperature(value),
               }
-            }
+            }),
+          }
+        }
 
-            return {
-              ...period,
-              [field]: normalizeTimeValue(value),
-            }
-          }),
+        const periodIndex = cycle.periods.findIndex((period) => period.id === periodId)
+        if (periodIndex < 0) {
+          return cycle
+        }
+
+        const nextPeriods = cycle.periods.map((period) => ({ ...period }))
+        const inputMinutes = parseTimeToMinutes(value)
+        const lastIndex = nextPeriods.length - 1
+
+        if (field === 'start') {
+          if (periodIndex <= 0) {
+            nextPeriods[0].start = '00:00'
+          } else {
+            const previousPeriod = nextPeriods[periodIndex - 1]
+            const minBoundary = parseTimeToMinutes(previousPeriod.start) + 1
+            const maxBoundary = TOTAL_DAY_MINUTES - (lastIndex - periodIndex + 1)
+            const safeBoundary = clampMinutesValue(inputMinutes, minBoundary, maxBoundary)
+            const boundaryText = formatMinutesToTimeValue(safeBoundary)
+
+            nextPeriods[periodIndex].start = boundaryText
+            nextPeriods[periodIndex - 1].end = boundaryText
+          }
+        } else if (field === 'end') {
+          const currentPeriod = nextPeriods[periodIndex]
+          const minBoundary = parseTimeToMinutes(currentPeriod.start) + 1
+          const maxBoundary = TOTAL_DAY_MINUTES - (lastIndex - periodIndex)
+          const safeBoundary = clampMinutesValue(inputMinutes, minBoundary, maxBoundary)
+          const boundaryText = formatMinutesToTimeValue(safeBoundary)
+
+          nextPeriods[periodIndex].end = boundaryText
+          if (periodIndex < lastIndex) {
+            nextPeriods[periodIndex + 1].start = boundaryText
+          }
+        }
+
+        normalizeCyclePeriods(nextPeriods)
+
+        return {
+          ...cycle,
+          periods: nextPeriods,
         }
       }),
     }))
@@ -559,31 +920,54 @@ function SmartTimerPage() {
           return cycle
         }
 
+        const removedIndex = cycle.periods.findIndex((period) => period.id === periodId)
+        if (removedIndex < 0) {
+          return cycle
+        }
+
+        const nextPeriods = cycle.periods.filter((period) => period.id !== periodId).map((period) => ({ ...period }))
+        const lastIndex = nextPeriods.length - 1
+
+        if (nextPeriods.length > 0) {
+          nextPeriods[0].start = '00:00'
+
+          if (removedIndex > 0 && removedIndex <= lastIndex) {
+            nextPeriods[removedIndex].start = nextPeriods[removedIndex - 1].end
+          }
+        }
+
         return {
           ...cycle,
-          periods: cycle.periods.filter((period) => period.id !== periodId),
+          periods: nextPeriods,
         }
       }),
     }))
   }
 
   const handleAddCycle = () => {
-    updateDraftPlan((draft) => {
-      if (draft.cycles.length >= MAX_CYCLE_COUNT) {
-        return draft
-      }
+    if (!draftPlan) {
+      return
+    }
+    if (draftPlan.cycles.length >= MAX_CYCLE_COUNT) {
+      return
+    }
 
-      return {
-        ...draft,
-        cycles: [
-          ...draft.cycles,
-          createCycle({
-            days: [],
-            periods: [{ start: '00:00', end: '00:00', mode: 'climate' }],
-          }),
-        ],
-      }
-    })
+    const invalidCycleIndexes = resolveInvalidCycleIndexes(draftPlan.cycles)
+    if (invalidCycleIndexes.length > 0) {
+      showAttentionModal('新增周期前，已有周期必须连续且覆盖24小时。')
+      return
+    }
+
+    updateDraftPlan((draft) => ({
+      ...draft,
+      cycles: [
+        ...draft.cycles,
+        createCycle({
+          days: [],
+          periods: [{ start: '00:00', end: '00:00', mode: 'climate' }],
+        }),
+      ],
+    }))
   }
 
   const handleRemoveCycle = (cycleId) => {
@@ -625,8 +1009,55 @@ function SmartTimerPage() {
     setTimePickerTarget(null)
   }
 
+  const handleOpenTemperatureKeypad = (cycleId, periodId, value) => {
+    setTemperatureKeypadTarget({
+      cycleId,
+      periodId,
+      value: sanitizeTemperature(value),
+    })
+  }
+
+  const handleConfirmTemperatureKeypad = (nextValue) => {
+    if (!temperatureKeypadTarget) {
+      return
+    }
+
+    handlePeriodFieldChange(
+      temperatureKeypadTarget.cycleId,
+      temperatureKeypadTarget.periodId,
+      'temperature',
+      sanitizeTemperature(nextValue),
+    )
+    setTemperatureKeypadTarget(null)
+  }
+
   const handleConfirmEditor = () => {
     if (!draftPlan) {
+      return
+    }
+
+    const emptyDayCycleIndexes = resolveCyclesWithoutDays(draftPlan.cycles)
+    if (emptyDayCycleIndexes.length > 0) {
+      const cycleText = emptyDayCycleIndexes.map((index) => index + 1).join(', ')
+      showAttentionModal(`周期 ${cycleText} 必须至少选择一个星期。`)
+      return
+    }
+
+    const invalidCycleIndexes = resolveInvalidCycleIndexes(draftPlan.cycles)
+    if (invalidCycleIndexes.length > 0) {
+      const cycleText = invalidCycleIndexes.map((index) => index + 1).join(', ')
+      showAttentionModal(`周期 ${cycleText} 必须连续且覆盖24小时。`)
+      return
+    }
+
+    const duplicateDays = resolveDuplicateCycleDays(draftPlan.cycles)
+    if (duplicateDays.length > 0) {
+      showAttentionModal('周期间星期不能重复。')
+      return
+    }
+
+    if (!areAllWeekdaysCovered(draftPlan.cycles)) {
+      showAttentionModal('所有周期加起来必须覆盖周一至周日。')
       return
     }
 
@@ -696,6 +1127,11 @@ function SmartTimerPage() {
               <img src={circlePlusWhiteIcon} alt="" aria-hidden="true" />
               <span>新增方案</span>
             </button>
+            <p className="smart-timer-page__plan-tip">
+              <span className="smart-timer-page__plan-tip-key is-climate">{PLAN_LEGEND_CLIMATE}</span>
+              <span className="smart-timer-page__plan-tip-separator">{PLAN_LEGEND_SEPARATOR}</span>
+              <span className="smart-timer-page__plan-tip-key is-constant">{PLAN_LEGEND_CONSTANT}</span>
+            </p>
 
             <div className="smart-timer-page__plan-list">
               {plans.length > 0 ? (
@@ -757,11 +1193,11 @@ function SmartTimerPage() {
                 {draftPlan.cycles.map((cycle, cycleIndex) => (
                   <section key={cycle.id} className="smart-timer-page__editor-cycle">
                     <header className="smart-timer-page__editor-cycle-head">
-                      <h4 className="smart-timer-page__editor-cycle-title">周期</h4>
+                      <h4 className="smart-timer-page__editor-cycle-title">{`周期${cycleIndex + 1}`}</h4>
                       <button
                         type="button"
                         className="smart-timer-page__cycle-remove-btn"
-                        aria-label={`删除第${cycleIndex + 1}个周期`}
+                        aria-label={`删除周期${cycleIndex + 1}`}
                         onClick={() => handleRemoveCycle(cycle.id)}
                         disabled={draftPlan.cycles.length <= 1}
                       >
@@ -772,12 +1208,17 @@ function SmartTimerPage() {
                     <div className="smart-timer-page__weekday-list">
                       {WEEKDAY_OPTIONS.map((weekday) => {
                         const active = cycle.days.includes(weekday.value)
+                        const selectedInOtherCycle = draftPlan.cycles.some(
+                          (otherCycle, otherIndex) => otherIndex !== cycleIndex && otherCycle.days.includes(weekday.value),
+                        )
+                        const disabled = !active && selectedInOtherCycle
                         return (
                           <button
                             key={`${cycle.id}-${weekday.value}`}
                             type="button"
-                            className={`smart-timer-page__weekday-btn${active ? ' is-active' : ''}`}
+                            className={`smart-timer-page__weekday-btn${active ? ' is-active' : ''}${disabled ? ' is-disabled' : ''}`}
                             onClick={() => handleToggleCycleDay(cycle.id, weekday.value)}
+                            disabled={disabled}
                           >
                             {weekday.label}
                           </button>
@@ -789,6 +1230,7 @@ function SmartTimerPage() {
 
                     <div className="smart-timer-page__period-list">
                       {cycle.periods.map((period, periodIndex) => {
+                        const isFirstPeriod = periodIndex === 0
                         const isLastPeriod = periodIndex === cycle.periods.length - 1
                         const actionType = isLastPeriod ? 'add' : 'remove'
                         const actionDisabled =
@@ -803,6 +1245,7 @@ function SmartTimerPage() {
                                 type="button"
                                 className="smart-timer-page__period-time is-start"
                                 onClick={() => handleOpenTimePicker(cycle.id, period.id, 'start', period.start)}
+                                disabled={isFirstPeriod}
                               >
                                 {period.start}
                               </button>
@@ -852,12 +1295,15 @@ function SmartTimerPage() {
                               <div className="smart-timer-page__period-temperature">
                                 <input
                                   type="text"
-                                  inputMode="numeric"
+                                  inputMode="none"
+                                  readOnly
                                   maxLength={2}
                                   value={period.temperature}
-                                  onChange={(event) =>
-                                    handlePeriodFieldChange(cycle.id, period.id, 'temperature', event.target.value)
-                                  }
+                                  onClick={() => handleOpenTemperatureKeypad(cycle.id, period.id, period.temperature)}
+                                  onFocus={(event) => {
+                                    event.target.blur()
+                                    handleOpenTemperatureKeypad(cycle.id, period.id, period.temperature)
+                                  }}
                                   placeholder="请输入入温度（0-50）"
                                   aria-label="定温模式温度设置"
                                 />
@@ -919,6 +1365,27 @@ function SmartTimerPage() {
         value={timePickerTarget?.value ?? [0, 0]}
         onClose={() => setTimePickerTarget(null)}
         onConfirm={handleConfirmTimePicker}
+        showBackdrop={false}
+        zIndex={260}
+      />
+
+      <NumericKeypadModal
+        isOpen={Boolean(temperatureKeypadTarget)}
+        initialValue={temperatureKeypadTarget?.value ?? ''}
+        onClose={() => setTemperatureKeypadTarget(null)}
+        onConfirm={handleConfirmTemperatureKeypad}
+        showBackdrop={false}
+        zIndex={260}
+      />
+
+      <AttentionModal
+        isOpen={Boolean(attentionModalMessage)}
+        title="提示"
+        message={attentionModalMessage}
+        confirmText="确认"
+        onClose={closeAttentionModal}
+        onConfirm={closeAttentionModal}
+        zIndex={300}
       />
     </>
   )

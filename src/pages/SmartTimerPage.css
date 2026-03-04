@@ -3,14 +3,21 @@
   height: 100%;
   min-height: 0;
   overflow: auto;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
   padding: 20px 24px 28px 0;
   box-sizing: border-box;
   color: #ffffff;
 }
 
+.smart-timer-page::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+}
+
 .smart-timer-page__mode-grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 520px));
+  grid-template-columns: repeat(2, minmax(0, 487px));
   width: min(1040px, 100%);
 }
 
@@ -49,19 +56,19 @@
 
 .smart-timer-page__add-plan-btn {
   margin-top: 24px;
-  width: 188px;
-  height: 64px;
+  height: 60px;
   border: none;
   border-radius: 20px;
   background: #197cdf;
   color: #f3f8ff;
-  font-size: 36px;
+  font-size: 20px;
   line-height: 1;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 14px;
   cursor: pointer;
+  padding: 0px 32px;
 }
 
 .smart-timer-page__add-plan-btn img {
@@ -70,8 +77,27 @@
   display: block;
 }
 
+.smart-timer-page__plan-tip {
+  margin: 24px 0 0;
+  font-size: 16px;
+  line-height: 1.4;
+  color: #b9cae4;
+}
+
+.smart-timer-page__plan-tip-key.is-climate {
+  color: #4ca7ff;
+}
+
+.smart-timer-page__plan-tip-key.is-constant {
+  color: #f3b53b;
+}
+
+.smart-timer-page__plan-tip-separator {
+  margin: 0 4px;
+}
+
 .smart-timer-page__plan-list {
-  margin-top: 24px;
+  margin-top: 10px;
   display: flex;
   flex-direction: column;
   gap: 24px;
@@ -94,7 +120,7 @@
   border-radius: 16px;
   background: #22262d;
   border: 1px solid rgba(255, 255, 255, 0.05);
-  padding: 24px 34px 30px;
+  padding: 32px;
 }
 
 .smart-timer-page__plan-head {
@@ -107,21 +133,21 @@
 .smart-timer-page__plan-title-wrap {
   display: inline-flex;
   align-items: center;
-  gap: 12px;
+  gap: 16px;
   min-width: 0;
 }
 
 .smart-timer-page__plan-title {
   margin: 0;
   color: #ffffff;
-  font-size: 42px;
+  font-size: 24px;
   font-weight: 500;
   line-height: 1;
 }
 
 .smart-timer-page__plan-edit-btn {
-  width: 44px;
-  height: 44px;
+  width: 40px;
+  height: 40px;
   border: none;
   border-radius: 10px;
   background: #3b4655;
@@ -147,65 +173,101 @@
 }
 
 .smart-timer-page__plan-body {
-  margin-top: 24px;
+  margin-top: 35px;
   display: flex;
   flex-direction: column;
   gap: 26px;
 }
 
 .smart-timer-page__cycle-block {
+  --timeline-gap: 6px;
+  --timeline-track-height: 72px;
+  --timeline-lower-extra-offset: 16px;
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: var(--timeline-gap);
+}
+
+.smart-timer-page__cycle-block.has-lower-ticks {
+  padding-bottom: 34px;
 }
 
 .smart-timer-page__cycle-days {
   color: #ffffff;
-  font-size: 40px;
+  font-size: 20px;
   line-height: 1;
   width: fit-content;
 }
 
-.smart-timer-page__cycle-days.is-chip {
-  min-height: 48px;
-  border-radius: 12px;
-  background: rgba(255, 255, 255, 0.1);
-  padding: 8px 14px;
-  display: inline-flex;
-  align-items: center;
-}
-
 .smart-timer-page__timeline-ticks {
   position: relative;
-  height: 40px;
+  height: 20px;
   margin-top: 6px;
+  z-index: 2;
+  overflow: visible;
 }
 
 .smart-timer-page__timeline-tick {
   position: absolute;
-  top: 0;
-  transform: translateX(-50%);
+  bottom: 0;
   color: #ffffff;
-  font-size: 36px;
+  font-size: 16px;
   line-height: 1;
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
 }
 
 .smart-timer-page__timeline-tick.is-start {
-  transform: none;
+  transform: translateX(0);
 }
 
 .smart-timer-page__timeline-tick.is-end {
   transform: translateX(-100%);
 }
 
+.smart-timer-page__timeline-tick.is-middle {
+  width: 0;
+  transform: translateX(0);
+  height: 1em;
+  white-space: normal;
+}
+
+.smart-timer-page__timeline-tick.is-middle .smart-timer-page__timeline-tick-hour {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  transform: translateX(calc(-100% - 2px));
+  white-space: nowrap;
+}
+
+.smart-timer-page__timeline-tick.is-middle .smart-timer-page__timeline-tick-colon {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  transform: translateX(-50%);
+  white-space: nowrap;
+}
+
+.smart-timer-page__timeline-tick.is-middle .smart-timer-page__timeline-tick-minute {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  transform: translateX(2px);
+  white-space: nowrap;
+}
+
+.smart-timer-page__timeline-tick.is-lower {
+  bottom: calc(-1 * (var(--timeline-track-height) + var(--timeline-gap) + var(--timeline-lower-extra-offset)));
+}
+
 .smart-timer-page__timeline-track {
-  min-height: 78px;
+  position: relative;
+  z-index: 1;
+  height: var(--timeline-track-height);
   border-radius: 8px;
   overflow: hidden;
   background: #323845;
-  display: flex;
+  display: block;
 }
 
 .smart-timer-page__timeline-track.is-empty {
@@ -213,17 +275,41 @@
 }
 
 .smart-timer-page__timeline-segment {
+  position: absolute;
+  top: 0;
+  height: 100%;
   min-width: 0;
   display: flex;
   align-items: center;
   justify-content: center;
   color: #edf5ff;
-  font-size: 38px;
+  font-size: 18px;
   line-height: 1;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
   padding: 0 10px;
+  container-type: inline-size;
+}
+
+.smart-timer-page__timeline-segment > span {
+  display: none;
+}
+
+@container (min-width: 8em) {
+  .smart-timer-page__timeline-segment.is-constant > span {
+    display: block;
+  }
+}
+
+@container (min-width: 9.5em) {
+  .smart-timer-page__timeline-segment.is-climate > span {
+    display: block;
+  }
+}
+
+.smart-timer-page__timeline-segment.has-divider {
+  box-shadow: inset 1px 0 0 rgba(238, 245, 255, 0.75);
 }
 
 .smart-timer-page__timeline-segment.is-climate {
@@ -304,14 +390,21 @@
   flex: 1;
   min-height: 0;
   overflow: auto;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
   padding: 16px 34px 24px;
+}
+
+.smart-timer-page__editor-body::-webkit-scrollbar {
+  width: 0;
+  height: 0;
 }
 
 .smart-timer-page__editor-plan-row {
   min-height: 95px;
   border-radius: 16px;
   background: #22262d;
-  padding: 0 24px;
+  padding: 0 32px;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -320,7 +413,7 @@
 
 .smart-timer-page__editor-plan-name {
   color: #f7fbff;
-  font-size: 42px;
+  font-size: 24px;
   line-height: 1;
 }
 
@@ -341,10 +434,8 @@
 
 .smart-timer-page__editor-cycle {
   border-radius: 16px;
-  background:
-    linear-gradient(90deg, rgba(255, 255, 255, 0.05) 0%, rgba(34, 38, 45, 0.80) 30%, rgba(17, 20, 34, 0.92) 100%),
-    #1b1f27;
-  padding: 16px 24px 20px;
+  background: rgba(255, 255, 255, 0.02);
+  padding: 24px;
 }
 
 .smart-timer-page__editor-cycle-head {
@@ -387,19 +478,19 @@
 }
 
 .smart-timer-page__weekday-list {
-  margin-top: 16px;
+  margin-top: 24px;
   display: grid;
   grid-template-columns: repeat(7, minmax(0, 1fr));
   gap: 16px;
 }
 
 .smart-timer-page__weekday-btn {
-  height: 64px;
+  height: 60px;
   border: none;
-  border-radius: 10px;
+  border-radius: 8px;
   background: #222833;
   color: #ffffff;
-  font-size: 34px;
+  font-size: 20px;
   line-height: 1;
   cursor: pointer;
 }
@@ -408,8 +499,15 @@
   background: #2a7fd4;
 }
 
+.smart-timer-page__weekday-btn.is-disabled,
+.smart-timer-page__weekday-btn:disabled {
+  background: #1a1f28;
+  color: rgba(255, 255, 255, 0.38);
+  cursor: not-allowed;
+}
+
 .smart-timer-page__period-title {
-  margin: 22px 0 0;
+  margin: 24px 0 0;
   color: #ffffff;
   font-size: 20px;
   font-weight: 400;
@@ -417,16 +515,16 @@
 }
 
 .smart-timer-page__period-list {
-  margin-top: 16px;
+  margin-top: 20px;
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 16px;
 }
 
 .smart-timer-page__period-item {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 16px;
 }
 
 .smart-timer-page__period-row {
@@ -437,17 +535,23 @@
 }
 
 .smart-timer-page__period-time {
-  height: 64px;
+  height: 60px;
   border: none;
   border-radius: 16px;
   background: #222a37;
   color: #f2f7ff;
-  font-size: 36px;
+  font-size: 20px;
   line-height: 1;
-  padding: 0 20px;
+  padding: 16px 24px;
   display: inline-flex;
   align-items: center;
   cursor: pointer;
+}
+
+.smart-timer-page__period-time:disabled {
+  background: #1b2230;
+  color: rgba(242, 247, 255, 0.45);
+  cursor: not-allowed;
 }
 
 .smart-timer-page__period-dash {
@@ -459,9 +563,9 @@
 
 .smart-timer-page__period-select {
   width: 100%;
-  --select-trigger-height: 64px;
+  --select-trigger-height: 60px;
   --select-trigger-radius: 16px;
-  --select-trigger-font-size: 38px;
+  --select-trigger-font-size: 20px;
   --select-trigger-padding-x: 20px;
   --select-arrow-right: 20px;
   --select-arrow-size: 8px;
@@ -470,7 +574,7 @@
   --select-menu-padding: 10px;
   --select-option-height: 52px;
   --select-option-radius: 10px;
-  --select-option-font-size: 34px;
+  --select-option-font-size: 20px;
   --select-option-padding-x: 16px;
 }
 
@@ -522,6 +626,7 @@
 
 .smart-timer-page__period-temperature {
   position: relative;
+  width: 763px;
 }
 
 .smart-timer-page__period-temperature input {
@@ -531,9 +636,10 @@
   border-radius: 16px;
   background: #222a37;
   color: #f2f7ff;
-  font-size: 34px;
+  font-size: 20px;
   line-height: 1;
   padding: 0 68px 0 20px;
+  cursor: pointer;
 }
 
 .smart-timer-page__period-temperature input::placeholder {
@@ -546,7 +652,7 @@
   top: 50%;
   transform: translateY(-50%);
   color: #f2f7ff;
-  font-size: 32px;
+  font-size: 20px;
   line-height: 1;
 }
 
@@ -558,7 +664,7 @@
   border-radius: 16px;
   background: #222a36;
   color: #1c8eea;
-  font-size: 36px;
+  font-size: 20px;
   line-height: 1;
   display: inline-flex;
   align-items: center;
@@ -587,12 +693,12 @@
 }
 
 .smart-timer-page__editor-action {
-  width: 210px;
+  width: 198px;
   height: 64px;
   border: none;
   border-radius: 16px;
   color: #f4f8ff;
-  font-size: 40px;
+  font-size: 20px;
   line-height: 1;
   cursor: pointer;
 }
@@ -700,6 +806,15 @@
     font-size: 24px;
   }
 
+  .smart-timer-page__cycle-block {
+    --timeline-track-height: 58px;
+    --timeline-lower-extra-offset: 14px;
+  }
+
+  .smart-timer-page__cycle-block.has-lower-ticks {
+    padding-bottom: 30px;
+  }
+
   .smart-timer-page__timeline-ticks {
     height: 28px;
   }
@@ -709,7 +824,7 @@
   }
 
   .smart-timer-page__timeline-track {
-    min-height: 58px;
+    height: var(--timeline-track-height);
   }
 
   .smart-timer-page__timeline-segment {
