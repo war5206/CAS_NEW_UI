@@ -12,7 +12,7 @@
   font-size: var(--select-trigger-font-size, 20px);
   line-height: 1;
   text-align: left;
-  padding: 0 var(--select-trigger-padding-x, 32px);
+  padding: var(--select-trigger-padding-y, 0) var(--select-trigger-padding-x, 32px);
   height: var(--select-trigger-height, 60px);
   position: relative;
   cursor: pointer;

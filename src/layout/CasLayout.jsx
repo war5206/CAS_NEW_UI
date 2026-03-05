@@ -21,7 +21,15 @@ const formatDateTime = (date) => {
   }
 }
 
-function CasLayout({ routeInfo, children, homePageTitle, unsavedGuard, hideSecondaryNav = false, hideModuleTabs = false }) {
+function CasLayout({
+  routeInfo,
+  children,
+  homePageTitle,
+  unsavedGuard,
+  hideSecondaryNav = false,
+  hideModuleTabs = false,
+  extraBreadcrumbLabel = null,
+}) {
   const [now, setNow] = useState(() => new Date())
   const activeModule = routeInfo.module
   const activeSection = routeInfo.section
@@ -43,8 +51,11 @@ function CasLayout({ routeInfo, children, homePageTitle, unsavedGuard, hideSecon
     if (activeTab) {
       items.push(activeTab.label)
     }
+    if (!isHomeLayout && extraBreadcrumbLabel) {
+      items.push(extraBreadcrumbLabel)
+    }
     return items
-  }, [activeModule, activeSection, activeTab, homePageTitle])
+  }, [activeModule, activeSection, activeTab, extraBreadcrumbLabel, homePageTitle, isHomeLayout])
 
   const sectionList = activeModule.sections ?? []
   const tabList = activeSection?.tabs ?? []

@@ -1,8 +1,21 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import SelectDropdown from '../components/SelectDropdown'
 import NumericKeypadModal from '../components/NumericKeypadModal'
+import TimePickerModal from '../components/TimePickerModal'
 import hpRunningIcon from '../assets/heat-pump/hp-running.svg'
 import hpNullIcon from '../assets/heat-pump/hp-null.svg'
+import basicSettingWaterPumpIcon from '../assets/basic-setting-water-pump.svg'
+import basicSettingHpPositionIcon from '../assets/basic-setting-hp-position.svg'
+import basicSettingSystemTypeIcon from '../assets/basic-setting-system-type.svg'
+import basicSettingEnergyPriceIcon from '../assets/basic-setting-energy-price.svg'
+import basicSettingMotherBoardIcon from '../assets/basic-setting-mother-board.svg'
+import couplingEnergyIcon from '../assets/icons/couple-energy.svg'
+import arrowRightSelectedIcon from '../assets/arrow-right-blackbg.svg'
+import arrowLeftSelectedIcon from '../assets/arrow-left-blackbg.svg'
+import showIcon from '../assets/icons/show.svg'
+import hideIcon from '../assets/icons/hide.svg'
+import longArrowDownBlueIcon from '../assets/long-arrow-down-blue.svg'
+import longArrowDownGrayIcon from '../assets/long-arrow-down-gray.svg'
 import { HEAT_PUMP_GRID_ITEMS } from '../config/homeHeatPumps'
 import './SystemParamsPage.css'
 
@@ -50,7 +63,7 @@ const ENERGY_PRICE_TABS = [
   { value: 'gas', label: '气' },
 ]
 
-const COUPLING_ENERGY_TYPES = ['电锅炉', '燃气锅炉', '水源热泵', '风冷热块', '无耦合能源']
+const COUPLING_ENERGY_TYPES = ['电锅炉', '燃气锅炉', '水源热泵', '风冷热泵', '无耦合能源']
 
 const REGION_OPTIONS = [
   {
@@ -81,8 +94,21 @@ const REGION_OPTIONS = [
 ]
 
 const UNIT_LAYOUT_COLS = 10
-const UNIT_LAYOUT_ROWS = 6
+const UNIT_LAYOUT_ROWS = 10
 const UNIT_TOTAL = 14
+const DATE_PICKER_YEARS = Array.from({ length: 61 }, (_, index) => 2000 + index)
+const DATE_PICKER_MONTHS = Array.from({ length: 12 }, (_, index) => index + 1)
+const DATE_PICKER_DAYS = Array.from({ length: 31 }, (_, index) => index + 1)
+const UNSAVED_MESSAGE = '当前页面有未保存修改，是否退出？'
+const SAVE_CONFIRM_MESSAGE = '确认保存当前参数吗？'
+const DETAIL_MAIN_KEYS = ['project-system-type', 'loop-pump-count', 'unit-layout', 'energy-price', 'coupling-energy']
+
+const CARD_ICON_MAP = {
+  'project-system-type': basicSettingSystemTypeIcon,
+  'loop-pump-count': basicSettingWaterPumpIcon,
+  'unit-layout': basicSettingHpPositionIcon,
+  'energy-price': basicSettingEnergyPriceIcon,
+}
 
 const initialProjectForm = {
   projectType: 'cooling-heating',
@@ -175,23 +201,87 @@ function toNoLabel(id) {
   return `NO${String(id).padStart(2, '0')}`
 }
 
-function SystemParamsPage({ onUnsavedGuardChange, onSecondaryNavVisibilityChange, onModuleTabsVisibilityChange }) {
+function deepClone(value) {
+  return JSON.parse(JSON.stringify(value))
+}
+
+function cloneUnitLayoutState(state) {
+  return {
+    slots: [...state.slots],
+    pendingIds: [...state.pendingIds],
+    layoutLocked: state.layoutLocked,
+    numberingDone: state.numberingDone,
+    numberingMap: { ...state.numberingMap },
+    showOriginalNo: state.showOriginalNo,
+  }
+}
+
+function parseDateString(value) {
+  if (!value) {
+    const now = new Date()
+    return [now.getFullYear(), now.getMonth() + 1, now.getDate()]
+  }
+
+  const [rawYear, rawMonth, rawDay] = value.split('-').map((item) => Number(item))
+  if (!Number.isInteger(rawYear) || !Number.isInteger(rawMonth) || !Number.isInteger(rawDay)) {
+    const now = new Date()
+    return [now.getFullYear(), now.getMonth() + 1, now.getDate()]
+  }
+
+  return [rawYear, rawMonth, rawDay]
+}
+
+function formatDateString(year, month, day) {
+  return `${String(year).padStart(4, '0')}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`
+}
+
+function SystemParamsPage({
+  onUnsavedGuardChange,
+  onSecondaryNavVisibilityChange,
+  onModuleTabsVisibilityChange,
+  onDetailBreadcrumbChange,
+  onUnitLayoutCommitted,
+}) {
   const [activeView, setActiveView] = useState('overview')
   const [mainboard, setMainboard] = useState('jingchuang')
-  const [projectForm, setProjectForm] = useState(initialProjectForm)
-  const [loopPumpForm, setLoopPumpForm] = useState(initialLoopPumpForm)
-  const [simpleForms, setSimpleForms] = useState(initialSimpleForms)
-  const [energyPriceState, setEnergyPriceState] = useState(initialEnergyPriceState)
-  const [couplingEnergyState, setCouplingEnergyState] = useState(initialCouplingEnergyState)
+  const [projectForm, setProjectForm] = useState(() => deepClone(initialProjectForm))
+  const [savedProjectForm, setSavedProjectForm] = useState(() => deepClone(initialProjectForm))
+  const [loopPumpForm, setLoopPumpForm] = useState(() => deepClone(initialLoopPumpForm))
+  const [savedLoopPumpForm, setSavedLoopPumpForm] = useState(() => deepClone(initialLoopPumpForm))
+  const [simpleForms, setSimpleForms] = useState(() => deepClone(initialSimpleForms))
+  const [savedSimpleForms, setSavedSimpleForms] = useState(() => deepClone(initialSimpleForms))
+  const [energyPriceState, setEnergyPriceState] = useState(() => deepClone(initialEnergyPriceState))
+  const [savedEnergyPriceState, setSavedEnergyPriceState] = useState(() => deepClone(initialEnergyPriceState))
+  const [couplingEnergyState, setCouplingEnergyState] = useState(() => deepClone(initialCouplingEnergyState))
+  const [savedCouplingEnergyState, setSavedCouplingEnergyState] = useState(() => deepClone(initialCouplingEnergyState))
   const [energyPriceModalOpen, setEnergyPriceModalOpen] = useState(false)
   const [keypadState, setKeypadState] = useState({ open: false, field: null, moduleKey: null })
+  const [datePickerField, setDatePickerField] = useState(null)
+  const [confirmDialog, setConfirmDialog] = useState({ open: false, mode: null, targetView: null })
 
-  const [unitSlots, setUnitSlots] = useState(INITIAL_UNIT_LAYOUT_STATE.slots)
-  const [pendingUnitIds, setPendingUnitIds] = useState(INITIAL_UNIT_LAYOUT_STATE.pendingIds)
+  const [unitSlots, setUnitSlots] = useState(() => [...INITIAL_UNIT_LAYOUT_STATE.slots])
+  const [pendingUnitIds, setPendingUnitIds] = useState(() => [...INITIAL_UNIT_LAYOUT_STATE.pendingIds])
   const [unitLayoutLocked, setUnitLayoutLocked] = useState(INITIAL_UNIT_LAYOUT_STATE.layoutLocked)
-  const [unitNumberingMap, setUnitNumberingMap] = useState(INITIAL_UNIT_LAYOUT_STATE.numberingMap)
+  const [unitNumberingMap, setUnitNumberingMap] = useState(() => ({ ...INITIAL_UNIT_LAYOUT_STATE.numberingMap }))
   const [unitNumberingDone, setUnitNumberingDone] = useState(INITIAL_UNIT_LAYOUT_STATE.numberingDone)
   const [showOriginalNo, setShowOriginalNo] = useState(INITIAL_UNIT_LAYOUT_STATE.showOriginalNo)
+  const [longPressedPendingIds, setLongPressedPendingIds] = useState(() => ({}))
+  const [smartScanDone, setSmartScanDone] = useState(false)
+  const [smartScanEnabled, setSmartScanEnabled] = useState(false)
+  const [manualDraggingPumpId, setManualDraggingPumpId] = useState(null)
+  const [manualDraggingSource, setManualDraggingSource] = useState(null)
+  const [manualDragPointer, setManualDragPointer] = useState({ x: 0, y: 0 })
+  const [savedUnitLayoutState, setSavedUnitLayoutState] = useState(() => cloneUnitLayoutState(INITIAL_UNIT_LAYOUT_STATE))
+  const pendingLongPressTimerRef = useRef(null)
+  const draggingPumpIdRef = useRef(null)
+  const manualDraggingPumpIdRef = useRef(null)
+  const pendingListRef = useRef(null)
+  const unitLayoutLockedRef = useRef(unitLayoutLocked)
+  const movePumpToSlotRef = useRef(null)
+  const dragStartPointRef = useRef({ x: 0, y: 0 })
+  const didManualDragMoveRef = useRef(false)
+  const suppressNextClickRef = useRef(false)
+  const previousActiveViewRef = useRef(activeView)
 
   const activeProvince = useMemo(
     () => REGION_OPTIONS.find((item) => item.value === projectForm.province) ?? REGION_OPTIONS[0],
@@ -204,6 +294,12 @@ function SystemParamsPage({ onUnsavedGuardChange, onSecondaryNavVisibilityChange
   const nextUnitNumber = useMemo(() => Object.keys(unitNumberingMap).length + 1, [unitNumberingMap])
   const canFinishLayout = pendingUnitIds.length === 0 && addedUnitIds.length > 0 && !unitLayoutLocked
   const canFinishNumbering = unitLayoutLocked && !unitNumberingDone && Object.keys(unitNumberingMap).length === addedUnitIds.length
+  const datePickerValue = useMemo(() => {
+    if (!datePickerField) {
+      return []
+    }
+    return parseDateString(projectForm[datePickerField])
+  }, [datePickerField, projectForm])
 
   useEffect(() => {
     const shouldHideSecondaryNav = activeView !== 'overview'
@@ -223,13 +319,175 @@ function SystemParamsPage({ onUnsavedGuardChange, onSecondaryNavVisibilityChange
     }
   }, [activeView, onModuleTabsVisibilityChange])
 
+  const activeDetailLabel = useMemo(() => {
+    if (activeView === 'overview') {
+      return null
+    }
+    return MODULE_ITEMS.find((item) => item.key === activeView)?.label ?? null
+  }, [activeView])
+
+  useEffect(() => {
+    onDetailBreadcrumbChange?.(activeDetailLabel)
+  }, [activeDetailLabel, onDetailBreadcrumbChange])
+
+  useEffect(() => () => onDetailBreadcrumbChange?.(null), [onDetailBreadcrumbChange])
+
+  useEffect(() => () => {
+    if (pendingLongPressTimerRef.current) {
+      clearTimeout(pendingLongPressTimerRef.current)
+      pendingLongPressTimerRef.current = null
+    }
+  }, [])
+
+  useEffect(() => {
+    const dropByClientPoint = (clientX, clientY, source) => {
+      const dragId = draggingPumpIdRef.current
+      if (!dragId || unitLayoutLockedRef.current || !manualDraggingPumpIdRef.current) {
+        return
+      }
+
+      const element = document.elementFromPoint(clientX, clientY)
+      const slotElement = element?.closest?.('[data-slot-index]')
+      if (!slotElement) {
+        return
+      }
+
+      const slotIndex = Number(slotElement.getAttribute('data-slot-index'))
+      if (!Number.isInteger(slotIndex)) {
+        return
+      }
+
+      if (UNIT_PUMP_ID_SET.has(dragId)) {
+        console.log('[UnitLayout] slot drop by global pointer up', { pumpId: dragId, slotIndex, source })
+        movePumpToSlotRef.current?.(dragId, slotIndex)
+      }
+    }
+
+    const clearDragState = () => {
+      draggingPumpIdRef.current = null
+      setManualDraggingPumpId(null)
+      setManualDraggingSource(null)
+      clearPendingLongPressTimer()
+    }
+
+    const handleGlobalMouseMove = (event) => {
+      if (!manualDraggingPumpIdRef.current) {
+        return
+      }
+      if (!didManualDragMoveRef.current) {
+        const deltaX = Math.abs(event.clientX - dragStartPointRef.current.x)
+        const deltaY = Math.abs(event.clientY - dragStartPointRef.current.y)
+        if (deltaX > 4 || deltaY > 4) {
+          didManualDragMoveRef.current = true
+        }
+      }
+      setManualDragPointer({ x: event.clientX, y: event.clientY })
+    }
+
+    const handleGlobalTouchMove = (event) => {
+      if (!manualDraggingPumpIdRef.current) {
+        return
+      }
+      const point = event.touches?.[0]
+      if (!point) {
+        return
+      }
+      if (!didManualDragMoveRef.current) {
+        const deltaX = Math.abs(point.clientX - dragStartPointRef.current.x)
+        const deltaY = Math.abs(point.clientY - dragStartPointRef.current.y)
+        if (deltaX > 4 || deltaY > 4) {
+          didManualDragMoveRef.current = true
+        }
+      }
+      event.preventDefault()
+      setManualDragPointer({ x: point.clientX, y: point.clientY })
+    }
+
+    const handleGlobalMouseUp = (event) => {
+      dropByClientPoint(event.clientX, event.clientY, 'mouse')
+      suppressNextClickRef.current = didManualDragMoveRef.current
+      didManualDragMoveRef.current = false
+      clearDragState()
+    }
+
+    const handleGlobalTouchEnd = (event) => {
+      const point = event.changedTouches?.[0]
+      if (point) {
+        dropByClientPoint(point.clientX, point.clientY, 'touch')
+      }
+      suppressNextClickRef.current = didManualDragMoveRef.current
+      didManualDragMoveRef.current = false
+      clearDragState()
+    }
+
+    const handleGlobalClickCapture = (event) => {
+      if (!suppressNextClickRef.current) {
+        return
+      }
+      event.preventDefault()
+      event.stopPropagation()
+      suppressNextClickRef.current = false
+    }
+
+    window.addEventListener('mouseup', handleGlobalMouseUp, true)
+    window.addEventListener('mousemove', handleGlobalMouseMove, true)
+    window.addEventListener('touchend', handleGlobalTouchEnd, true)
+    window.addEventListener('touchmove', handleGlobalTouchMove, { capture: true, passive: false })
+    window.addEventListener('click', handleGlobalClickCapture, true)
+    window.addEventListener('blur', clearDragState)
+
+    return () => {
+      window.removeEventListener('mouseup', handleGlobalMouseUp, true)
+      window.removeEventListener('mousemove', handleGlobalMouseMove, true)
+      window.removeEventListener('touchend', handleGlobalTouchEnd, true)
+      window.removeEventListener('touchmove', handleGlobalTouchMove, true)
+      window.removeEventListener('click', handleGlobalClickCapture, true)
+      window.removeEventListener('blur', clearDragState)
+    }
+  }, [])
+
+  useEffect(() => {
+    unitLayoutLockedRef.current = unitLayoutLocked
+  }, [unitLayoutLocked])
+
+  useEffect(() => {
+    manualDraggingPumpIdRef.current = manualDraggingPumpId
+  }, [manualDraggingPumpId])
+
+  useEffect(() => {
+    const shouldLockScroll = Boolean(manualDraggingPumpId)
+    document.body.classList.toggle('unit-layout-drag-lock', shouldLockScroll)
+    return () => {
+      document.body.classList.remove('unit-layout-drag-lock')
+    }
+  }, [manualDraggingPumpId])
+
+  useEffect(() => {
+    const previousActiveView = previousActiveViewRef.current
+    if (previousActiveView === 'unit-layout' && activeView !== 'unit-layout' && !unitNumberingDone) {
+      setUnitSlots([...INITIAL_UNIT_LAYOUT_STATE.slots])
+      setPendingUnitIds([...INITIAL_UNIT_LAYOUT_STATE.pendingIds])
+      setUnitLayoutLocked(INITIAL_UNIT_LAYOUT_STATE.layoutLocked)
+      setUnitNumberingDone(INITIAL_UNIT_LAYOUT_STATE.numberingDone)
+      setUnitNumberingMap({ ...INITIAL_UNIT_LAYOUT_STATE.numberingMap })
+      setShowOriginalNo(INITIAL_UNIT_LAYOUT_STATE.showOriginalNo)
+      setLongPressedPendingIds({})
+      setSmartScanDone(false)
+      setSmartScanEnabled(false)
+      setManualDraggingPumpId(null)
+      setManualDraggingSource(null)
+      draggingPumpIdRef.current = null
+    }
+    previousActiveViewRef.current = activeView
+  }, [activeView, unitNumberingDone])
+
   const activeDirty = useMemo(() => {
     if (activeView === 'project-system-type') {
-      return JSON.stringify(projectForm) !== JSON.stringify(initialProjectForm)
+      return JSON.stringify(projectForm) !== JSON.stringify(savedProjectForm)
     }
 
     if (activeView === 'loop-pump-count') {
-      return JSON.stringify(loopPumpForm) !== JSON.stringify(initialLoopPumpForm)
+      return JSON.stringify(loopPumpForm) !== JSON.stringify(savedLoopPumpForm)
     }
 
     if (activeView === 'unit-layout') {
@@ -240,43 +498,49 @@ function SystemParamsPage({ onUnsavedGuardChange, onSecondaryNavVisibilityChange
         numberingDone: unitNumberingDone,
         numberingMap: unitNumberingMap,
         showOriginalNo,
-      }) !== JSON.stringify(INITIAL_UNIT_LAYOUT_STATE)
+      }) !== JSON.stringify(savedUnitLayoutState)
     }
 
     if (activeView === 'energy-price') {
-      return JSON.stringify(energyPriceState) !== JSON.stringify(initialEnergyPriceState)
+      return JSON.stringify(energyPriceState) !== JSON.stringify(savedEnergyPriceState)
     }
 
     if (activeView === 'coupling-energy') {
-      return JSON.stringify(couplingEnergyState) !== JSON.stringify(initialCouplingEnergyState)
+      return JSON.stringify(couplingEnergyState) !== JSON.stringify(savedCouplingEnergyState)
     }
 
-    if (MODULE_ITEMS.some((item) => item.key === activeView && !['project-system-type', 'loop-pump-count', 'unit-layout', 'energy-price', 'coupling-energy'].includes(item.key))) {
-      return JSON.stringify(simpleForms[activeView]) !== JSON.stringify(initialSimpleForms[activeView])
+    if (MODULE_ITEMS.some((item) => item.key === activeView && !DETAIL_MAIN_KEYS.includes(item.key))) {
+      return JSON.stringify(simpleForms[activeView]) !== JSON.stringify(savedSimpleForms[activeView])
     }
 
     return false
   }, [
     activeView,
     projectForm,
+    savedProjectForm,
     loopPumpForm,
+    savedLoopPumpForm,
     unitSlots,
     pendingUnitIds,
     unitLayoutLocked,
     unitNumberingDone,
     unitNumberingMap,
     showOriginalNo,
+    savedUnitLayoutState,
     energyPriceState,
+    savedEnergyPriceState,
     couplingEnergyState,
+    savedCouplingEnergyState,
     simpleForms,
+    savedSimpleForms,
   ])
 
   useEffect(() => {
     const shouldEnableGuard = activeView !== 'overview' && activeDirty
-    onUnsavedGuardChange?.({ active: shouldEnableGuard, message: '当前页面有未保存更改，是否退出？' })
+    onUnsavedGuardChange?.({ active: shouldEnableGuard, message: UNSAVED_MESSAGE })
 
     return () => {
-      onUnsavedGuardChange?.({ active: false, message: '当前页面有未保存更改，是否退出？' })
+      onUnsavedGuardChange?.({ active: false, message: UNSAVED_MESSAGE })
     }
   }, [activeDirty, activeView, onUnsavedGuardChange])
 
@@ -284,18 +548,99 @@ function SystemParamsPage({ onUnsavedGuardChange, onSecondaryNavVisibilityChange
     setKeypadState({ open: true, field, moduleKey })
   }
 
+  const openDiscardConfirm = (targetView = null) => {
+    setConfirmDialog({ open: true, mode: 'discard', targetView })
+  }
+
+  const openSaveConfirm = () => {
+    setConfirmDialog({ open: true, mode: 'save', targetView: null })
+  }
+
+  const closeConfirmDialog = () => {
+    setConfirmDialog({ open: false, mode: null, targetView: null })
+  }
+
   const handleBackToOverview = () => {
-    if (activeDirty && !window.confirm('当前页面有未保存更改，是否退出？')) {
+    if (activeDirty) {
+      openDiscardConfirm()
       return
     }
+    setDatePickerField(null)
     setActiveView('overview')
   }
 
   const handleOpenModule = (moduleKey) => {
-    if (activeView !== 'overview' && activeDirty && !window.confirm('当前页面有未保存更改，是否退出？')) {
+    if (activeView !== 'overview' && activeDirty) {
+      openDiscardConfirm(moduleKey)
       return
     }
+    setDatePickerField(null)
     setActiveView(moduleKey)
+  }
+
+  const saveCurrentView = () => {
+    if (activeView === 'project-system-type') {
+      setSavedProjectForm(deepClone(projectForm))
+      return
+    }
+
+    if (activeView === 'loop-pump-count') {
+      setSavedLoopPumpForm(deepClone(loopPumpForm))
+      return
+    }
+
+    if (activeView === 'unit-layout') {
+      setSavedUnitLayoutState(
+        cloneUnitLayoutState({
+          slots: unitSlots,
+          pendingIds: pendingUnitIds,
+          layoutLocked: unitLayoutLocked,
+          numberingDone: unitNumberingDone,
+          numberingMap: unitNumberingMap,
+          showOriginalNo,
+        }),
+      )
+      return
+    }
+
+    if (activeView === 'energy-price') {
+      setSavedEnergyPriceState(deepClone(energyPriceState))
+      return
+    }
+
+    if (activeView === 'coupling-energy') {
+      setSavedCouplingEnergyState(deepClone(couplingEnergyState))
+      return
+    }
+
+    if (MODULE_ITEMS.some((item) => item.key === activeView && !DETAIL_MAIN_KEYS.includes(item.key))) {
+      setSavedSimpleForms((previous) => ({
+        ...previous,
+        [activeView]: deepClone(simpleForms[activeView]),
+      }))
+    }
+  }
+
+  const handleConfirmDialogConfirm = () => {
+    if (confirmDialog.mode === 'save') {
+      saveCurrentView()
+      closeConfirmDialog()
+      return
+    }
+
+    if (confirmDialog.mode === 'discard') {
+      setDatePickerField(null)
+      if (confirmDialog.targetView) {
+        setActiveView(confirmDialog.targetView)
+      } else {
+        setActiveView('overview')
+      }
+      closeConfirmDialog()
+    }
+  }
+
+  const handleSaveClick = () => {
+    openSaveConfirm()
   }
 
   const handleKeypadConfirm = (value) => {
@@ -322,22 +667,132 @@ function SystemParamsPage({ onUnsavedGuardChange, onSecondaryNavVisibilityChange
   }
 
   const resetUnitLayout = () => {
-    setUnitSlots(INITIAL_UNIT_LAYOUT_STATE.slots)
-    setPendingUnitIds(INITIAL_UNIT_LAYOUT_STATE.pendingIds)
-    setUnitLayoutLocked(INITIAL_UNIT_LAYOUT_STATE.layoutLocked)
-    setUnitNumberingDone(INITIAL_UNIT_LAYOUT_STATE.numberingDone)
-    setUnitNumberingMap(INITIAL_UNIT_LAYOUT_STATE.numberingMap)
-    setShowOriginalNo(INITIAL_UNIT_LAYOUT_STATE.showOriginalNo)
-  }
-
-  const handleSmartScan = () => {
-    const allIds = [...new Set([...pendingUnitIds, ...addedUnitIds])].filter((id) => UNIT_PUMP_ID_SET.has(id)).sort((a, b) => a - b)
-    setPendingUnitIds(allIds)
+    const allCurrentIds = [...new Set([...pendingUnitIds, ...addedUnitIds])]
+      .filter((id) => UNIT_PUMP_ID_SET.has(id))
+      .sort((a, b) => a - b)
+    console.log('[UnitLayout] reset clicked', {
+      beforePendingCount: pendingUnitIds.length,
+      beforeAddedCount: addedUnitIds.length,
+      resetToPendingCount: allCurrentIds.length,
+    })
+    setPendingUnitIds(allCurrentIds)
     setUnitSlots(Array.from({ length: UNIT_LAYOUT_COLS * UNIT_LAYOUT_ROWS }, () => null))
     setUnitLayoutLocked(false)
     setUnitNumberingDone(false)
     setUnitNumberingMap({})
     setShowOriginalNo(false)
+    setLongPressedPendingIds({})
+    setSmartScanDone(false)
+    setSmartScanEnabled(true)
+    setManualDraggingPumpId(null)
+    setManualDraggingSource(null)
+    draggingPumpIdRef.current = null
+  }
+
+  const handleSmartScan = () => {
+    const rawTargetCount = Number(projectForm.heatPumpCount)
+    if (!smartScanEnabled) {
+      return
+    }
+    const targetCount = Number.isInteger(rawTargetCount) ? Math.max(0, Math.min(rawTargetCount, UNIT_TOTAL)) : 0
+    const availableIds = Array.from({ length: UNIT_TOTAL }, (_, index) => index + 1)
+
+    const currentAddedIds = unitSlots.filter((id) => id != null && UNIT_PUMP_ID_SET.has(id))
+    const currentPendingIds = pendingUnitIds.filter((id) => UNIT_PUMP_ID_SET.has(id))
+    const currentAllIds = [...new Set([...currentAddedIds, ...currentPendingIds])]
+    console.log('[UnitLayout] smart scan start', {
+      heatPumpCount: projectForm.heatPumpCount,
+      targetCount,
+      currentPendingCount: currentPendingIds.length,
+      currentAddedCount: currentAddedIds.length,
+      currentTotalCount: currentAllIds.length,
+    })
+
+    let nextPendingIds = [...currentPendingIds]
+    let nextSlots = [...unitSlots]
+
+    if (currentAllIds.length < targetCount) {
+      const missingCount = targetCount - currentAllIds.length
+      const idsToAdd = availableIds.filter((id) => !currentAllIds.includes(id)).slice(0, missingCount)
+      nextPendingIds = [...nextPendingIds, ...idsToAdd]
+    } else if (currentAllIds.length > targetCount) {
+      let removeCount = currentAllIds.length - targetCount
+
+      const removablePending = [...nextPendingIds].sort((a, b) => b - a)
+      while (removeCount > 0 && removablePending.length > 0) {
+        const removingId = removablePending.shift()
+        nextPendingIds = nextPendingIds.filter((id) => id !== removingId)
+        removeCount -= 1
+      }
+
+      if (removeCount > 0) {
+        const removableAdded = [...new Set(currentAddedIds)].sort((a, b) => b - a)
+        for (let index = 0; index < removableAdded.length && removeCount > 0; index += 1) {
+          const removingId = removableAdded[index]
+          nextSlots = nextSlots.map((id) => (id === removingId ? null : id))
+          removeCount -= 1
+        }
+      }
+    }
+
+    const finalPendingIds = Array.from(new Set(nextPendingIds)).sort((a, b) => a - b)
+    const finalAddedIds = nextSlots.filter((id) => id != null && UNIT_PUMP_ID_SET.has(id))
+    console.log('[UnitLayout] smart scan result', {
+      finalPendingCount: finalPendingIds.length,
+      finalAddedCount: finalAddedIds.length,
+      finalTotalCount: new Set([...finalPendingIds, ...finalAddedIds]).size,
+      targetCount,
+    })
+
+    setPendingUnitIds(finalPendingIds)
+    setUnitSlots(nextSlots)
+    setUnitLayoutLocked(false)
+    setUnitNumberingDone(false)
+    setUnitNumberingMap({})
+    setShowOriginalNo(false)
+    setSmartScanDone(true)
+    setManualDraggingPumpId(null)
+    setManualDraggingSource(null)
+    draggingPumpIdRef.current = null
+  }
+
+  const clearPendingLongPressTimer = () => {
+    if (pendingLongPressTimerRef.current) {
+      clearTimeout(pendingLongPressTimerRef.current)
+      pendingLongPressTimerRef.current = null
+    }
+  }
+
+  const startManualDrag = (pumpId, source, event) => {
+    if (!pumpId || (source === 'pending' && unitLayoutLocked)) {
+      return
+    }
+    if (event?.button != null && event.button !== 0) {
+      return
+    }
+    event?.preventDefault?.()
+
+    draggingPumpIdRef.current = pumpId
+    setManualDraggingPumpId(pumpId)
+    setManualDraggingSource(source)
+    const pointer = event?.touches?.[0] ?? event
+    if (pointer?.clientX != null && pointer?.clientY != null) {
+      setManualDragPointer({ x: pointer.clientX, y: pointer.clientY })
+      dragStartPointRef.current = { x: pointer.clientX, y: pointer.clientY }
+    }
+    didManualDragMoveRef.current = false
+    console.log('[UnitLayout] pending press start', { pumpId, source })
+
+    clearPendingLongPressTimer()
+    if (source === 'pending') {
+      pendingLongPressTimerRef.current = setTimeout(() => {
+        setLongPressedPendingIds((previous) => ({
+          ...previous,
+          [pumpId]: true,
+        }))
+        pendingLongPressTimerRef.current = null
+      }, 3000)
+    }
   }
 
   const movePumpToSlot = (pumpId, targetIndex) => {
@@ -367,6 +822,10 @@ function SystemParamsPage({ onUnsavedGuardChange, onSecondaryNavVisibilityChange
     })
   }
 
+  useEffect(() => {
+    movePumpToSlotRef.current = movePumpToSlot
+  }, [movePumpToSlot])
+
   const handleCompleteLayout = () => {
     if (!canFinishLayout) {
       return
@@ -393,19 +852,67 @@ function SystemParamsPage({ onUnsavedGuardChange, onSecondaryNavVisibilityChange
       return
     }
     setUnitNumberingDone(true)
+    onUnitLayoutCommitted?.([...unitSlots])
   }
+
+  const handleDateConfirm = (nextDateParts) => {
+    if (!datePickerField || !Array.isArray(nextDateParts) || nextDateParts.length < 3) {
+      setDatePickerField(null)
+      return
+    }
+
+    const [rawYear, rawMonth, rawDay] = nextDateParts.map((item) => Number(item))
+    const now = new Date()
+    const year = Number.isInteger(rawYear) ? rawYear : now.getFullYear()
+    const month = Number.isInteger(rawMonth) && rawMonth >= 1 && rawMonth <= 12 ? rawMonth : now.getMonth() + 1
+    const maxDay = new Date(year, month, 0).getDate()
+    const day = Number.isInteger(rawDay) && rawDay >= 1 ? Math.min(rawDay, maxDay) : now.getDate()
+
+    setProjectForm((previous) => ({
+      ...previous,
+      [datePickerField]: formatDateString(year, month, day),
+    }))
+    setDatePickerField(null)
+  }
+
+  const scrollPendingList = (direction) => {
+    const listElement = pendingListRef.current
+    if (!listElement) {
+      return
+    }
+    const offset = direction === 'left' ? -360 : 360
+    listElement.scrollBy({ left: offset, behavior: 'smooth' })
+  }
+
+  const renderDetailHeader = (title) => (
+    <div className="system-params-detail__header">
+      <button type="button" className="system-params-back" onClick={handleBackToOverview}>
+        <img src={arrowLeftSelectedIcon} alt="" aria-hidden="true" />
+      </button>
+      <h3>{title}</h3>
+      <button type="button" className="system-params-save" onClick={handleSaveClick}>保存</button>
+    </div>
+  )
 
   const renderOverview = () => (
     <div className="system-params-overview">
       {MODULE_ITEMS.slice(0, 4).map((item) => (
         <button key={item.key} type="button" className="system-params-card" onClick={() => handleOpenModule(item.key)}>
-          <span>{item.label}</span>
-          <span className="system-params-card__arrow">›</span>
+          <span className="system-params-card__main">
+            <img src={CARD_ICON_MAP[item.key]} alt="" aria-hidden="true" className="system-params-card__icon" />
+            <span className="system-params-card__label">{item.label}</span>
+          </span>
+          <span className="system-params-card__arrow">
+            <img src={arrowRightSelectedIcon} alt="" aria-hidden="true" />
+          </span>
         </button>
       ))}
 
       <div className="system-params-card system-params-card--inline">
-        <span>主板类型</span>
+        <span className="system-params-card__main">
+          <img src={basicSettingMotherBoardIcon} alt="" aria-hidden="true" className="system-params-card__icon" />
+          <span className="system-params-card__label">主板类型</span>
+        </span>
         <SelectDropdown
           value={mainboard}
           options={MAINBOARD_OPTIONS}
@@ -417,25 +924,28 @@ function SystemParamsPage({ onUnsavedGuardChange, onSecondaryNavVisibilityChange
 
       <button
         type="button"
-        className="system-params-card system-params-card--inline"
+        className="system-params-card system-params-card--inline system-params-card--coupling"
         onClick={() => handleOpenModule('coupling-energy')}
       >
-        <span>耦合能源</span>
-        <span className="system-params-inline-meta">{`${couplingEnergyState.type}，${couplingEnergyState.count}台`}</span>
-        <span className="system-params-card__arrow">›</span>
+        <span className="system-params-card__main">
+          <img src={couplingEnergyIcon} alt="" aria-hidden="true" className="system-params-card__icon" />
+          <span className="system-params-card__label">耦合能源</span>
+        </span>
+        <span className="system-params-card__tail">
+          <span className="system-params-inline-meta">{`${couplingEnergyState.type} ${couplingEnergyState.count}台`}</span>
+          <span className="system-params-card__arrow">
+            <img src={arrowRightSelectedIcon} alt="" aria-hidden="true" />
+          </span>
+        </span>
       </button>
     </div>
   )
 
   const renderProjectSystemTypeForm = () => (
     <div className="system-params-detail">
-      <div className="system-params-detail__header">
-        <button type="button" className="system-params-back" onClick={handleBackToOverview}>‹</button>
-        <h3>项目系统类型</h3>
-        <button type="button" className="system-params-save">保存</button>
-      </div>
+      {renderDetailHeader('项目系统类型')}
 
-      <div className="system-params-form-grid">
+      <div className="system-params-form-grid system-params-form-grid--project">
         <label className="system-params-field">
           <span>项目类型</span>
           <SelectDropdown value={projectForm.projectType} options={PROJECT_TYPE_OPTIONS} onChange={(value) => setProjectForm((prev) => ({ ...prev, projectType: value }))} />
@@ -472,26 +982,30 @@ function SystemParamsPage({ onUnsavedGuardChange, onSecondaryNavVisibilityChange
 
         <button type="button" className="system-params-field system-params-field--input" onClick={() => openNumberPad('heatPumpCount')}>
           <span>热泵总台数</span>
-          <div>{projectForm.heatPumpCount} 台</div>
+          <div className="system-params-input-display">
+            <span>{projectForm.heatPumpCount}</span>
+            <span className="system-params-input-unit">台</span>
+          </div>
         </button>
 
         <button type="button" className="system-params-field system-params-field--input" onClick={() => openNumberPad('heatingArea')}>
-          <span>供暖面积</span>
-          <div>{projectForm.heatingArea} m²</div>
+          <span>供应面积</span>
+          <div className="system-params-input-display">
+            <span>{projectForm.heatingArea}</span>
+            <span className="system-params-input-unit">m²</span>
+          </div>
         </button>
 
         <div className="system-params-field system-params-field--date">
           <span>采暖季</span>
           <div className="system-params-date-range">
-            <label>
-              <input type="date" value={projectForm.heatingSeasonStart} onChange={(event) => setProjectForm((prev) => ({ ...prev, heatingSeasonStart: event.target.value }))} />
-              <span>{formatDateInput(projectForm.heatingSeasonStart)}</span>
-            </label>
+            <button type="button" onClick={() => setDatePickerField('heatingSeasonStart')}>
+              <span className="system-params-date-value">{formatDateInput(projectForm.heatingSeasonStart)}</span>
+            </button>
             <em>-</em>
-            <label>
-              <input type="date" value={projectForm.heatingSeasonEnd} onChange={(event) => setProjectForm((prev) => ({ ...prev, heatingSeasonEnd: event.target.value }))} />
-              <span>{formatDateInput(projectForm.heatingSeasonEnd)}</span>
-            </label>
+            <button type="button" onClick={() => setDatePickerField('heatingSeasonEnd')}>
+              <span className="system-params-date-value">{formatDateInput(projectForm.heatingSeasonEnd)}</span>
+            </button>
           </div>
         </div>
       </div>
@@ -500,161 +1014,208 @@ function SystemParamsPage({ onUnsavedGuardChange, onSecondaryNavVisibilityChange
 
   const renderLoopPumpCountDetail = () => (
     <div className="system-params-detail">
-      <div className="system-params-detail__header">
-        <button type="button" className="system-params-back" onClick={handleBackToOverview}>‹</button>
-        <h3>循环泵台数</h3>
-        <button type="button" className="system-params-save">保存</button>
-      </div>
+      {renderDetailHeader('循环泵台数')}
 
-      <div className="system-params-form-grid">
+      <div className="system-params-form-grid system-params-form-grid--loop-pump">
         <label className="system-params-field">
           <span>主泵循环台数</span>
           <SelectDropdown value={loopPumpForm.mainPumpCount} options={LOOP_PUMP_COUNT_OPTIONS} onChange={(value) => setLoopPumpForm((prev) => ({ ...prev, mainPumpCount: value }))} />
         </label>
 
         <label className="system-params-field">
-          <span>备泵循环泵台数</span>
+          <span>备泵循环台数</span>
           <SelectDropdown value={loopPumpForm.standbyPumpCount} options={LOOP_PUMP_COUNT_OPTIONS} onChange={(value) => setLoopPumpForm((prev) => ({ ...prev, standbyPumpCount: value }))} />
         </label>
       </div>
     </div>
   )
 
-  const renderUnitLayoutDetail = () => (
-    <div className="system-params-detail system-layout-detail">
-      <div className="system-params-detail__header">
-        <button type="button" className="system-params-back" onClick={handleBackToOverview}>‹</button>
-        <h3>机组排布</h3>
-      </div>
+  const renderUnitLayoutDetail = () => {
+    const isStep1Done = addedUnitIds.length === UNIT_TOTAL
+    const isStep1Active = !isStep1Done
+    const isStep2Active = isStep1Done && !unitLayoutLocked
+    const isStep2Done = unitLayoutLocked
+    const isStep3Active = unitLayoutLocked && !unitNumberingDone
+    const isStep3Done = unitNumberingDone
+    const pendingDisplayIds = pendingUnitIds.length > 0
+      ? [
+          ...pendingUnitIds,
+          ...Array.from({ length: Math.max(0, UNIT_TOTAL - pendingUnitIds.length) }, () => null),
+        ]
+      : Array.from({ length: UNIT_TOTAL }, () => null)
 
-      <div className="unit-layout-wrap">
-        <div className="unit-layout-main">
-          <div className="unit-layout-pending-header">
-            <strong>待添加（{pendingUnitIds.length}）</strong>
-            <span>操作提醒：点击1次即选中，长按3秒即启动风扇点。可拖动到下层区域进行布局</span>
-          </div>
-          <div className="unit-layout-pending-list">
-            {pendingUnitIds.map((id) => (
+    return (
+      <div className="system-params-detail system-layout-detail">
+        {renderDetailHeader('机组排布')}
+
+        <div className="unit-layout-wrap">
+          <div className="unit-layout-main">
+            <div className="unit-layout-pending-header">
+              <strong>待添加（{pendingUnitIds.length}）</strong>
+              <span>操作提示：单击可选中，长按可启动风扇热点。可拖动到下方区域进行布置。</span>
+            </div>
+            <div className={`unit-layout-pending-scroller${pendingUnitIds.length === 0 ? ' is-empty' : ''}`}>
               <button
-                key={`pending-${id}`}
                 type="button"
-                className="unit-layout-pending-card"
-                draggable={!unitLayoutLocked}
-                onDragStart={(event) => event.dataTransfer.setData('text/plain', String(id))}
+                className="unit-layout-pending-arrow unit-layout-pending-arrow--left"
+                onClick={() => scrollPendingList('left')}
+                aria-label="向左滚动待添加热泵"
               >
-                <span>{toNoLabel(id)}</span>
-                <img src={hpNullIcon} alt="" aria-hidden="true" />
+                <img src={arrowLeftSelectedIcon} alt="" aria-hidden="true" />
               </button>
-            ))}
-          </div>
 
-          <div className="unit-layout-added-title">已添加（{addedUnitIds.length}）</div>
-          <div className="unit-layout-grid-head">
-            {Array.from({ length: UNIT_LAYOUT_COLS }, (_, index) => (
-              <span key={`col-${index + 1}`}>{index + 1}</span>
-            ))}
-            <em>列</em>
-          </div>
-
-          <div className="unit-layout-grid-body">
-            {Array.from({ length: UNIT_LAYOUT_ROWS }, (_, index) => (
-              <span key={`row-${index + 1}`} className="unit-layout-row-label">{index + 1}</span>
-            ))}
-
-            <div className="unit-layout-grid">
-              {unitSlots.map((pumpId, index) => {
-                const displayLabel = pumpId
-                  ? showOriginalNo
-                    ? toNoLabel(pumpId)
-                    : unitNumberingMap[pumpId] ?? toNoLabel(pumpId)
-                  : ''
-
-                return (
+              <div ref={pendingListRef} className={`unit-layout-pending-list${pendingUnitIds.length === 0 ? ' is-empty' : ''}`}>
+                {pendingDisplayIds.map((id, index) => (
                   <button
-                    key={`slot-${index}`}
+                    key={id ? `pending-${id}` : `pending-placeholder-${index}`}
                     type="button"
-                    className={`unit-layout-slot${pumpId ? ' has-pump' : ''}${unitLayoutLocked && !unitNumberingDone ? ' is-numbering' : ''}`}
-                    draggable={Boolean(pumpId) && !unitLayoutLocked}
-                    onDragStart={(event) => {
-                      if (pumpId) {
-                        event.dataTransfer.setData('text/plain', String(pumpId))
-                      }
-                    }}
-                    onDragOver={(event) => {
-                      if (!unitLayoutLocked) {
-                        event.preventDefault()
-                      }
-                    }}
-                    onDrop={(event) => {
-                      if (unitLayoutLocked) {
-                        return
-                      }
-                      event.preventDefault()
-                      const dragId = Number(event.dataTransfer.getData('text/plain'))
-                      if (dragId) {
-                        movePumpToSlot(dragId, index)
-                      }
-                    }}
-                    onClick={() => {
-                      if (pumpId) {
-                        handleUnitCardClick(pumpId)
-                      }
-                    }}
+                    className={`unit-layout-pending-card${id ? '' : ' is-placeholder'}${longPressedPendingIds[id] ? ' is-long-press' : ''}${manualDraggingPumpId === id && manualDraggingSource === 'pending' ? ' is-dragging' : ''}`}
+                    draggable={false}
+                    disabled={!id}
+                    onMouseDown={(event) => startManualDrag(id, 'pending', event)}
+                    onTouchStart={(event) => startManualDrag(id, 'pending', event)}
                   >
-                    {pumpId ? <div className="unit-layout-slot-label">{displayLabel}</div> : null}
-                    <img src={pumpId ? hpRunningIcon : hpNullIcon} alt="" aria-hidden="true" />
+                    {id ? <span>{toNoLabel(id)}</span> : <span aria-hidden="true" />}
+                    <img src={longPressedPendingIds[id] ? hpRunningIcon : hpNullIcon} alt="" aria-hidden="true" />
                   </button>
-                )
-              })}
-            </div>
-          </div>
-        </div>
+                ))}
+              </div>
 
-        <aside className="unit-layout-flow">
-          <div className="unit-layout-flow__header">
-            <h4>操作流程</h4>
-            <button type="button" onClick={resetUnitLayout}>复位</button>
-          </div>
-
-          <div className="unit-layout-flow__step">
-            <b>01 添加热泵{pendingUnitIds.length}/{UNIT_TOTAL}</b>
-            <small>读取处于激活状态的热泵</small>
-            <button type="button" className="is-active" onClick={handleSmartScan}>智能扫描</button>
-          </div>
-
-          <div className="unit-layout-flow__step">
-            <b>02 热泵布局</b>
-            <small>布局完成不可更改</small>
-            <button type="button" className={canFinishLayout ? 'is-active' : ''} onClick={handleCompleteLayout}>布局完成</button>
-          </div>
-
-          <div className="unit-layout-flow__step">
-            <b>03 热泵编号</b>
-            <small>{unitLayoutLocked && !unitNumberingDone ? `点击热泵按顺序编号，下一位：${nextUnitNumber}` : '编号完成后可切换显示'}</small>
-            <button
-              type="button"
-              className={unitLayoutLocked && !unitNumberingDone ? 'is-active' : ''}
-              onClick={() => {
-                if (unitLayoutLocked) {
-                  setUnitNumberingDone(false)
-                  setShowOriginalNo(false)
-                }
-              }}
-            >
-              重新编号
-            </button>
-            <div className="unit-layout-flow__row">
-              <button type="button" className={canFinishNumbering ? 'is-active' : ''} onClick={handleCompleteNumbering}>编号完成</button>
-              <button type="button" className="unit-layout-flow__eye" onClick={() => setShowOriginalNo((prev) => !prev)}>
-                {showOriginalNo ? '🙈' : '👁'}
+              <button
+                type="button"
+                className="unit-layout-pending-arrow unit-layout-pending-arrow--right"
+                onClick={() => scrollPendingList('right')}
+                aria-label="向右滚动待添加热泵"
+              >
+                <img src={arrowRightSelectedIcon} alt="" aria-hidden="true" />
               </button>
             </div>
-          </div>
-        </aside>
-      </div>
-    </div>
-  )
 
+            <div className="unit-layout-added-title">已添加（{addedUnitIds.length}）</div>
+            <div className="unit-layout-grid-head">
+              <span aria-hidden="true" />
+              {Array.from({ length: UNIT_LAYOUT_COLS }, (_, index) => (
+                <span key={`col-${index + 1}`}>{index + 1}</span>
+              ))}
+            </div>
+
+            <div className={`unit-layout-grid-body${manualDraggingPumpId ? ' is-dragging' : ''}`}>
+              <div className="unit-layout-row-labels">
+                {Array.from({ length: UNIT_LAYOUT_ROWS }, (_, index) => (
+                  <span key={`row-${index + 1}`} className="unit-layout-row-label">{index + 1}</span>
+                ))}
+              </div>
+
+              <div className="unit-layout-grid">
+                {unitSlots.map((pumpId, index) => {
+                  const displayLabel = pumpId
+                    ? showOriginalNo
+                      ? toNoLabel(pumpId)
+                      : unitNumberingMap[pumpId] ?? toNoLabel(pumpId)
+                    : ''
+
+                  return (
+                    <button
+                      key={`slot-${index}`}
+                      type="button"
+                      data-slot-index={index}
+                      className={`unit-layout-slot${pumpId ? ' has-pump' : ''}${unitLayoutLocked && !unitNumberingDone ? ' is-numbering' : ''}`}
+                      draggable={false}
+                      onMouseDown={(event) => {
+                        if (!unitLayoutLocked && pumpId) {
+                          startManualDrag(pumpId, 'slot', event)
+                        }
+                      }}
+                      onTouchStart={(event) => {
+                        if (!unitLayoutLocked && pumpId) {
+                          startManualDrag(pumpId, 'slot', event)
+                        }
+                      }}
+                      onClick={() => {
+                        if (pumpId) {
+                          handleUnitCardClick(pumpId)
+                        }
+                      }}
+                    >
+                      {pumpId ? <div className="unit-layout-slot-label">{displayLabel}</div> : null}
+                      <img src={pumpId ? hpRunningIcon : hpNullIcon} alt="" aria-hidden="true" />
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+          </div>
+
+          <aside className="unit-layout-flow">
+            <div className="unit-layout-flow__header">
+              <h4>操作流程</h4>
+              <button type="button" onClick={resetUnitLayout}>复位</button>
+            </div>
+
+            <div className="unit-layout-flow__step-item">
+              <div className={`unit-layout-flow__step-indicator${isStep1Active ? ' is-active' : ''}${isStep1Done ? ' is-done' : ''}`}>
+                <span>01</span>
+                <img src={longArrowDownBlueIcon} alt="" aria-hidden="true" />
+              </div>
+              <div className="unit-layout-flow__step">
+                <div className="unit-layout-flow__title">添加热泵{addedUnitIds.length}/{UNIT_TOTAL}</div>
+                <small>读取处于激活状态的热泵</small>
+                <button
+                  type="button"
+                  className={smartScanDone ? '' : 'is-active'}
+                  onClick={handleSmartScan}
+                  disabled={!smartScanEnabled}
+                >
+                  智能扫描
+                </button>
+              </div>
+            </div>
+
+            <div className="unit-layout-flow__step-item">
+              <div className={`unit-layout-flow__step-indicator${isStep2Active ? ' is-active' : ''}${isStep2Done ? ' is-done' : ''}`}>
+                <span>02</span>
+                <img src={isStep2Active || isStep2Done ? longArrowDownBlueIcon : longArrowDownGrayIcon} alt="" aria-hidden="true" />
+              </div>
+              <div className="unit-layout-flow__step">
+                <div className="unit-layout-flow__title">热泵布局</div>
+                <small>布局完成不可更改</small>
+                <button type="button" className={canFinishLayout ? 'is-active' : ''} onClick={handleCompleteLayout}>布局完成</button>
+              </div>
+            </div>
+
+            <div className="unit-layout-flow__step-item">
+              <div className={`unit-layout-flow__step-indicator${isStep3Active ? ' is-active' : ''}${isStep3Done ? ' is-done' : ''}`}>
+                <span>03</span>
+              </div>
+              <div className="unit-layout-flow__step">
+                <div className="unit-layout-flow__title">热泵编号</div>
+                <small>{unitLayoutLocked && !unitNumberingDone ? `点击热泵按顺序编号，下一位：${nextUnitNumber}` : '编号完成后可切换显示'}</small>
+                <button
+                  type="button"
+                  className={unitLayoutLocked && !unitNumberingDone ? 'is-active' : ''}
+                  onClick={() => {
+                    if (unitLayoutLocked) {
+                      setUnitNumberingDone(false)
+                      setUnitNumberingMap({})
+                      setShowOriginalNo(false)
+                    }
+                  }}
+                >
+                  重新编号
+                </button>
+                <div className="unit-layout-flow__row">
+                  <button type="button" className={canFinishNumbering ? 'is-active' : ''} onClick={handleCompleteNumbering}>编号完成</button>
+                  <button type="button" className="unit-layout-flow__eye" onClick={() => setShowOriginalNo((prev) => !prev)}>
+                    {showOriginalNo ? <img src={hideIcon} alt="" aria-hidden="true" /> : <img src={showIcon} alt="" aria-hidden="true" />}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </aside>
+        </div>
+      </div>
+    )
+  }
 
   const renderEnergyPriceDetail = () => {
     const isWater = energyPriceState.tab === 'water'
@@ -663,11 +1224,7 @@ function SystemParamsPage({ onUnsavedGuardChange, onSecondaryNavVisibilityChange
 
     return (
       <div className="system-params-detail">
-        <div className="system-params-detail__header">
-          <button type="button" className="system-params-back" onClick={handleBackToOverview}>‹</button>
-          <h3>能源价格</h3>
-          <button type="button" className="system-params-save">保存</button>
-        </div>
+        {renderDetailHeader('能源价格')}
 
         <div className="energy-price-tabs">
           {ENERGY_PRICE_TABS.map((tab) => (
@@ -691,18 +1248,18 @@ function SystemParamsPage({ onUnsavedGuardChange, onSecondaryNavVisibilityChange
             onClick={() => openNumberPad('value', isWater ? 'energy-water' : 'energy-gas')}
           >
             <span>固定价格</span>
-            <div>{isWater ? energyPriceState.waterFixed : energyPriceState.gasFixed} 元/m²</div>
+            <div>{isWater ? energyPriceState.waterFixed : energyPriceState.gasFixed} 元/m³</div>
           </button>
         ) : null}
 
         {isElectricity ? (
           <div className="energy-price-electric">
-            <button type="button" className="energy-price-add" onClick={() => setEnergyPriceModalOpen(true)}>＋ 新增</button>
+            <button type="button" className="energy-price-add" onClick={() => setEnergyPriceModalOpen(true)}>+ 新增</button>
             {energyPriceState.electricPlans.map((plan) => (
               <div key={plan.id} className="energy-price-plan">
                 <div className="energy-price-plan__head">
                   <span>{plan.label}</span>
-                  <button type="button" onClick={() => setEnergyPriceModalOpen(true)}>✎</button>
+                  <button type="button" onClick={() => setEnergyPriceModalOpen(true)}>编辑</button>
                 </div>
                 <div className="energy-price-plan__times">
                   {plan.segments.map((segment) => (
@@ -727,24 +1284,24 @@ function SystemParamsPage({ onUnsavedGuardChange, onSecondaryNavVisibilityChange
             <div className="energy-price-modal" onClick={(event) => event.stopPropagation()}>
               <div className="energy-price-modal__header">
                 <h4>新增价格</h4>
-                <button type="button" onClick={() => setEnergyPriceModalOpen(false)}>×</button>
+                <button type="button" onClick={() => setEnergyPriceModalOpen(false)}>关闭</button>
               </div>
               <div className="energy-price-modal__body">
                 <section>
                   <h5>月份</h5>
                   <div className="energy-price-modal__row">
-                    <span>00:00</span><em>—</em><span>08:00</span>
+                    <span>00:00</span><em>-</em><span>08:00</span>
                   </div>
                 </section>
                 <section>
                   <h5>时段价格设置</h5>
                   <div className="energy-price-modal__row">
-                    <span>00:00</span><em>—</em><span>08:00</span><span>0.38</span>
+                    <span>00:00</span><em>-</em><span>08:00</span><span>0.38</span>
                   </div>
                   <div className="energy-price-modal__row">
-                    <span>00:00</span><em>—</em><span>08:00</span><span className="is-placeholder">请输入价格</span>
+                    <span>00:00</span><em>-</em><span>08:00</span><span className="is-placeholder">请输入价格</span>
                   </div>
-                  <button type="button" className="energy-price-modal__add">＋ 新增时段</button>
+                  <button type="button" className="energy-price-modal__add">+ 新增时段</button>
                 </section>
               </div>
               <div className="energy-price-modal__actions">
@@ -760,11 +1317,7 @@ function SystemParamsPage({ onUnsavedGuardChange, onSecondaryNavVisibilityChange
 
   const renderCouplingEnergyDetail = () => (
     <div className="system-params-detail">
-      <div className="system-params-detail__header">
-        <button type="button" className="system-params-back" onClick={handleBackToOverview}>‹</button>
-        <h3>耦合能源</h3>
-        <button type="button" className="system-params-save">保存</button>
-      </div>
+      {renderDetailHeader('耦合能源')}
 
       <div className="coupling-energy-detail">
         <div className="coupling-energy-detail__label">能源类型</div>
@@ -793,11 +1346,7 @@ function SystemParamsPage({ onUnsavedGuardChange, onSecondaryNavVisibilityChange
     const activeItem = MODULE_ITEMS.find((item) => item.key === activeView)
     return (
       <div className="system-params-detail">
-        <div className="system-params-detail__header">
-          <button type="button" className="system-params-back" onClick={handleBackToOverview}>‹</button>
-          <h3>{activeItem?.label}</h3>
-          <button type="button" className="system-params-save">保存</button>
-        </div>
+        {renderDetailHeader(activeItem?.label)}
 
         <button type="button" className="system-params-field system-params-field--input system-params-simple-input" onClick={() => openNumberPad('value', activeView)}>
           <span>参数值</span>
@@ -807,15 +1356,17 @@ function SystemParamsPage({ onUnsavedGuardChange, onSecondaryNavVisibilityChange
     )
   }
 
+  const confirmDialogMessage = confirmDialog.mode === 'save' ? SAVE_CONFIRM_MESSAGE : UNSAVED_MESSAGE
+
   return (
-    <div className="system-params-page">
+    <div className={`system-params-page${activeView === 'overview' ? ' is-overview' : ''}`}>
       {activeView === 'overview' ? renderOverview() : null}
       {activeView === 'project-system-type' ? renderProjectSystemTypeForm() : null}
       {activeView === 'loop-pump-count' ? renderLoopPumpCountDetail() : null}
       {activeView === 'unit-layout' ? renderUnitLayoutDetail() : null}
       {activeView === 'energy-price' ? renderEnergyPriceDetail() : null}
       {activeView === 'coupling-energy' ? renderCouplingEnergyDetail() : null}
-      {activeView !== 'overview' && !['project-system-type', 'loop-pump-count', 'unit-layout', 'energy-price', 'coupling-energy'].includes(activeView) ? renderSimpleDetail() : null}
+      {activeView !== 'overview' && !DETAIL_MAIN_KEYS.includes(activeView) ? renderSimpleDetail() : null}
 
       <NumericKeypadModal
         isOpen={keypadState.open}
@@ -830,12 +1381,61 @@ function SystemParamsPage({ onUnsavedGuardChange, onSecondaryNavVisibilityChange
                   ? simpleForms[keypadState.moduleKey]?.value
                   : projectForm[keypadState.field]
         }
-        title="输入参数"
+        title={
+          !keypadState.moduleKey && keypadState.field === 'heatPumpCount'
+            ? '热泵总台数'
+            : !keypadState.moduleKey && keypadState.field === 'heatingArea'
+              ? '供应面积'
+              : '输入参数'
+        }
         onConfirm={handleKeypadConfirm}
         onClose={() => setKeypadState({ open: false, field: null, moduleKey: null })}
       />
+
+      <TimePickerModal
+        isOpen={Boolean(datePickerField)}
+        title="日期选择"
+        columns={[
+          { key: 'year', options: DATE_PICKER_YEARS, formatter: (value) => String(value) },
+          { key: 'month', options: DATE_PICKER_MONTHS, formatter: (value) => String(value).padStart(2, '0') },
+          { key: 'day', options: DATE_PICKER_DAYS, formatter: (value) => String(value).padStart(2, '0') },
+        ]}
+        value={datePickerValue}
+        onClose={() => setDatePickerField(null)}
+        onConfirm={handleDateConfirm}
+      />
+
+      {manualDraggingPumpId ? (
+        <div
+          className={`unit-layout-drag-preview${longPressedPendingIds[manualDraggingPumpId] ? ' is-long-press' : ''}`}
+          style={{ left: manualDragPointer.x, top: manualDragPointer.y }}
+        >
+          <span>{toNoLabel(manualDraggingPumpId)}</span>
+          <img src={longPressedPendingIds[manualDraggingPumpId] ? hpRunningIcon : hpNullIcon} alt="" aria-hidden="true" />
+        </div>
+      ) : null}
+
+      {confirmDialog.open ? (
+        <div className="system-params-confirm-backdrop" role="presentation" onClick={closeConfirmDialog}>
+          <section
+            className="system-params-confirm-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-label="确认提示"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <h4>{confirmDialog.mode === 'save' ? '确认保存' : '确认退出'}</h4>
+            <p>{confirmDialogMessage}</p>
+            <div className="system-params-confirm-actions">
+              <button type="button" className="is-cancel" onClick={closeConfirmDialog}>取消</button>
+              <button type="button" className="is-confirm" onClick={handleConfirmDialogConfirm}>确定</button>
+            </div>
+          </section>
+        </div>
+      ) : null}
     </div>
   )
 }
 
 export default SystemParamsPage
+

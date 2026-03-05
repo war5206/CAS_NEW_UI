@@ -35,14 +35,27 @@ function AppRoutes({ homePageTitle, onHomePageTitleChange }) {
   })
   const [hideSecondaryNav, setHideSecondaryNav] = useState(false)
   const [hideModuleTabs, setHideModuleTabs] = useState(false)
+  const [moduleBreadcrumbSuffix, setModuleBreadcrumbSuffix] = useState(null)
+  const [committedUnitLayoutSlots, setCommittedUnitLayoutSlots] = useState(null)
   const isHomeRoute = location.pathname === HOME_PATH || location.pathname === `${HOME_PATH}/`
+
+  useEffect(() => {
+    setModuleBreadcrumbSuffix(null)
+  }, [location.pathname])
 
   return (
     <>
       {homeEntry ? (
         <div className={`app-route-cache${isHomeRoute ? ' is-active' : ''}`} aria-hidden={!isHomeRoute}>
-          <CasLayout routeInfo={homeEntry} homePageTitle={homePageTitle} unsavedGuard={unsavedGuard} hideSecondaryNav={hideSecondaryNav} hideModuleTabs={hideModuleTabs}>
-            <HomePage onActivePageChange={onHomePageTitleChange} />
+          <CasLayout
+            routeInfo={homeEntry}
+            homePageTitle={homePageTitle}
+            unsavedGuard={unsavedGuard}
+            hideSecondaryNav={hideSecondaryNav}
+            hideModuleTabs={hideModuleTabs}
+            extraBreadcrumbLabel={moduleBreadcrumbSuffix}
+          >
+            <HomePage onActivePageChange={onHomePageTitleChange} committedUnitLayoutSlots={committedUnitLayoutSlots} />
           </CasLayout>
         </div>
       ) : null}
@@ -59,12 +72,21 @@ function AppRoutes({ homePageTitle, onHomePageTitleChange }) {
             key={entry.key}
             path={entry.path}
             element={
-              <CasLayout routeInfo={entry} homePageTitle={homePageTitle} unsavedGuard={unsavedGuard} hideSecondaryNav={hideSecondaryNav} hideModuleTabs={hideModuleTabs}>
+              <CasLayout
+                routeInfo={entry}
+                homePageTitle={homePageTitle}
+                unsavedGuard={unsavedGuard}
+                hideSecondaryNav={hideSecondaryNav}
+                hideModuleTabs={hideModuleTabs}
+                extraBreadcrumbLabel={moduleBreadcrumbSuffix}
+              >
                 <ModulePage
                   routeInfo={entry}
                   onUnsavedGuardChange={setUnsavedGuard}
                   onSecondaryNavVisibilityChange={setHideSecondaryNav}
                   onModuleTabsVisibilityChange={setHideModuleTabs}
+                  onDetailBreadcrumbChange={setModuleBreadcrumbSuffix}
+                  onUnitLayoutCommitted={setCommittedUnitLayoutSlots}
                 />
               </CasLayout>
             }

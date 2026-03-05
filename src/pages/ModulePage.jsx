@@ -15,6 +15,8 @@ function ModulePage({
   onUnsavedGuardChange,
   onSecondaryNavVisibilityChange,
   onModuleTabsVisibilityChange,
+  onDetailBreadcrumbChange,
+  onUnitLayoutCommitted,
 }) {
   const { module, section, tab } = routeInfo
   const isModeSelectSection = module.id === 'settings' && section?.id === 'mode-select'
@@ -63,6 +65,8 @@ function ModulePage({
         onUnsavedGuardChange={onUnsavedGuardChange}
         onSecondaryNavVisibilityChange={onSecondaryNavVisibilityChange}
         onModuleTabsVisibilityChange={onModuleTabsVisibilityChange}
+        onDetailBreadcrumbChange={onDetailBreadcrumbChange}
+        onUnitLayoutCommitted={onUnitLayoutCommitted}
       />
     )
   }
