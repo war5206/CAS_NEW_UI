@@ -3,7 +3,29 @@ import * as echarts from 'echarts'
 import SelectDropdown from '../components/SelectDropdown'
 import backIcon from '../assets/layout/back.svg'
 import { useDeferredVisible } from '../hooks/useDeferredVisible'
+import '../components/SettingCards.css'
 import './AlertsModulePage.css'
+
+const ALARM_NAME_OPTIONS = [
+  { value: 'high-pressure', label: '高压故障' },
+  { value: 'low-pressure', label: '低压故障' },
+  { value: 'flow', label: '水流故障' },
+]
+
+const ALARM_LEVEL_OPTIONS = [
+  { value: '1', label: '一级' },
+  { value: '2', label: '二级' },
+  { value: '3', label: '三级' },
+  { value: '4', label: '四级' },
+]
+
+const HEATING_SEASON_OPTIONS = [
+  { value: '2024-06', label: '2024.06.01 17:50:00' },
+  { value: '2024-05', label: '2024.05.01 08:00:00' },
+  { value: '2023-11', label: '2023.11.15 09:30:00' },
+]
+
+const ROWS_PER_PAGE = 8
 
 const SYSTEM_ALARM_ROWS = Array.from({ length: 8 }, (_, index) => ({
   id: `system-${index}`,
@@ -129,8 +151,33 @@ function AlarmChart({ period, mode }) {
   return <div ref={chartRef} className="alerts-analysis__chart" />
 }
 
+function LabeledFilterField({ label, children, className = '' }) {
+  return (
+    <div className={`labeled-select-row alerts-filter-field ${className}`.trim()}>
+      <div className="labeled-select-row__content">
+        <div className="labeled-select-row__label">{label}</div>
+      </div>
+      <div className="labeled-select-row__control">{children}</div>
+    </div>
+  )
+}
+
 function SystemAlarmPage() {
   const [isHistoryView, setIsHistoryView] = useState(false)
+  const [alarmName, setAlarmName] = useState('high-pressure')
+  const [alarmLevel, setAlarmLevel] = useState('4')
+  const [heatingSeason, setHeatingSeason] = useState('2024-06')
+  const [currentPage, setCurrentPage] = useState(1)
+
+  const totalPages = Math.ceil(SYSTEM_ALARM_ROWS.length / ROWS_PER_PAGE)
+  const pageRows = useMemo(
+    () =>
+      SYSTEM_ALARM_ROWS.slice(
+        (currentPage - 1) * ROWS_PER_PAGE,
+        currentPage * ROWS_PER_PAGE,
+      ),
+    [currentPage],
+  )
 
   return (
     <div className="alerts-page">
@@ -144,17 +191,71 @@ function SystemAlarmPage() {
             <h3>历史报警</h3>
           </div>
           <div className="alerts-filter-bar alerts-filter-bar--history">
-            <div className="alerts-field"><span>名称</span><button type="button">高压故障</button></div>
-            <div className="alerts-field"><span>报警等级</span><button type="button">四级</button></div>
-            <div className="alerts-field"><span>采暖季</span><button type="button">2024.06.01 17:50:00</button></div>
-            <div className="alerts-field"><span>—</span><button type="button" className="is-placeholder">请选择时间</button></div>
+            <LabeledFilterField label="名称">
+              <SelectDropdown
+                options={ALARM_NAME_OPTIONS}
+                value={alarmName}
+                onChange={setAlarmName}
+                triggerClassName="alerts-filter-field__trigger"
+                dropdownClassName="alerts-filter-field__dropdown"
+                optionClassName="alerts-filter-field__option"
+                triggerAriaLabel="选择报警名称"
+              />
+            </LabeledFilterField>
+            <LabeledFilterField label="报警等级">
+              <SelectDropdown
+                options={ALARM_LEVEL_OPTIONS}
+                value={alarmLevel}
+                onChange={setAlarmLevel}
+                triggerClassName="alerts-filter-field__trigger"
+                dropdownClassName="alerts-filter-field__dropdown"
+                optionClassName="alerts-filter-field__option"
+                triggerAriaLabel="选择报警等级"
+              />
+            </LabeledFilterField>
+            <LabeledFilterField label="采暖季">
+              <SelectDropdown
+                options={HEATING_SEASON_OPTIONS}
+                value={heatingSeason}
+                onChange={setHeatingSeason}
+                triggerClassName="alerts-filter-field__trigger"
+                dropdownClassName="alerts-filter-field__dropdown"
+                optionClassName="alerts-filter-field__option"
+                triggerAriaLabel="选择采暖季"
+              />
+            </LabeledFilterField>
+            <LabeledFilterField label="—">
+              <button type="button" className="alerts-filter-field__trigger is-placeholder">
+                请选择时间
+              </button>
+            </LabeledFilterField>
             <button type="button" className="alerts-primary-btn">查询</button>
           </div>
         </>
       ) : (
         <div className="alerts-filter-bar">
-          <div className="alerts-field"><span>名称</span><button type="button">高压故障</button></div>
-          <div className="alerts-field"><span>报警等级</span><button type="button">四级</button></div>
+          <LabeledFilterField label="名称">
+            <SelectDropdown
+              options={ALARM_NAME_OPTIONS}
+              value={alarmName}
+              onChange={setAlarmName}
+              triggerClassName="alerts-filter-field__trigger"
+              dropdownClassName="alerts-filter-field__dropdown"
+              optionClassName="alerts-filter-field__option"
+              triggerAriaLabel="选择报警名称"
+            />
+          </LabeledFilterField>
+          <LabeledFilterField label="报警等级">
+            <SelectDropdown
+              options={ALARM_LEVEL_OPTIONS}
+              value={alarmLevel}
+              onChange={setAlarmLevel}
+              triggerClassName="alerts-filter-field__trigger"
+              dropdownClassName="alerts-filter-field__dropdown"
+              optionClassName="alerts-filter-field__option"
+              triggerAriaLabel="选择报警等级"
+            />
+          </LabeledFilterField>
           <button type="button" className="alerts-primary-btn">查询</button>
           <button type="button" className="alerts-link-btn" onClick={() => setIsHistoryView(true)}>历史报警</button>
         </div>
@@ -173,7 +274,7 @@ function SystemAlarmPage() {
             </tr>
           </thead>
           <tbody>
-            {SYSTEM_ALARM_ROWS.map((row) => (
+            {pageRows.map((row) => (
               <tr key={row.id}>
                 <td>{row.deviceName}</td>
                 <td>{row.alarmName}</td>
@@ -188,11 +289,32 @@ function SystemAlarmPage() {
                 </td>
               </tr>
             ))}
-            <tr className="is-empty"><td colSpan={6}>.</td></tr>
-            <tr className="is-empty"><td colSpan={6}>.</td></tr>
           </tbody>
         </table>
       </div>
+      {totalPages > 1 ? (
+        <div className="alerts-pagination">
+          <button
+            type="button"
+            className="alerts-pagination__btn"
+            disabled={currentPage <= 1}
+            onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+          >
+            上一页
+          </button>
+          <span className="alerts-pagination__info">
+            {currentPage} / {totalPages}
+          </span>
+          <button
+            type="button"
+            className="alerts-pagination__btn"
+            disabled={currentPage >= totalPages}
+            onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+          >
+            下一页
+          </button>
+        </div>
+      ) : null}
     </div>
   )
 }
@@ -210,6 +332,17 @@ function FaultTreePage() {
         })),
       ),
     [],
+  )
+
+  const [currentPage, setCurrentPage] = useState(1)
+  const totalPages = Math.ceil(flattenedRows.length / ROWS_PER_PAGE)
+  const pageRows = useMemo(
+    () =>
+      flattenedRows.slice(
+        (currentPage - 1) * ROWS_PER_PAGE,
+        currentPage * ROWS_PER_PAGE,
+      ),
+    [currentPage, flattenedRows],
   )
 
   return (
@@ -232,7 +365,7 @@ function FaultTreePage() {
             </tr>
           </thead>
           <tbody>
-            {flattenedRows.map((row) => (
+            {pageRows.map((row) => (
               <tr key={row.rowId}>
                 <td>{row.code}</td>
                 <td>{row.name}</td>
@@ -240,11 +373,32 @@ function FaultTreePage() {
                 <td>{row.plan}</td>
               </tr>
             ))}
-            <tr className="is-empty"><td colSpan={4}>.</td></tr>
-            <tr className="is-empty"><td colSpan={4}>.</td></tr>
           </tbody>
         </table>
       </div>
+      {totalPages > 1 ? (
+        <div className="alerts-pagination">
+          <button
+            type="button"
+            className="alerts-pagination__btn"
+            disabled={currentPage <= 1}
+            onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+          >
+            上一页
+          </button>
+          <span className="alerts-pagination__info">
+            {currentPage} / {totalPages}
+          </span>
+          <button
+            type="button"
+            className="alerts-pagination__btn"
+            disabled={currentPage >= totalPages}
+            onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+          >
+            下一页
+          </button>
+        </div>
+      ) : null}
     </div>
   )
 }
