@@ -21,7 +21,15 @@ const formatDateTime = (date) => {
   }
 }
 
-function CasLayout({ routeInfo, children, homePageTitle }) {
+function CasLayout({
+  routeInfo,
+  children,
+  homePageTitle,
+  unsavedGuard,
+  hideSecondaryNav = false,
+  hideModuleTabs = false,
+  extraBreadcrumbLabel = null,
+}) {
   const [now, setNow] = useState(() => new Date())
   const activeModule = routeInfo.module
   const activeSection = routeInfo.section
@@ -43,13 +51,16 @@ function CasLayout({ routeInfo, children, homePageTitle }) {
     if (activeTab) {
       items.push(activeTab.label)
     }
+    if (!isHomeLayout && extraBreadcrumbLabel) {
+      items.push(extraBreadcrumbLabel)
+    }
     return items
-  }, [activeModule, activeSection, activeTab, homePageTitle])
+  }, [activeModule, activeSection, activeTab, extraBreadcrumbLabel, homePageTitle, isHomeLayout])
 
   const sectionList = activeModule.sections ?? []
   const tabList = activeSection?.tabs ?? []
-  const showSecondaryNav = sectionList.length > 0 || !isHomeLayout
-  const hasTabs = tabList.length > 0
+  const showSecondaryNav = !hideSecondaryNav && (sectionList.length > 0 || !isHomeLayout)
+  const hasTabs = !hideModuleTabs && tabList.length > 0
   const { dateLabel, timeLabel } = formatDateTime(now)
   const alertIndicator = (
     <div className="alert-indicator" title="hasAlert">
@@ -89,6 +100,12 @@ function CasLayout({ routeInfo, children, homePageTitle }) {
               key={module.id}
               to={getModuleDefaultPath(module)}
               className={`nav-item${module.id === activeModule.id ? ' is-active' : ''}`}
+              onClick={(event) => {
+                const shouldConfirm = unsavedGuard?.active && module.id !== 'settings'
+                if (shouldConfirm && !window.confirm(unsavedGuard?.message || '当前内容未保存，是否退出？')) {
+                  event.preventDefault()
+                }
+              }}
             >
               <img src={module.icon} alt="" aria-hidden="true" />
               <span>{module.label}</span>

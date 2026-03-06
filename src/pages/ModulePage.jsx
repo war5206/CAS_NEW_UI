@@ -9,8 +9,19 @@ import ModeSelectPage from './ModeSelectPage'
 import ClimateCompensationPage from './ClimateCompensationPage'
 import CouplingEnergyPage from './CouplingEnergyPage'
 import BasicSettingPage from './BasicSettingPage'
+import SystemParamsPage from './SystemParamsPage'
+import SmartStartStopPage from './SmartStartStopPage'
+import PeakValleyPage from './PeakValleyPage'
+import SmartTimerPage from './SmartTimerPage'
 
-function ModulePage({ routeInfo }) {
+function ModulePage({
+  routeInfo,
+  onUnsavedGuardChange,
+  onSecondaryNavVisibilityChange,
+  onModuleTabsVisibilityChange,
+  onDetailBreadcrumbChange,
+  onUnitLayoutCommitted,
+}) {
   const { module, section, tab } = routeInfo
   const isModeSelectSection = module.id === 'settings' && section?.id === 'mode-select'
   const isDeviceParamsSection = module.id === 'settings' && section?.id === 'device-params'
@@ -49,11 +60,46 @@ function ModulePage({ routeInfo }) {
     }
   }
 
+  const isBaseSettingSystemParamsPage =
+    module.id === 'settings' && section?.id === 'base-setting' && tab?.id === 'system-params'
+
+  if (isBaseSettingSystemParamsPage) {
+    return (
+      <SystemParamsPage
+        onUnsavedGuardChange={onUnsavedGuardChange}
+        onSecondaryNavVisibilityChange={onSecondaryNavVisibilityChange}
+        onModuleTabsVisibilityChange={onModuleTabsVisibilityChange}
+        onDetailBreadcrumbChange={onDetailBreadcrumbChange}
+        onUnitLayoutCommitted={onUnitLayoutCommitted}
+      />
+    )
+  }
+
   const isModeSettingClimatePage =
     module.id === 'settings' && section?.id === 'mode-setting' && tab?.id === 'climate'
 
   if (isModeSettingClimatePage) {
     return <ClimateCompensationPage />
+  }
+
+  const isModeSettingStartStopPage =
+    module.id === 'settings' && section?.id === 'mode-setting' && tab?.id === 'start-stop'
+
+  if (isModeSettingStartStopPage) {
+    return <SmartStartStopPage />
+  }
+
+  const isModeSettingPeakValleyPage =
+    module.id === 'settings' && section?.id === 'mode-setting' && tab?.id === 'peak'
+
+  if (isModeSettingPeakValleyPage) {
+    return <PeakValleyPage />
+  }
+  const isModeSettingTimerPage =
+    module.id === 'settings' && section?.id === 'mode-setting' && tab?.id === 'timer'
+
+  if (isModeSettingTimerPage) {
+    return <SmartTimerPage />
   }
 
   const isModeSettingCouplingPage =

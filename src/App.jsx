@@ -29,14 +29,33 @@ const nonHomeEntries = pageEntries.filter((entry) => entry.module.id !== 'home')
 
 function AppRoutes({ homePageTitle, onHomePageTitleChange }) {
   const location = useLocation()
+  const [unsavedGuard, setUnsavedGuard] = useState({
+    active: false,
+    message: '当前页面有未保存更改，是否退出？',
+  })
+  const [hideSecondaryNav, setHideSecondaryNav] = useState(false)
+  const [hideModuleTabs, setHideModuleTabs] = useState(false)
+  const [moduleBreadcrumbSuffix, setModuleBreadcrumbSuffix] = useState(null)
+  const [committedUnitLayoutSlots, setCommittedUnitLayoutSlots] = useState(null)
   const isHomeRoute = location.pathname === HOME_PATH || location.pathname === `${HOME_PATH}/`
+
+  useEffect(() => {
+    setModuleBreadcrumbSuffix(null)
+  }, [location.pathname])
 
   return (
     <>
       {homeEntry ? (
         <div className={`app-route-cache${isHomeRoute ? ' is-active' : ''}`} aria-hidden={!isHomeRoute}>
-          <CasLayout routeInfo={homeEntry} homePageTitle={homePageTitle}>
-            <HomePage onActivePageChange={onHomePageTitleChange} />
+          <CasLayout
+            routeInfo={homeEntry}
+            homePageTitle={homePageTitle}
+            unsavedGuard={unsavedGuard}
+            hideSecondaryNav={hideSecondaryNav}
+            hideModuleTabs={hideModuleTabs}
+            extraBreadcrumbLabel={moduleBreadcrumbSuffix}
+          >
+            <HomePage onActivePageChange={onHomePageTitleChange} committedUnitLayoutSlots={committedUnitLayoutSlots} />
           </CasLayout>
         </div>
       ) : null}
@@ -53,8 +72,22 @@ function AppRoutes({ homePageTitle, onHomePageTitleChange }) {
             key={entry.key}
             path={entry.path}
             element={
-              <CasLayout routeInfo={entry} homePageTitle={homePageTitle}>
-                <ModulePage routeInfo={entry} />
+              <CasLayout
+                routeInfo={entry}
+                homePageTitle={homePageTitle}
+                unsavedGuard={unsavedGuard}
+                hideSecondaryNav={hideSecondaryNav}
+                hideModuleTabs={hideModuleTabs}
+                extraBreadcrumbLabel={moduleBreadcrumbSuffix}
+              >
+                <ModulePage
+                  routeInfo={entry}
+                  onUnsavedGuardChange={setUnsavedGuard}
+                  onSecondaryNavVisibilityChange={setHideSecondaryNav}
+                  onModuleTabsVisibilityChange={setHideModuleTabs}
+                  onDetailBreadcrumbChange={setModuleBreadcrumbSuffix}
+                  onUnitLayoutCommitted={setCommittedUnitLayoutSlots}
+                />
               </CasLayout>
             }
           />
