@@ -8,6 +8,7 @@ import ReliefValvePage from './ReliefValvePage'
 import ModeSelectPage from './ModeSelectPage'
 import ClimateCompensationPage from './ClimateCompensationPage'
 import CouplingEnergyPage from './CouplingEnergyPage'
+import BasicSettingPage from './BasicSettingPage'
 
 function ModulePage({ routeInfo }) {
   const { module, section, tab } = routeInfo
@@ -60,6 +61,12 @@ function ModulePage({ routeInfo }) {
 
   if (isModeSettingCouplingPage) {
     return <CouplingEnergyPage />
+  }
+
+  const isBasicSettingSection = module.id === 'settings' && section?.id === 'base-setting'
+
+  if (isBasicSettingSection) {
+    return <BasicSettingPage tabId={tab?.id} />
   }
 
   return (
