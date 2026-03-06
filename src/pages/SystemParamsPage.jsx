@@ -16,6 +16,8 @@ import showIcon from '../assets/icons/show.svg'
 import hideIcon from '../assets/icons/hide.svg'
 import longArrowDownBlueIcon from '../assets/long-arrow-down-blue.svg'
 import longArrowDownGrayIcon from '../assets/long-arrow-down-gray.svg'
+import addIcon from '../assets/icons/add.svg'
+import editIcon from '../assets/edit.svg'
 import { HEAT_PUMP_GRID_ITEMS } from '../config/homeHeatPumps'
 import './SystemParamsPage.css'
 
@@ -29,7 +31,7 @@ const MODULE_ITEMS = [
 
 const MAINBOARD_OPTIONS = [
   { value: 'jingchuang', label: '精创主板' },
-  { value: 'other', label: '其他主板' },
+  { value: 'other', label: '自制主板' },
 ]
 
 const PROJECT_TYPE_OPTIONS = [
@@ -99,8 +101,14 @@ const UNIT_TOTAL = 33
 const DATE_PICKER_YEARS = Array.from({ length: 61 }, (_, index) => 2000 + index)
 const DATE_PICKER_MONTHS = Array.from({ length: 12 }, (_, index) => index + 1)
 const DATE_PICKER_DAYS = Array.from({ length: 31 }, (_, index) => index + 1)
+const TIME_PICKER_HOURS = Array.from({ length: 25 }, (_, index) => index)
+const TIME_PICKER_MINUTES = Array.from({ length: 60 }, (_, index) => index)
 const UNSAVED_MESSAGE = '当前页面有未保存修改，是否退出？'
 const SAVE_CONFIRM_MESSAGE = '确认保存当前参数吗？'
+const ENERGY_PRICE_PLAN_TIME_INVALID_MESSAGE = '时段价格设置需覆盖24小时：首段开始时间必须为00:00，末段结束时间必须为24:00。'
+const ENERGY_PRICE_SEGMENT_INVALID_MESSAGE = '时段设置无效：每段结束时间必须晚于开始时间。'
+/** 能源价格各时段条块颜色，按索引循环使用 */
+const ENERGY_PRICE_SEGMENT_COLORS = ['#2387f0', '#efc443', '#ff7a45', '#2dd283', '#9b6bcc', '#00b4d8']
 const DETAIL_MAIN_KEYS = ['project-system-type', 'loop-pump-count', 'unit-layout', 'energy-price', 'coupling-energy']
 
 const CARD_ICON_MAP = {
@@ -139,7 +147,8 @@ const initialEnergyPriceState = {
   electricPlans: [
     {
       id: 1,
-      label: '1月1日 - 6月30日',
+      startDate: '01-01',
+      endDate: '06-30',
       segments: [
         { start: '00:00', end: '06:00', price: '0.38', color: '#2387f0' },
         { start: '06:00', end: '12:00', price: '0.60', color: '#efc443' },
@@ -152,7 +161,7 @@ const initialEnergyPriceState = {
 }
 
 const initialCouplingEnergyState = {
-  type: '电锅炉',
+  type: '无耦合能源',
   count: '0',
 }
 
@@ -205,6 +214,73 @@ function deepClone(value) {
   return JSON.parse(JSON.stringify(value))
 }
 
+function parseTimeToMinutes(value) {
+  if (!value || typeof value !== 'string') return 0
+  const [hourText, minuteText] = value.split(':')
+  const hour = Number(hourText)
+  const minute = Number(minuteText)
+  if (!Number.isInteger(hour) || !Number.isInteger(minute)) return 0
+  return Math.min(24 * 60, Math.max(0, hour * 60 + minute))
+}
+
+function formatMinutesToTime(totalMinutes) {
+  const safe = Math.min(24 * 60, Math.max(0, Number(totalMinutes) || 0))
+  const hour = Math.floor(safe / 60)
+  const minute = safe % 60
+  return `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`
+}
+
+function parseMonthDay(value) {
+  if (!value || typeof value !== 'string') return [1, 1]
+  const [monthText, dayText] = value.split('-')
+  const month = Number(monthText)
+  const day = Number(dayText)
+  const safeMonth = Number.isInteger(month) && month >= 1 && month <= 12 ? month : 1
+  const safeDay = Number.isInteger(day) && day >= 1 && day <= 31 ? day : 1
+  return [safeMonth, safeDay]
+}
+
+function formatMonthDay(month, day) {
+  return `${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`
+}
+
+function formatMonthDayText(value) {
+  const [month, day] = parseMonthDay(value)
+  return `${month}月${day}日`
+}
+
+function parseTimeValue(value) {
+  if (!value || typeof value !== 'string') return [0, 0]
+  const [hourText, minuteText] = value.split(':')
+  const hour = Number(hourText)
+  const minute = Number(minuteText)
+  const safeHour = Number.isInteger(hour) && hour >= 0 && hour <= 24 ? hour : 0
+  const safeMinute = Number.isInteger(minute) && minute >= 0 && minute <= 59 ? minute : 0
+  return [safeHour, safeMinute]
+}
+
+function normalizeEnergyPlanDraftSegments(segments) {
+  const source = Array.isArray(segments) ? segments : []
+  if (source.length === 0) {
+    return [{ start: '00:00', end: '24:00', price: '', color: ENERGY_PRICE_SEGMENT_COLORS[0] }]
+  }
+
+  const normalized = source.map((segment, index) => ({
+    ...segment,
+    start: formatMinutesToTime(parseTimeToMinutes(segment?.start)),
+    end: formatMinutesToTime(parseTimeToMinutes(segment?.end)),
+    price: segment?.price ?? '',
+    color: segment?.color ?? ENERGY_PRICE_SEGMENT_COLORS[index % ENERGY_PRICE_SEGMENT_COLORS.length],
+  }))
+
+  normalized[0].start = '00:00'
+  for (let index = 1; index < normalized.length; index += 1) {
+    normalized[index - 1].end = normalized[index].start
+  }
+
+  return normalized
+}
+
 function cloneUnitLayoutState(state) {
   return {
     slots: [...state.slots],
@@ -255,9 +331,12 @@ function SystemParamsPage({
   const [couplingEnergyState, setCouplingEnergyState] = useState(() => deepClone(initialCouplingEnergyState))
   const [savedCouplingEnergyState, setSavedCouplingEnergyState] = useState(() => deepClone(initialCouplingEnergyState))
   const [energyPriceModalOpen, setEnergyPriceModalOpen] = useState(false)
+  const [editingEnergyPlanId, setEditingEnergyPlanId] = useState(null)
+  const [energyPriceModalDraft, setEnergyPriceModalDraft] = useState({ startDate: '01-01', endDate: '12-31', segments: [] })
+  const [energyPricePickerState, setEnergyPricePickerState] = useState({ open: false, type: null, segmentIndex: null })
   const [keypadState, setKeypadState] = useState({ open: false, field: null, moduleKey: null })
   const [datePickerField, setDatePickerField] = useState(null)
-  const [confirmDialog, setConfirmDialog] = useState({ open: false, mode: null, targetView: null })
+  const [confirmDialog, setConfirmDialog] = useState({ open: false, mode: null, targetView: null, title: '', message: '' })
 
   const [unitSlots, setUnitSlots] = useState(() => [...INITIAL_UNIT_LAYOUT_STATE.slots])
   const [pendingUnitIds, setPendingUnitIds] = useState(() => [...INITIAL_UNIT_LAYOUT_STATE.pendingIds])
@@ -303,6 +382,14 @@ function SystemParamsPage({
     }
     return parseDateString(projectForm[datePickerField])
   }, [datePickerField, projectForm])
+  const energyPricePickerValue = useMemo(() => {
+    if (!energyPricePickerState.open) return []
+    if (energyPricePickerState.type === 'startDate') return parseMonthDay(energyPriceModalDraft.startDate)
+    if (energyPricePickerState.type === 'endDate') return parseMonthDay(energyPriceModalDraft.endDate)
+    if (energyPricePickerState.type === 'segment-start') return parseTimeValue(energyPriceModalDraft.segments[energyPricePickerState.segmentIndex]?.start)
+    if (energyPricePickerState.type === 'segment-end') return parseTimeValue(energyPriceModalDraft.segments[energyPricePickerState.segmentIndex]?.end)
+    return []
+  }, [energyPriceModalDraft, energyPricePickerState])
 
   useEffect(() => {
     const shouldHideSecondaryNav = activeView !== 'overview'
@@ -552,15 +639,19 @@ function SystemParamsPage({
   }
 
   const openDiscardConfirm = (targetView = null) => {
-    setConfirmDialog({ open: true, mode: 'discard', targetView })
+    setConfirmDialog({ open: true, mode: 'discard', targetView, title: '', message: '' })
   }
 
   const openSaveConfirm = () => {
-    setConfirmDialog({ open: true, mode: 'save', targetView: null })
+    setConfirmDialog({ open: true, mode: 'save', targetView: null, title: '', message: '' })
+  }
+
+  const openAlertDialog = (title, message) => {
+    setConfirmDialog({ open: true, mode: 'alert', targetView: null, title, message })
   }
 
   const closeConfirmDialog = () => {
-    setConfirmDialog({ open: false, mode: null, targetView: null })
+    setConfirmDialog({ open: false, mode: null, targetView: null, title: '', message: '' })
   }
 
   const handleBackToOverview = () => {
@@ -607,8 +698,17 @@ function SystemParamsPage({
     }
 
     if (activeView === 'energy-price') {
+      const hasInvalidPlanTime = energyPriceState.electricPlans.some((plan) => {
+        const segments = Array.isArray(plan?.segments) ? plan.segments : []
+        if (segments.length === 0) return true
+        return segments[0]?.start !== '00:00' || segments[segments.length - 1]?.end !== '24:00'
+      })
+      if (hasInvalidPlanTime) {
+        openAlertDialog('提示', ENERGY_PRICE_PLAN_TIME_INVALID_MESSAGE)
+        return false
+      }
       setSavedEnergyPriceState(deepClone(energyPriceState))
-      return
+      return true
     }
 
     if (activeView === 'coupling-energy') {
@@ -625,8 +725,16 @@ function SystemParamsPage({
   }
 
   const handleConfirmDialogConfirm = () => {
+    if (confirmDialog.mode === 'alert') {
+      closeConfirmDialog()
+      return
+    }
+
     if (confirmDialog.mode === 'save') {
-      saveCurrentView()
+      const saveResult = saveCurrentView()
+      if (saveResult === false) {
+        return
+      }
       closeConfirmDialog()
       return
     }
@@ -653,6 +761,11 @@ function SystemParamsPage({
       setEnergyPriceState((previous) => ({ ...previous, gasFixed: value }))
     } else if (keypadState.moduleKey === 'coupling-count') {
       setCouplingEnergyState((previous) => ({ ...previous, count: value }))
+    } else if (keypadState.moduleKey === 'energy-plan-price' && Number.isInteger(keypadState.field)) {
+      setEnergyPriceModalDraft((previous) => ({
+        ...previous,
+        segments: previous.segments.map((segment, index) => (index === keypadState.field ? { ...segment, price: value } : segment)),
+      }))
     } else if (keypadState.moduleKey) {
       setSimpleForms((previous) => ({
         ...previous,
@@ -667,6 +780,59 @@ function SystemParamsPage({
       }))
     }
     setKeypadState({ open: false, field: null, moduleKey: null })
+  }
+
+  const handleEnergyPricePickerConfirm = (nextValueParts) => {
+    if (!Array.isArray(nextValueParts) || nextValueParts.length < 2) {
+      setEnergyPricePickerState({ open: false, type: null, segmentIndex: null })
+      return
+    }
+
+    const [rawA, rawB] = nextValueParts.map((item) => Number(item))
+    const a = Number.isInteger(rawA) ? rawA : 0
+    const b = Number.isInteger(rawB) ? rawB : 0
+
+    if (energyPricePickerState.type === 'startDate' || energyPricePickerState.type === 'endDate') {
+      const month = Math.min(12, Math.max(1, a))
+      const maxDay = new Date(2024, month, 0).getDate()
+      const day = Math.min(maxDay, Math.max(1, b))
+      setEnergyPriceModalDraft((previous) => ({
+        ...previous,
+        [energyPricePickerState.type]: formatMonthDay(month, day),
+      }))
+    } else if ((energyPricePickerState.type === 'segment-start' || energyPricePickerState.type === 'segment-end') && Number.isInteger(energyPricePickerState.segmentIndex)) {
+      const hour = Math.min(24, Math.max(0, a))
+      const minute = Math.min(59, Math.max(0, b))
+      const nextTime = `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`
+      const targetIndex = energyPricePickerState.segmentIndex
+      setEnergyPriceModalDraft((previous) => ({
+        ...previous,
+        segments: previous.segments.map((segment, index) => {
+          if (energyPricePickerState.type === 'segment-start') {
+            if (index === 0) {
+              return { ...segment, start: '00:00' }
+            }
+            if (index === targetIndex) {
+              return { ...segment, start: nextTime }
+            }
+            if (index === targetIndex - 1) {
+              return { ...segment, end: nextTime }
+            }
+            return segment
+          }
+
+          if (index === targetIndex) {
+            return { ...segment, end: nextTime }
+          }
+          if (index === targetIndex + 1) {
+            return { ...segment, start: nextTime }
+          }
+          return segment
+        }),
+      }))
+    }
+
+    setEnergyPricePickerState({ open: false, type: null, segmentIndex: null })
   }
 
   const resetUnitLayout = () => {
@@ -1233,6 +1399,103 @@ function SystemParamsPage({
     const isWater = energyPriceState.tab === 'water'
     const isElectricity = energyPriceState.tab === 'electricity'
     const isGas = energyPriceState.tab === 'gas'
+    const openEnergyPriceModal = (plan = null) => {
+      if (plan) {
+        setEditingEnergyPlanId(plan.id)
+        setEnergyPriceModalDraft({
+          startDate: plan.startDate ?? '01-01',
+          endDate: plan.endDate ?? '12-31',
+          segments: normalizeEnergyPlanDraftSegments(deepClone(plan.segments ?? [])),
+        })
+      } else {
+        setEditingEnergyPlanId(null)
+        setEnergyPriceModalDraft({
+          startDate: '01-01',
+          endDate: '12-31',
+          segments: [{ start: '00:00', end: '24:00', price: '', color: ENERGY_PRICE_SEGMENT_COLORS[0] }],
+        })
+      }
+      setEnergyPriceModalOpen(true)
+    }
+    const closeEnergyPriceModal = () => {
+      setEnergyPriceModalOpen(false)
+      setEditingEnergyPlanId(null)
+      setEnergyPricePickerState({ open: false, type: null, segmentIndex: null })
+    }
+    const handleAddEnergyPlanDraftSegment = () => {
+      const last = energyPriceModalDraft.segments.at(-1)
+      const lastEndMinutes = parseTimeToMinutes(last?.end ?? '00:00')
+      if (lastEndMinutes >= 24 * 60) return
+      const nextStart = formatMinutesToTime(lastEndMinutes)
+      setEnergyPriceModalDraft((previous) => ({
+        ...previous,
+        segments: [
+          ...previous.segments,
+          { start: nextStart, end: '24:00', price: '', color: ENERGY_PRICE_SEGMENT_COLORS[previous.segments.length % ENERGY_PRICE_SEGMENT_COLORS.length] },
+        ],
+      }))
+    }
+    const handleRemoveEnergyPlanDraftSegment = (index) => {
+      setEnergyPriceModalDraft((previous) => ({
+        ...previous,
+        segments: normalizeEnergyPlanDraftSegments(previous.segments.filter((_, segmentIndex) => segmentIndex !== index)),
+      }))
+    }
+    const canAddEnergyPriceSegment = parseTimeToMinutes(energyPriceModalDraft.segments.at(-1)?.end ?? '00:00') < 24 * 60
+    const handleConfirmEnergyPlanModal = () => {
+      const hasInvalidDraftSegment = energyPriceModalDraft.segments.some(
+        (segment) => parseTimeToMinutes(segment?.end) <= parseTimeToMinutes(segment?.start),
+      )
+      if (hasInvalidDraftSegment) {
+        openAlertDialog('提示', ENERGY_PRICE_SEGMENT_INVALID_MESSAGE)
+        return
+      }
+
+      const normalizedDraftSegments = normalizeEnergyPlanDraftSegments(energyPriceModalDraft.segments)
+      const hasInvalidSegment = normalizedDraftSegments.some((segment) => parseTimeToMinutes(segment.end) <= parseTimeToMinutes(segment.start))
+      if (hasInvalidSegment) {
+        openAlertDialog('提示', ENERGY_PRICE_SEGMENT_INVALID_MESSAGE)
+        return
+      }
+      const normalizedSegments = normalizedDraftSegments.map((segment, index) => {
+        const startMinutes = parseTimeToMinutes(segment.start)
+        const endMinutes = parseTimeToMinutes(segment.end)
+        if (endMinutes <= startMinutes) return null
+        return {
+          start: formatMinutesToTime(startMinutes),
+          end: formatMinutesToTime(endMinutes),
+          price: segment.price ?? '',
+          color: segment.color ?? ENERGY_PRICE_SEGMENT_COLORS[index % ENERGY_PRICE_SEGMENT_COLORS.length],
+        }
+      }).filter(Boolean)
+      if (normalizedSegments.length === 0) {
+        openAlertDialog('提示', ENERGY_PRICE_SEGMENT_INVALID_MESSAGE)
+        return
+      }
+      if (normalizedSegments[0]?.start !== '00:00' || normalizedSegments.at(-1)?.end !== '24:00') {
+        openAlertDialog('提示', ENERGY_PRICE_PLAN_TIME_INVALID_MESSAGE)
+        return
+      }
+      setEnergyPriceState((previous) => {
+        const nextPlan = {
+          id: editingEnergyPlanId ?? Date.now(),
+          startDate: energyPriceModalDraft.startDate ?? '01-01',
+          endDate: energyPriceModalDraft.endDate ?? '12-31',
+          segments: normalizedSegments,
+        }
+        if (editingEnergyPlanId == null) return { ...previous, electricPlans: [...previous.electricPlans, nextPlan] }
+        return { ...previous, electricPlans: previous.electricPlans.map((plan) => (plan.id === editingEnergyPlanId ? nextPlan : plan)) }
+      })
+      closeEnergyPriceModal()
+    }
+    const handleDeleteEnergyPlan = () => {
+      if (editingEnergyPlanId == null) {
+        closeEnergyPriceModal()
+        return
+      }
+      setEnergyPriceState((previous) => ({ ...previous, electricPlans: previous.electricPlans.filter((plan) => plan.id !== editingEnergyPlanId) }))
+      closeEnergyPriceModal()
+    }
 
     return (
       <div className="system-params-detail">
@@ -1259,66 +1522,115 @@ function SystemParamsPage({
             className="system-params-field system-params-field--input energy-price-fixed"
             onClick={() => openNumberPad('value', isWater ? 'energy-water' : 'energy-gas')}
           >
-            <span>固定价格</span>
-            <div>{isWater ? energyPriceState.waterFixed : energyPriceState.gasFixed} 元/m³</div>
+            <span>{isWater ? '水固定价格' : '气固定价格'}</span>
+            <div className="system-params-input-display">
+              <span>{isWater ? energyPriceState.waterFixed : energyPriceState.gasFixed}</span>
+              <span className="system-params-input-unit">元/m³</span>
+            </div>
           </button>
         ) : null}
 
         {isElectricity ? (
           <div className="energy-price-electric">
-            <button type="button" className="energy-price-add" onClick={() => setEnergyPriceModalOpen(true)}>+ 新增</button>
-            {energyPriceState.electricPlans.map((plan) => (
-              <div key={plan.id} className="energy-price-plan">
-                <div className="energy-price-plan__head">
-                  <span>{plan.label}</span>
-                  <button type="button" onClick={() => setEnergyPriceModalOpen(true)}>编辑</button>
-                </div>
-                <div className="energy-price-plan__times">
-                  {plan.segments.map((segment) => (
-                    <span key={`${plan.id}-${segment.start}`}>{segment.start}</span>
-                  ))}
-                  <span>24:00</span>
-                </div>
-                <div className="energy-price-plan__bar">
-                  {plan.segments.map((segment) => (
-                    <div key={`${plan.id}-${segment.start}-bar`} style={{ background: segment.color }}>
-                      {segment.price}
+            <button type="button" className="energy-price-add" onClick={() => openEnergyPriceModal()}>
+              <img src={addIcon} alt="" aria-hidden="true" />
+              <span>新增</span>
+            </button>
+            {energyPriceState.electricPlans.map((plan) => {
+              const bars = plan.segments.map((segment, index) => {
+                const start = parseTimeToMinutes(segment.start)
+                const end = parseTimeToMinutes(segment.end)
+                const duration = Math.max(1, end - start)
+                return { key: `${plan.id}-${index}`, start: formatMinutesToTime(start), end: formatMinutesToTime(end), duration, price: segment.price, color: segment.color }
+              })
+              const totalDuration = bars.reduce((sum, item) => sum + item.duration, 0) || 1
+              const boundaries = []
+              let passed = 0
+              bars.forEach((item, index) => {
+                boundaries.push({ key: `${item.key}-start`, time: item.start, left: (passed / totalDuration) * 100 })
+                passed += item.duration
+                if (index === bars.length - 1) boundaries.push({ key: `${item.key}-end`, time: item.end, left: 100 })
+              })
+
+              return (
+                <div key={plan.id} className="energy-price-plan">
+                  <div className="energy-price-plan__head">
+                    <span>{`${formatMonthDayText(plan.startDate)} - ${formatMonthDayText(plan.endDate)}`}</span>
+                    <button type="button" onClick={() => openEnergyPriceModal(plan)}>
+                      <img src={editIcon} alt="" aria-hidden="true" />
+                    </button>
+                  </div>
+                  <div className="energy-price-plan__times">
+                    <div className="energy-price-plan__times-track">
+                      {boundaries.map((item) => {
+                        const [hh, mm] = item.time.split(':')
+                        return (
+                          <span key={item.key} className="energy-price-plan__time-marker" style={{ left: `${item.left}%` }}>
+                            <span>{hh}</span>
+                            <span className="energy-price-plan__time-sep">:</span>
+                            <span>{mm}</span>
+                          </span>
+                        )
+                      })}
                     </div>
-                  ))}
+                  </div>
+                  <div className="energy-price-plan__bar">
+                    {bars.map((segment) => (
+                      <div key={`${segment.key}-bar`} style={{ background: segment.color, flexGrow: segment.duration, flexBasis: 0 }}>
+                        {segment.price ? `${segment.price} 元/kWh` : ''}
+                      </div>
+                    ))}
+                  </div>
                 </div>
-              </div>
-            ))}
+              )
+            })}
           </div>
         ) : null}
 
         {energyPriceModalOpen ? (
-          <div className="energy-price-modal-backdrop" onClick={() => setEnergyPriceModalOpen(false)}>
+          <div className="energy-price-modal-backdrop" onClick={closeEnergyPriceModal}>
             <div className="energy-price-modal" onClick={(event) => event.stopPropagation()}>
               <div className="energy-price-modal__header">
-                <h4>新增价格</h4>
-                <button type="button" onClick={() => setEnergyPriceModalOpen(false)}>关闭</button>
+                <h4>{editingEnergyPlanId == null ? '新增价格' : '编辑价格'}</h4>
+                <button type="button" onClick={closeEnergyPriceModal}>×</button>
               </div>
               <div className="energy-price-modal__body">
                 <section>
                   <h5>月份</h5>
-                  <div className="energy-price-modal__row">
-                    <span>00:00</span><em>-</em><span>08:00</span>
+                  <div className="energy-price-modal__label energy-price-modal__month">
+                    <button
+                      type="button"
+                      onClick={() => setEnergyPricePickerState({ open: true, type: 'startDate', segmentIndex: null })}
+                    >
+                      <span>开始时间</span>
+                      <strong>{formatMonthDayText(energyPriceModalDraft.startDate)}</strong>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setEnergyPricePickerState({ open: true, type: 'endDate', segmentIndex: null })}
+                    >
+                      <span>结束时间</span>
+                      <strong>{formatMonthDayText(energyPriceModalDraft.endDate)}</strong>
+                    </button>
                   </div>
                 </section>
                 <section>
                   <h5>时段价格设置</h5>
-                  <div className="energy-price-modal__row">
-                    <span>00:00</span><em>-</em><span>08:00</span><span>0.38</span>
-                  </div>
-                  <div className="energy-price-modal__row">
-                    <span>00:00</span><em>-</em><span>08:00</span><span className="is-placeholder">请输入价格</span>
-                  </div>
-                  <button type="button" className="energy-price-modal__add">+ 新增时段</button>
+                  {energyPriceModalDraft.segments.map((segment, index) => (
+                    <div key={`modal-segment-${index}`} className="energy-price-modal__row">
+                      <button type="button" onClick={() => setEnergyPricePickerState({ open: true, type: 'segment-start', segmentIndex: index })} disabled={index === 0}>{segment.start}</button>
+                      <em>-</em>
+                      <button type="button" onClick={() => setEnergyPricePickerState({ open: true, type: 'segment-end', segmentIndex: index })}>{segment.end}</button>
+                      <button type="button" className={`energy-price-modal__value${segment.price ? '' : ' is-placeholder'}`} onClick={() => openNumberPad(index, 'energy-plan-price')}>{segment.price || '请输入价格'}</button>
+                      <button type="button" className="energy-price-modal__remove" onClick={() => handleRemoveEnergyPlanDraftSegment(index)}>删除</button>
+                    </div>
+                  ))}
+                  <button type="button" className="energy-price-modal__add" onClick={handleAddEnergyPlanDraftSegment} disabled={!canAddEnergyPriceSegment}>新增时段</button>
                 </section>
               </div>
               <div className="energy-price-modal__actions">
-                <button type="button" className="is-danger">删除方案</button>
-                <button type="button" className="is-primary" onClick={() => setEnergyPriceModalOpen(false)}>确定</button>
+                <button type="button" className="is-danger" onClick={handleDeleteEnergyPlan}>删除方案</button>
+                <button type="button" className="is-primary" onClick={handleConfirmEnergyPlanModal}>确定</button>
               </div>
             </div>
           </div>
@@ -1339,16 +1651,30 @@ function SystemParamsPage({
               key={item}
               type="button"
               className={`coupling-energy-type${couplingEnergyState.type === item ? ' is-active' : ''}`}
-              onClick={() => setCouplingEnergyState((previous) => ({ ...previous, type: item }))}
+              onClick={() =>
+                setCouplingEnergyState((previous) => ({
+                  ...previous,
+                  type: item,
+                  count: item === '无耦合能源' ? '0' : previous.count,
+                }))
+              }
             >
               {item}
             </button>
           ))}
         </div>
 
-        <button type="button" className="system-params-field system-params-field--input coupling-energy-count" onClick={() => openNumberPad('value', 'coupling-count')}>
+        <button
+          type="button"
+          className="system-params-field system-params-field--input coupling-energy-count"
+          onClick={() => openNumberPad('value', 'coupling-count')}
+          disabled={couplingEnergyState.type === '无耦合能源'}
+        >
           <span>耦合能源台数</span>
-          <div>{couplingEnergyState.count} 台</div>
+          <div className="system-params-input-display">
+            <span>{couplingEnergyState.count}</span>
+            <span className="system-params-input-unit">台</span>
+          </div>
         </button>
       </div>
     </div>
@@ -1380,7 +1706,7 @@ function SystemParamsPage({
       {activeView === 'coupling-energy' ? renderCouplingEnergyDetail() : null}
       {activeView !== 'overview' && !DETAIL_MAIN_KEYS.includes(activeView) ? renderSimpleDetail() : null}
 
-      <NumericKeypadModal
+        <NumericKeypadModal
         isOpen={keypadState.open}
         initialValue={
           keypadState.moduleKey === 'energy-water'
@@ -1389,19 +1715,48 @@ function SystemParamsPage({
               ? energyPriceState.gasFixed
               : keypadState.moduleKey === 'coupling-count'
                 ? couplingEnergyState.count
+                : keypadState.moduleKey === 'energy-plan-price' && Number.isInteger(keypadState.field)
+                  ? energyPriceModalDraft.segments[keypadState.field]?.price ?? ''
                 : keypadState.moduleKey
                   ? simpleForms[keypadState.moduleKey]?.value
                   : projectForm[keypadState.field]
         }
         title={
-          !keypadState.moduleKey && keypadState.field === 'heatPumpCount'
-            ? '热泵总台数'
-            : !keypadState.moduleKey && keypadState.field === 'heatingArea'
-              ? '供应面积'
-              : '输入参数'
+          keypadState.moduleKey === 'energy-water'
+            ? '水固定价格'
+            : keypadState.moduleKey === 'energy-gas'
+              ? '气固定价格'
+              : keypadState.moduleKey === 'energy-plan-price'
+                ? '时段电价'
+                : keypadState.moduleKey === 'coupling-count'
+                  ? '耦合能源台数'
+                  : !keypadState.moduleKey && keypadState.field === 'heatPumpCount'
+                    ? '热泵总台数'
+                    : !keypadState.moduleKey && keypadState.field === 'heatingArea'
+                      ? '供应面积'
+                      : '输入参数'
         }
         onConfirm={handleKeypadConfirm}
         onClose={() => setKeypadState({ open: false, field: null, moduleKey: null })}
+      />
+
+      <TimePickerModal
+        isOpen={energyPricePickerState.open}
+        title={energyPricePickerState.type === 'startDate' || energyPricePickerState.type === 'endDate' ? '日期选择' : '时间选择'}
+        columns={
+          energyPricePickerState.type === 'startDate' || energyPricePickerState.type === 'endDate'
+            ? [
+                { key: 'month', options: DATE_PICKER_MONTHS, formatter: (value) => `${String(value).padStart(2, '0')}月` },
+                { key: 'day', options: DATE_PICKER_DAYS, formatter: (value) => `${String(value).padStart(2, '0')}日` },
+              ]
+            : [
+                { key: 'hour', options: TIME_PICKER_HOURS, formatter: (value) => String(value).padStart(2, '0') },
+                { key: 'minute', options: TIME_PICKER_MINUTES, formatter: (value) => String(value).padStart(2, '0') },
+              ]
+        }
+        value={energyPricePickerValue}
+        onClose={() => setEnergyPricePickerState({ open: false, type: null, segmentIndex: null })}
+        onConfirm={handleEnergyPricePickerConfirm}
       />
 
       <TimePickerModal
@@ -1436,11 +1791,11 @@ function SystemParamsPage({
             aria-label="确认提示"
             onClick={(event) => event.stopPropagation()}
           >
-            <h4>{confirmDialog.mode === 'save' ? '确认保存' : '确认退出'}</h4>
-            <p>{confirmDialogMessage}</p>
+            <h4>{confirmDialog.mode === 'alert' ? (confirmDialog.title || '提示') : confirmDialog.mode === 'save' ? '确认保存' : '确认退出'}</h4>
+            <p>{confirmDialog.mode === 'alert' ? confirmDialog.message : confirmDialogMessage}</p>
             <div className="system-params-confirm-actions">
-              <button type="button" className="is-cancel" onClick={closeConfirmDialog}>取消</button>
-              <button type="button" className="is-confirm" onClick={handleConfirmDialogConfirm}>确定</button>
+              {confirmDialog.mode === 'alert' ? null : <button type="button" className="is-cancel" onClick={closeConfirmDialog}>取消</button>}
+              <button type="button" className="is-confirm" onClick={handleConfirmDialogConfirm}>{confirmDialog.mode === 'alert' ? '我知道了' : '确定'}</button>
             </div>
           </section>
         </div>
@@ -1450,3 +1805,4 @@ function SystemParamsPage({
 }
 
 export default SystemParamsPage
+

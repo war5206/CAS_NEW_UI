@@ -51,7 +51,7 @@
   }
   to {
     opacity: 1;
-    transform: translateY(0) scale(1);
+    transform: none;
   }
 }
 
@@ -116,8 +116,14 @@
 }
 
 .system-params-card--inline {
+  position: relative;
+  z-index: 2;
   justify-content: space-between;
   gap: 24px;
+}
+
+.system-params-card--coupling {
+  z-index: 1;
 }
 
 .system-params-card__tail {
@@ -143,6 +149,7 @@
   --select-menu-radius: 18px;
   --select-menu-padding: 12px;
   --select-menu-max-height: 300px;
+  --select-menu-z-index: 999;
 
   --select-option-height: 56px;
   --select-option-radius: 14px;
@@ -154,6 +161,10 @@
   border: none;
   background: url('../assets/icons/arrow-down.svg') center / 20px 20px no-repeat;
   transform: translateY(-50%);
+}
+
+.system-params-select .select-dropdown__trigger {
+  background: #3b4655;
 }
 
 .system-params-select .select-dropdown__trigger.is-open::after {
@@ -195,6 +206,10 @@
 .system-params-save {
   border: none;
   color: #fff;
+}
+
+.energy-price-fixed {
+  margin-left: 32px;
 }
 
 .system-params-back {
@@ -241,7 +256,6 @@
 
 .system-params-field {
   display: flex;
-  flex-direction: column;
 }
 
 .system-params-form-grid--project .system-params-field {
@@ -257,9 +271,11 @@
 }
 
 .system-params-field > span {
+  display: inline-block;
+  width: 125px;
   color: rgba(255, 255, 255, 0.9);
   font-size: 20px;
-  line-height: 1;
+  line-height: 2.9;
 }
 
 .system-params-form-grid--project .system-params-field > span {
@@ -307,6 +323,8 @@
 }
 
 .system-params-field--input {
+  display: inline-flex;
+  gap: 25px;
   border: none;
   text-align: left;
   background: none;
@@ -316,6 +334,7 @@
 
 .system-params-field--input div,
 .system-params-date-range button {
+  width: 412px;
   height: 60px;
   border-radius: 16px;
   background: #22262d;
@@ -337,6 +356,7 @@
 .system-params-input-unit {
   margin-left: auto;
   color: rgba(255, 255, 255, 0.82);
+  line-height: 1;
 }
 
 .system-params-field--date {
@@ -970,57 +990,72 @@ body.unit-layout-drag-lock {
 }
 
 .energy-price-tabs {
+  width: 296px;
+  height: 66px;
   display: inline-flex;
+  justify-content: center;
+  align-items: center;
+  gap: 8px;
   background: #1f2733;
   border-radius: 16px;
   border: 1px solid rgba(255, 255, 255, 0.08);
   overflow: hidden;
+  margin-left: 32px;
+  margin-bottom: 24px;
 }
 
 .energy-price-tab {
-  width: 120px;
-  height: 64px;
+  width: 88px;
+  height: 50px;
   border: none;
   background: transparent;
-  color: #b8c2cf;
-  font-size: 32px;
+  color: rgba(255, 255, 255, 0.60);
+  font-size: 24px;
+  line-height: 1;
 }
 
 .energy-price-tab.is-active {
   background: #198cff;
   color: #fff;
+  border-radius: 8px;
 }
 
 .energy-price-tip {
-  margin: 16px 0 20px;
+  margin: 0px 32px 24px 32px;
   color: #909da2;
-  font-size: 34px;
+  font-size: 20px;
 }
 
-.energy-price-fixed {
-  max-width: 620px;
+.energy-price-fixed-grid {
+  margin-top: 8px;
 }
 
 .energy-price-electric {
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: 24px;
+  margin: 0 32px;
 }
 
 .energy-price-add {
-  width: 170px;
-  height: 66px;
+  width: 138px;
+  height: 52px;
   border: none;
   border-radius: 16px;
   background: #198cff;
   color: #fff;
-  font-size: 32px;
+  font-size: 20px;
+  display: inline-flex;
+  justify-content: center;
+  align-items: center;
+  gap: 10px;
+  line-height: 1;
 }
 
 .energy-price-plan {
   border-radius: 16px;
   background: #202735;
-  padding: 20px;
+  padding: 32px;
 }
 
 .energy-price-plan__head {
@@ -1028,29 +1063,61 @@ body.unit-layout-drag-lock {
   justify-content: space-between;
   align-items: center;
   margin-bottom: 18px;
-  font-size: 34px;
+  font-size: 20px;
+}
+
+.energy-price-plan__head button img {
+  width: 24px;
+  height: 24px;
 }
 
 .energy-price-plan__head button {
-  width: 52px;
-  height: 52px;
+  width: 40px;
+  height: 40px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   border: none;
   border-radius: 12px;
   background: #198cff;
   color: #fff;
-  font-size: 28px;
 }
 
 .energy-price-plan__times,
 .energy-price-plan__bar {
-  display: grid;
-  grid-template-columns: repeat(6, 1fr);
+  width: 100%;
 }
 
 .energy-price-plan__times {
+  position: relative;
+  height: 28px;
   color: #d3dae4;
-  font-size: 28px;
-  margin-bottom: 8px;
+  font-size: 18px;
+}
+
+.energy-price-plan__times-track {
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+
+.energy-price-plan__time-marker {
+  position: absolute;
+  top: 0;
+  transform: translateX(-50%);
+  display: inline-flex;
+  align-items: center;
+  line-height: 1;
+}
+
+.energy-price-plan__time-sep {
+  width: 10px;
+  text-align: center;
+}
+
+.energy-price-plan__bar {
+  display: flex;
+  width: 100%;
 }
 
 .energy-price-plan__bar div {
@@ -1059,7 +1126,7 @@ body.unit-layout-drag-lock {
   justify-content: center;
   align-items: center;
   color: #fff;
-  font-size: 34px;
+  font-size: 20px;
 }
 
 .energy-price-plan__bar div:first-child {
@@ -1081,70 +1148,121 @@ body.unit-layout-drag-lock {
 }
 
 .energy-price-modal {
-  width: 1520px;
-  border-radius: 30px;
-  background: #0d1320;
+  width: 824px;
+  height: 714px;
+  border-radius: 24px;
+  background: 
+    linear-gradient(180deg, rgba(163, 197, 230, 0.00) 60.19%, rgba(163, 197, 230, 0.05) 100%),
+    linear-gradient(69deg, rgba(255, 255, 255, 0.05) 0%, rgba(255, 255, 255, 0.00) 98.35%),
+    #0d0e0f;
   overflow: hidden;
+  display: flex;
+  flex-direction: column;
 }
 
 .energy-price-modal__header {
-  height: 104px;
+  min-height: 84px;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 40px;
-  background: rgba(255, 255, 255, 0.04);
+  padding: 0 28px;
+  background: rgba(255, 255, 255, 0.055);
 }
 
 .energy-price-modal__header h4 {
   margin: 0;
-  font-size: 52px;
+  font-size: 32px;
 }
 
 .energy-price-modal__header button {
   border: none;
   background: transparent;
   color: #fff;
-  font-size: 64px;
+  font-size: 28px;
 }
 
 .energy-price-modal__body {
-  padding: 28px 36px;
+  flex: 1;
+  padding: 20px 24px 14px;
+  overflow-y: auto;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.energy-price-modal__body::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+  display: none;
 }
 
 .energy-price-modal__body section {
-  background: #1a2230;
-  border-radius: 22px;
-  padding: 26px;
-  margin-bottom: 20px;
+  background: rgba(255, 255, 255, 0.02);
+  border-radius: 16px;
+  padding: 16px;
+  margin-bottom: 14px;
 }
 
 .energy-price-modal__body h5 {
-  margin: 0 0 16px;
-  font-size: 52px;
+  margin: 0 0 12px;
+  font-size: 24px;
 }
 
 .energy-price-modal__row {
   display: grid;
-  grid-template-columns: 1fr 64px 1fr 1.2fr;
-  gap: 12px;
-  margin-bottom: 12px;
+  grid-template-columns: 1fr 32px 1fr 1fr auto;
+  gap: 8px;
+  margin-bottom: 8px;
 }
 
-.energy-price-modal__row span,
+.energy-price-modal__row button,
+.energy-price-modal__label button,
 .energy-price-modal__add {
-  height: 90px;
-  border-radius: 22px;
-  background: #273140;
+  height: 54px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.08);
   display: flex;
   align-items: center;
-  padding: 0 24px;
-  font-size: 52px;
+  justify-content: flex-start;
+  padding: 0 14px;
+  font-size: 20px;
+  color: #fff;
+  border: none;
+}
+
+.energy-price-modal__row button:disabled,
+.energy-price-modal__add:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.energy-price-modal__label button {
+  width: 100%;
+}
+
+.energy-price-modal__month {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.energy-price-modal__month button {
+  display: flex;
+  justify-content: space-between;
+}
+
+.energy-price-modal__month button span {
+  color: rgba(255, 255, 255, 0.74);
+  font-size: 22px;
+}
+
+.energy-price-modal__month button strong {
+  font-size: 24px;
+  font-weight: 500;
 }
 
 .energy-price-modal__row em {
   font-style: normal;
-  font-size: 64px;
+  font-size: 26px;
   text-align: center;
   align-self: center;
 }
@@ -1153,39 +1271,60 @@ body.unit-layout-drag-lock {
   color: #8f9baa;
 }
 
+.energy-price-modal__value.is-placeholder {
+  color: #8f9baa;
+}
+
+.energy-price-modal__row .energy-price-modal__remove {
+  width: 78px;
+  border: none;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.08);
+  color: #FFF;
+  font-size: 16px;
+  justify-content: center;
+}
+
 .energy-price-modal__add {
   border: none;
   color: #198cff;
+  margin-top: 15px;
 }
 
 .energy-price-modal__actions {
-  padding: 0 36px 30px;
+  padding: 0 24px 18px;
   display: flex;
   justify-content: center;
-  gap: 22px;
+  gap: 12px;
 }
 
 .energy-price-modal__actions button {
-  width: 460px;
-  height: 100px;
+  width: 198px;
+  height: 60px;
+  flex: 0 0 auto;
   border: none;
-  border-radius: 22px;
+  border-radius: 16px;
   background: #273140;
   color: #fff;
-  font-size: 54px;
+  font-size: 20px;
 }
 
 .energy-price-modal__actions .is-danger {
-  color: #ff5f40;
+  background: rgba(255, 255, 255, 0.08);
+  color: #E74828;
 }
 
 .energy-price-modal__actions .is-primary {
   background: #198cff;
 }
 
+.coupling-energy-detail {
+  margin-left: 24px;
+}
+
 .coupling-energy-detail__label {
   margin-bottom: 14px;
-  font-size: 36px;
+  font-size: 20px;
 }
 
 .coupling-energy-detail__types {
@@ -1197,12 +1336,12 @@ body.unit-layout-drag-lock {
 
 .coupling-energy-type {
   border: none;
-  border-radius: 12px;
+  border-radius: 8px;
   background: #273140;
   color: #fff;
-  font-size: 34px;
+  font-size: 20px;
   height: 68px;
-  padding: 0 30px;
+  padding: 16px 24px;
 }
 
 .coupling-energy-type.is-active {
