@@ -1,0 +1,252 @@
+.basic-setting-page {
+  width: 100%;
+  padding: 24px;
+  box-sizing: border-box;
+  color: #fff;
+}
+
+.basic-setting-page--system-reset {
+  max-width: 1556px;
+}
+
+.basic-setting-page__action-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 24px;
+}
+
+.basic-setting-page__action-button {
+  min-height: 160px;
+  border: none;
+  border-radius: 18px;
+  background: #202734;
+  color: #fff;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+}
+
+.basic-setting-page__action-button h3 {
+  margin: 0;
+  font-size: 40px;
+  font-weight: 400;
+}
+
+.basic-setting-page__action-button p {
+  margin: 0;
+  font-size: 30px;
+  font-weight: 400;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.basic-setting-page__action-button.is-full {
+  grid-column: 1 / -1;
+}
+
+.basic-setting-page__shutdown-title-wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 46px;
+}
+
+.basic-setting-page__action-icon {
+  width: 42px;
+  height: 42px;
+  stroke: currentColor;
+  fill: none;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.basic-setting-page--device-lock {
+  max-width: 700px;
+}
+
+.basic-setting-page__lock-card {
+  width: 100%;
+  height: 238px;
+  border-radius: 16px;
+  border: 2px solid rgba(255, 255, 255, 0.9);
+  background: #202734;
+  color: #fff;
+  padding: 24px 32px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  position: relative;
+  cursor: pointer;
+}
+
+.basic-setting-page__lock-left {
+  display: inline-flex;
+  align-items: center;
+  gap: 32px;
+}
+
+.basic-setting-page__lock-icon-wrap {
+  width: 100px;
+  height: 100px;
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.08);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.basic-setting-page__lock-icon {
+  width: 48px;
+  height: 48px;
+  stroke: rgba(255, 255, 255, 0.9);
+  fill: none;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.basic-setting-page__lock-left h3 {
+  margin: 0;
+  font-size: 44px;
+  font-weight: 400;
+}
+
+.basic-setting-page__lock-selected {
+  position: absolute;
+  right: -2px;
+  bottom: -2px;
+  width: 42px;
+  height: 42px;
+  border-radius: 100% 0 14px 0;
+  background: #fff;
+  color: #197cdf;
+  font-size: 28px;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.basic-setting-page--operation-log {
+  max-width: 1556px;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.basic-setting-page__filter-row {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+}
+
+.basic-setting-page__filter-label {
+  font-size: 40px;
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.basic-setting-page__datetime-input {
+  min-width: 430px;
+  height: 76px;
+  border: none;
+  border-radius: 20px;
+  background: #202734;
+  color: #f5f8ff;
+  font-size: 40px;
+  padding: 0 24px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  cursor: pointer;
+}
+
+.basic-setting-page__datetime-input.is-empty {
+  color: rgba(255, 255, 255, 0.38);
+}
+
+.basic-setting-page__calendar-icon {
+  width: 34px;
+  height: 34px;
+  stroke: currentColor;
+  fill: none;
+  stroke-width: 2;
+}
+
+.basic-setting-page__range-sep {
+  font-size: 40px;
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.basic-setting-page__search-button {
+  width: 135px;
+  height: 76px;
+  border: none;
+  border-radius: 20px;
+  background: #1d82e6;
+  color: #fff;
+  font-size: 40px;
+  cursor: pointer;
+}
+
+.basic-setting-page__table-wrap {
+  border: 1px solid rgba(151, 180, 219, 0.45);
+  border-radius: 20px;
+  overflow: hidden;
+}
+
+.basic-setting-page__table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+}
+
+.basic-setting-page__table th,
+.basic-setting-page__table td {
+  border-right: 1px solid rgba(151, 180, 219, 0.4);
+  height: 72px;
+  text-align: center;
+  padding: 0 16px;
+}
+
+.basic-setting-page__table th:last-child,
+.basic-setting-page__table td:last-child {
+  border-right: none;
+}
+
+.basic-setting-page__table th {
+  background: rgba(255, 255, 255, 0.08);
+  font-size: 44px;
+  font-weight: 400;
+}
+
+.basic-setting-page__table td {
+  background: rgba(5, 10, 20, 0.7);
+  font-size: 40px;
+}
+
+.basic-setting-page__table tbody tr:nth-child(2n) td {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.basic-setting-page__table th:nth-child(1),
+.basic-setting-page__table td:nth-child(1) {
+  width: 24%;
+}
+
+.basic-setting-page__table th:nth-child(2),
+.basic-setting-page__table td:nth-child(2) {
+  width: 14%;
+}
+
+.basic-setting-page__table th:nth-child(3),
+.basic-setting-page__table td:nth-child(3) {
+  width: 14%;
+}
+
+.basic-setting-page__table th:nth-child(4),
+.basic-setting-page__table td:nth-child(4) {
+  width: 48%;
+}
