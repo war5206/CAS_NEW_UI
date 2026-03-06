@@ -6,10 +6,13 @@ function AttentionModal({
   title = '提示',
   message = '',
   confirmText = '确认',
+  cancelText = '取消',
+  showCancel = false,
   showBackdrop = true,
   zIndex,
   onClose,
   onConfirm,
+  onCancel,
 }) {
   useEffect(() => {
     if (!isOpen) {
@@ -41,6 +44,13 @@ function AttentionModal({
     }
     onClose?.()
   }
+  const handleCancel = () => {
+    if (onCancel) {
+      onCancel()
+      return
+    }
+    onClose?.()
+  }
 
   return (
     <div className={backdropClassName} style={backdropStyle} role="presentation" onClick={onClose}>
@@ -60,9 +70,16 @@ function AttentionModal({
 
         <div className="attention-modal__body">
           <p className="attention-modal__message">{message}</p>
-          <button type="button" className="attention-modal__confirm" onClick={handleConfirm}>
-            {confirmText}
-          </button>
+          <div className={`attention-modal__actions${showCancel ? ' has-cancel' : ''}`}>
+            {showCancel ? (
+              <button type="button" className="attention-modal__cancel" onClick={handleCancel}>
+                {cancelText}
+              </button>
+            ) : null}
+            <button type="button" className="attention-modal__confirm" onClick={handleConfirm}>
+              {confirmText}
+            </button>
+          </div>
         </div>
       </section>
     </div>

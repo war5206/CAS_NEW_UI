@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import FeatureInfoCard from '../components/FeatureInfoCard'
 import TimePickerModal from '../components/TimePickerModal'
+import AttentionModal from '../components/AttentionModal'
 import dateIcon from '../assets/icons/date.svg'
 import './BasicSettingPage.css'
 
@@ -147,40 +148,24 @@ function SystemResetView() {
         ))}
       </div>
 
-      {confirmAction ? (
-        <div className="basic-setting-page__confirm-backdrop" role="presentation" onClick={handleCloseConfirm}>
-          <section
-            className="basic-setting-page__confirm-modal"
-            role="dialog"
-            aria-modal="true"
-            aria-label="操作确认"
-            onClick={(event) => event.stopPropagation()}
-          >
-            <header className="basic-setting-page__confirm-header">
-              <h3 className="basic-setting-page__confirm-title">确认操作</h3>
-            </header>
-            <div className="basic-setting-page__confirm-body">
-              <p className="basic-setting-page__confirm-text">
-                确定要执行
-                <span className="basic-setting-page__confirm-action-name">{confirmAction.title}</span>
-                吗？
-              </p>
-            </div>
-            <div className="basic-setting-page__confirm-actions">
-              <button
-                type="button"
-                className="basic-setting-page__confirm-button is-cancel"
-                onClick={handleCloseConfirm}
-              >
-                取消
-              </button>
-              <button type="button" className="basic-setting-page__confirm-button is-confirm" onClick={handleConfirm}>
-                确定
-              </button>
-            </div>
-          </section>
-        </div>
-      ) : null}
+      <AttentionModal
+        isOpen={Boolean(confirmAction)}
+        title="确认操作"
+        message={
+          confirmAction ? (
+            <>
+              确定要执行<span className="attention-modal__highlight">{confirmAction.title}</span>吗？
+            </>
+          ) : (
+            ''
+          )
+        }
+        confirmText="确定"
+        showCancel
+        onClose={handleCloseConfirm}
+        onConfirm={handleConfirm}
+        onCancel={handleCloseConfirm}
+      />
     </div>
   )
 }
@@ -215,40 +200,20 @@ function DeviceLockView() {
         className="basic-setting-page__device-lock-card"
       />
 
-      {showConfirm ? (
-        <div className="basic-setting-page__confirm-backdrop" role="presentation" onClick={handleCloseConfirm}>
-          <section
-            className="basic-setting-page__confirm-modal"
-            role="dialog"
-            aria-modal="true"
-            aria-label="操作确认"
-            onClick={(event) => event.stopPropagation()}
-          >
-            <header className="basic-setting-page__confirm-header">
-              <h3 className="basic-setting-page__confirm-title">确认操作</h3>
-            </header>
-            <div className="basic-setting-page__confirm-body">
-              <p className="basic-setting-page__confirm-text">
-                确定要
-                <span className="basic-setting-page__confirm-action-name">{confirmActionName}</span>
-                吗？
-              </p>
-            </div>
-            <div className="basic-setting-page__confirm-actions">
-              <button
-                type="button"
-                className="basic-setting-page__confirm-button is-cancel"
-                onClick={handleCloseConfirm}
-              >
-                取消
-              </button>
-              <button type="button" className="basic-setting-page__confirm-button is-confirm" onClick={handleConfirm}>
-                确定
-              </button>
-            </div>
-          </section>
-        </div>
-      ) : null}
+      <AttentionModal
+        isOpen={showConfirm}
+        title="确认操作"
+        message={
+          <>
+            确定要<span className="attention-modal__highlight">{confirmActionName}</span>吗？
+          </>
+        }
+        confirmText="确定"
+        showCancel
+        onClose={handleCloseConfirm}
+        onConfirm={handleConfirm}
+        onCancel={handleCloseConfirm}
+      />
     </div>
   )
 }

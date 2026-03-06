@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import SelectDropdown from '../components/SelectDropdown'
 import NumericKeypadModal from '../components/NumericKeypadModal'
 import TimePickerModal from '../components/TimePickerModal'
+import AttentionModal from '../components/AttentionModal'
 import hpRunningIcon from '../assets/heat-pump/hp-running.svg'
 import hpNullIcon from '../assets/heat-pump/hp-null.svg'
 import basicSettingWaterPumpIcon from '../assets/basic-setting-water-pump.svg'
@@ -1782,24 +1783,22 @@ function SystemParamsPage({
         </div>
       ) : null}
 
-      {confirmDialog.open ? (
-        <div className="system-params-confirm-backdrop" role="presentation" onClick={closeConfirmDialog}>
-          <section
-            className="system-params-confirm-modal"
-            role="dialog"
-            aria-modal="true"
-            aria-label="确认提示"
-            onClick={(event) => event.stopPropagation()}
-          >
-            <h4>{confirmDialog.mode === 'alert' ? (confirmDialog.title || '提示') : confirmDialog.mode === 'save' ? '确认保存' : '确认退出'}</h4>
-            <p>{confirmDialog.mode === 'alert' ? confirmDialog.message : confirmDialogMessage}</p>
-            <div className="system-params-confirm-actions">
-              {confirmDialog.mode === 'alert' ? null : <button type="button" className="is-cancel" onClick={closeConfirmDialog}>取消</button>}
-              <button type="button" className="is-confirm" onClick={handleConfirmDialogConfirm}>{confirmDialog.mode === 'alert' ? '我知道了' : '确定'}</button>
-            </div>
-          </section>
-        </div>
-      ) : null}
+      <AttentionModal
+        isOpen={confirmDialog.open}
+        title={
+          confirmDialog.mode === 'alert'
+            ? (confirmDialog.title || '提示')
+            : confirmDialog.mode === 'save'
+              ? '确认保存'
+              : '确认退出'
+        }
+        message={confirmDialog.mode === 'alert' ? confirmDialog.message : confirmDialogMessage}
+        confirmText={confirmDialog.mode === 'alert' ? '我知道了' : '确定'}
+        showCancel={confirmDialog.mode !== 'alert'}
+        onClose={closeConfirmDialog}
+        onConfirm={handleConfirmDialogConfirm}
+        onCancel={closeConfirmDialog}
+      />
     </div>
   )
 }
