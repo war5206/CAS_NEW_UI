@@ -8,11 +8,19 @@ import ReliefValvePage from './ReliefValvePage'
 import ModeSelectPage from './ModeSelectPage'
 import ClimateCompensationPage from './ClimateCompensationPage'
 import CouplingEnergyPage from './CouplingEnergyPage'
+import SystemParamsPage from './SystemParamsPage'
 import SmartStartStopPage from './SmartStartStopPage'
 import PeakValleyPage from './PeakValleyPage'
 import SmartTimerPage from './SmartTimerPage'
 
-function ModulePage({ routeInfo }) {
+function ModulePage({
+  routeInfo,
+  onUnsavedGuardChange,
+  onSecondaryNavVisibilityChange,
+  onModuleTabsVisibilityChange,
+  onDetailBreadcrumbChange,
+  onUnitLayoutCommitted,
+}) {
   const { module, section, tab } = routeInfo
   const isModeSelectSection = module.id === 'settings' && section?.id === 'mode-select'
   const isDeviceParamsSection = module.id === 'settings' && section?.id === 'device-params'
@@ -49,6 +57,21 @@ function ModulePage({ routeInfo }) {
     if (tab?.id === 'relief-valve') {
       return <ReliefValvePage />
     }
+  }
+
+  const isBaseSettingSystemParamsPage =
+    module.id === 'settings' && section?.id === 'base-setting' && tab?.id === 'system-params'
+
+  if (isBaseSettingSystemParamsPage) {
+    return (
+      <SystemParamsPage
+        onUnsavedGuardChange={onUnsavedGuardChange}
+        onSecondaryNavVisibilityChange={onSecondaryNavVisibilityChange}
+        onModuleTabsVisibilityChange={onModuleTabsVisibilityChange}
+        onDetailBreadcrumbChange={onDetailBreadcrumbChange}
+        onUnitLayoutCommitted={onUnitLayoutCommitted}
+      />
+    )
   }
 
   const isModeSettingClimatePage =

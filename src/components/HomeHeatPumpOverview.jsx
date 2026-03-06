@@ -57,7 +57,7 @@ const HEAT_PUMP_OVERVIEW_TEXT = {
   TIP: '蓝色设备运行中，红色设备有故障，灰色设备已待机，黄色设备正在化霜；点击热泵可查看详情。',
 }
 
-function HomeHeatPumpOverview({onBack}) {
+function HomeHeatPumpOverview({ onBack, committedUnitLayoutSlots }) {
   const [activePump, setActivePump] = useState(null)
   const [isOverviewModalOpen, setIsOverviewModalOpen] = useState(false)
   const [overviewPage, setOverviewPage] = useState(1)
@@ -100,7 +100,44 @@ function HomeHeatPumpOverview({onBack}) {
     [],
   )
 
-  const allHeatPumps = useMemo(() => HEAT_PUMP_GRID_ITEMS.filter((item) => item.id !== null), [])
+  const boardHeatPumpItems = useMemo(() => {
+    if (!Array.isArray(committedUnitLayoutSlots) || committedUnitLayoutSlots.length === 0) {
+      return HEAT_PUMP_GRID_ITEMS
+    }
+
+    const baseById = new Map(
+      HEAT_PUMP_GRID_ITEMS.filter((item) => item.id !== null).map((item) => [item.id, item]),
+    )
+
+    return Array.from({ length: HEAT_PUMP_GRID_ROWS * HEAT_PUMP_GRID_COLS }, (_, index) => {
+      const row = Math.floor(index / HEAT_PUMP_GRID_COLS) + 1
+      const col = (index % HEAT_PUMP_GRID_COLS) + 1
+      const pumpId = committedUnitLayoutSlots[index]
+      const mapped = baseById.get(pumpId)
+
+      if (mapped) {
+        return {
+          ...mapped,
+          row,
+          col,
+          key: `hp-layout-${mapped.id}-${row}-${col}`,
+        }
+      }
+
+      return {
+        key: `hp-layout-empty-${row}-${col}`,
+        id: null,
+        row,
+        col,
+        status: HEAT_PUMP_STATUS.EMPTY,
+        label: null,
+        name: null,
+        details: [],
+      }
+    })
+  }, [committedUnitLayoutSlots])
+
+  const allHeatPumps = useMemo(() => boardHeatPumpItems.filter((item) => item.id !== null), [boardHeatPumpItems])
 
   const metricLabels = useMemo(() => {
     const labels = new Set()
@@ -190,7 +227,7 @@ function HomeHeatPumpOverview({onBack}) {
               </div>
             ))}
 
-            {HEAT_PUMP_GRID_ITEMS.map((item) => {
+            {boardHeatPumpItems.map((item) => {
               const icon = HEAT_PUMP_ICON_MAP[item.status]
               const isEmpty = item.status === HEAT_PUMP_STATUS.EMPTY
 

@@ -86,7 +86,7 @@ const HOME_TEXT = {
   BACK_HOME: '返回主页',
 }
 
-function HomePage({ onActivePageChange }) {
+function HomePage({ onActivePageChange, committedUnitLayoutSlots }) {
   const location = useLocation()
   const [activePage, setActivePage] = useState(HOME_PAGE_VIEW.DASHBOARD)
   const [isSystemImageLoaded, setIsSystemImageLoaded] = useState(false)
@@ -331,7 +331,7 @@ function HomePage({ onActivePageChange }) {
         {activePage === HOME_PAGE_VIEW.HEAT_PUMP_OVERVIEW ? (
           <div className="home-page home-hp is-active">
             <div className="home-subpage">
-              <HomeHeatPumpOverview onBack={goBackHome} />
+              <HomeHeatPumpOverview onBack={goBackHome} committedUnitLayoutSlots={committedUnitLayoutSlots} />
             </div>
           </div>
         ) : null}
