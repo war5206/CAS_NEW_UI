@@ -1,4 +1,16 @@
+import { useState } from 'react'
+import FeatureInfoCard from '../components/FeatureInfoCard'
+import TimePickerModal from '../components/TimePickerModal'
+import dateIcon from '../assets/icons/date.svg'
 import './BasicSettingPage.css'
+
+const DATE_YEARS = [2022, 2023, 2024, 2025, 2026, 2027, 2028]
+const MONTHS = Array.from({ length: 12 }, (_, index) => index + 1)
+const DAYS = Array.from({ length: 31 }, (_, index) => index + 1)
+
+function formatTwoDigits(value) {
+  return String(value).padStart(2, '0')
+}
 
 const RESET_ACTIONS = [
   {
@@ -24,16 +36,16 @@ const RESET_ACTIONS = [
 
 const OPERATION_LOG_ROWS = [
   {
-    time: '2024年6月1日 17:59:42',
-    type: '登录',
+    time: '2026年3月14日 17:59:42',
+    type: '下置',
     operator: '管理员',
     action: '气候补偿开启',
   },
   {
-    time: '2024年6月1日 17:59:42',
+    time: '2026年3月15日 14:23:00',
     type: '下置',
     operator: '管理员',
-    action: '智能定时模式设置定时段一',
+    action: '智能定时模式定时段一开启',
   },
   {
     time: '',
@@ -80,10 +92,7 @@ function ActionIcon({ type }) {
 
 function CalendarIcon() {
   return (
-    <svg viewBox="0 0 24 24" className="basic-setting-page__calendar-icon" aria-hidden="true">
-      <rect x="3" y="4" width="18" height="17" rx="2" />
-      <path d="M8 2.5v3M16 2.5v3M3 9h18" />
-    </svg>
+    <img src={dateIcon} alt="calendar" className="basic-setting-page__calendar-icon" />
   )
 }
 
@@ -98,6 +107,21 @@ function LockIcon() {
 }
 
 function SystemResetView() {
+  const [confirmAction, setConfirmAction] = useState(null)
+
+  const handleActionClick = (action) => {
+    setConfirmAction(action)
+  }
+
+  const handleCloseConfirm = () => {
+    setConfirmAction(null)
+  }
+
+  const handleConfirm = () => {
+    // TODO: 在此处触发具体的系统重置/关机指令
+    setConfirmAction(null)
+  }
+
   return (
     <div className="basic-setting-page basic-setting-page--system-reset">
       <div className="basic-setting-page__action-grid">
@@ -106,6 +130,7 @@ function SystemResetView() {
             type="button"
             key={action.id}
             className={`basic-setting-page__action-button${action.fullWidth ? ' is-full' : ''}`}
+            onClick={() => handleActionClick(action)}
           >
             {action.icon === 'power' ? (
               <span className="basic-setting-page__shutdown-title-wrap">
@@ -121,44 +146,183 @@ function SystemResetView() {
           </button>
         ))}
       </div>
+
+      {confirmAction ? (
+        <div className="basic-setting-page__confirm-backdrop" role="presentation" onClick={handleCloseConfirm}>
+          <section
+            className="basic-setting-page__confirm-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-label="操作确认"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <header className="basic-setting-page__confirm-header">
+              <h3 className="basic-setting-page__confirm-title">确认操作</h3>
+            </header>
+            <div className="basic-setting-page__confirm-body">
+              <p className="basic-setting-page__confirm-text">
+                确定要执行
+                <span className="basic-setting-page__confirm-action-name">{confirmAction.title}</span>
+                吗？
+              </p>
+            </div>
+            <div className="basic-setting-page__confirm-actions">
+              <button
+                type="button"
+                className="basic-setting-page__confirm-button is-cancel"
+                onClick={handleCloseConfirm}
+              >
+                取消
+              </button>
+              <button type="button" className="basic-setting-page__confirm-button is-confirm" onClick={handleConfirm}>
+                确定
+              </button>
+            </div>
+          </section>
+        </div>
+      ) : null}
     </div>
   )
 }
 
 function DeviceLockView() {
+  const [isDeviceLocked, setIsDeviceLocked] = useState(false)
+  const [showConfirm, setShowConfirm] = useState(false)
+
+  const handleClick = () => {
+    setShowConfirm(true)
+  }
+
+  const handleCloseConfirm = () => {
+    setShowConfirm(false)
+  }
+
+  const handleConfirm = () => {
+    setIsDeviceLocked((previous) => !previous)
+    setShowConfirm(false)
+  }
+
+  const confirmActionName = isDeviceLocked ? '解锁设备' : '锁定设备'
+
   return (
     <div className="basic-setting-page basic-setting-page--device-lock">
-      <button type="button" className="basic-setting-page__lock-card" aria-pressed="true">
-        <div className="basic-setting-page__lock-left">
-          <div className="basic-setting-page__lock-icon-wrap">
-            <LockIcon />
-          </div>
-          <h3>设备锁定</h3>
+      <FeatureInfoCard
+        icon={<LockIcon />}
+        title="设备锁定"
+        description="开启时，终端设备操作被锁定"
+        selected={isDeviceLocked}
+        onClick={handleClick}
+        className="basic-setting-page__device-lock-card"
+      />
+
+      {showConfirm ? (
+        <div className="basic-setting-page__confirm-backdrop" role="presentation" onClick={handleCloseConfirm}>
+          <section
+            className="basic-setting-page__confirm-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-label="操作确认"
+            onClick={(event) => event.stopPropagation()}
+          >
+            <header className="basic-setting-page__confirm-header">
+              <h3 className="basic-setting-page__confirm-title">确认操作</h3>
+            </header>
+            <div className="basic-setting-page__confirm-body">
+              <p className="basic-setting-page__confirm-text">
+                确定要
+                <span className="basic-setting-page__confirm-action-name">{confirmActionName}</span>
+                吗？
+              </p>
+            </div>
+            <div className="basic-setting-page__confirm-actions">
+              <button
+                type="button"
+                className="basic-setting-page__confirm-button is-cancel"
+                onClick={handleCloseConfirm}
+              >
+                取消
+              </button>
+              <button type="button" className="basic-setting-page__confirm-button is-confirm" onClick={handleConfirm}>
+                确定
+              </button>
+            </div>
+          </section>
         </div>
-        <span className="basic-setting-page__lock-selected">✓</span>
-      </button>
+      ) : null}
     </div>
   )
 }
 
+const DATE_PICKER_COLUMNS = [
+  { key: 'year', options: DATE_YEARS, formatter: (value) => String(value) },
+  { key: 'month', options: MONTHS, formatter: (value) => formatTwoDigits(value) },
+  { key: 'day', options: DAYS, formatter: (value) => formatTwoDigits(value) },
+]
+
+function formatDateDisplay(value) {
+  if (!Array.isArray(value) || value.length < 3) return null
+  return `${value[0]}.${formatTwoDigits(value[1])}.${formatTwoDigits(value[2])}`
+}
+
 function OperationLogView() {
+  const [startDate, setStartDate] = useState([2026, 3, 13])
+  const [endDate, setEndDate] = useState([2026, 3, 16])
+  const [activePickerKey, setActivePickerKey] = useState('')
+
+  const pickerMap = {
+    start: {
+      title: '选择开始日期',
+      columns: DATE_PICKER_COLUMNS,
+      value: startDate,
+      onConfirm: setStartDate,
+    },
+    end: {
+      title: '选择结束日期',
+      columns: DATE_PICKER_COLUMNS,
+      value: endDate ?? startDate,
+      onConfirm: setEndDate,
+    },
+  }
+
+  const activePicker = pickerMap[activePickerKey] ?? null
+
   return (
     <div className="basic-setting-page basic-setting-page--operation-log">
       <div className="basic-setting-page__filter-row">
         <span className="basic-setting-page__filter-label">时间范围：</span>
-        <button type="button" className="basic-setting-page__datetime-input is-filled">
-          <span>2024.06.01 17:50:00</span>
+        <button
+          type="button"
+          className={`basic-setting-page__datetime-input ${startDate ? 'is-filled' : 'is-empty'}`}
+          onClick={() => setActivePickerKey('start')}
+        >
+          <span>{formatDateDisplay(startDate) ?? '请选择日期'}</span>
           <CalendarIcon />
         </button>
         <span className="basic-setting-page__range-sep">-</span>
-        <button type="button" className="basic-setting-page__datetime-input is-empty">
-          <span>请选择时间</span>
+        <button
+          type="button"
+          className={`basic-setting-page__datetime-input ${endDate ? 'is-filled' : 'is-empty'}`}
+          onClick={() => setActivePickerKey('end')}
+        >
+          <span>{formatDateDisplay(endDate) ?? '请选择日期'}</span>
           <CalendarIcon />
         </button>
         <button type="button" className="basic-setting-page__search-button">
           查询
         </button>
       </div>
+
+      <TimePickerModal
+        isOpen={Boolean(activePicker)}
+        title={activePicker?.title}
+        columns={activePicker?.columns}
+        value={activePicker?.value}
+        onClose={() => setActivePickerKey('')}
+        onConfirm={(nextValue) => {
+          activePicker?.onConfirm(nextValue)
+          setActivePickerKey('')
+        }}
+      />
 
       <div className="basic-setting-page__table-wrap">
         <table className="basic-setting-page__table">
