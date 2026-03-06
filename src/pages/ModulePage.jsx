@@ -8,6 +8,7 @@ import ReliefValvePage from './ReliefValvePage'
 import ModeSelectPage from './ModeSelectPage'
 import ClimateCompensationPage from './ClimateCompensationPage'
 import CouplingEnergyPage from './CouplingEnergyPage'
+import BasicSettingPage from './BasicSettingPage'
 import SystemParamsPage from './SystemParamsPage'
 import SmartStartStopPage from './SmartStartStopPage'
 import PeakValleyPage from './PeakValleyPage'
@@ -106,6 +107,12 @@ function ModulePage({
 
   if (isModeSettingCouplingPage) {
     return <CouplingEnergyPage />
+  }
+
+  const isBasicSettingSection = module.id === 'settings' && section?.id === 'base-setting'
+
+  if (isBasicSettingSection) {
+    return <BasicSettingPage tabId={tab?.id} />
   }
 
   return (
