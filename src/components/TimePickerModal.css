@@ -9,6 +9,10 @@
   background: rgba(6, 10, 18, 0.74);
 }
 
+.time-picker-modal-backdrop.is-transparent {
+  background: transparent;
+}
+
 .time-picker-modal {
   --picker-row-height: 56px;
   width: min(100%, 616px);

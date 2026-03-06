@@ -24,6 +24,8 @@ function NumericKeypadModal({
   isOpen = false,
   initialValue = '',
   title = '输入',
+  showBackdrop = true,
+  zIndex,
   onConfirm,
   onClose,
 }) {
@@ -34,6 +36,7 @@ function NumericKeypadModal({
     if (!isOpen) {
       return
     }
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setDraftValue(sanitizeText(initialValue))
   }, [initialValue, isOpen])
 
@@ -84,9 +87,13 @@ function NumericKeypadModal({
   }
 
   const modalTitle = resolveModalTitle(title)
+  const backdropClassName = ['labeled-select-keypad-backdrop', showBackdrop ? '' : 'is-transparent']
+    .filter(Boolean)
+    .join(' ')
+  const backdropStyle = Number.isFinite(zIndex) ? { zIndex } : undefined
 
   return (
-    <div className="labeled-select-keypad-backdrop" role="presentation" onClick={onClose}>
+    <div className={backdropClassName} style={backdropStyle} role="presentation" onClick={onClose}>
       <section
         className="labeled-select-keypad"
         role="dialog"
