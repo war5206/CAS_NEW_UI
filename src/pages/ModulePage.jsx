@@ -11,6 +11,7 @@ import CouplingEnergyPage from './CouplingEnergyPage'
 import SmartStartStopPage from './SmartStartStopPage'
 import PeakValleyPage from './PeakValleyPage'
 import SmartTimerPage from './SmartTimerPage'
+import AlertsModulePage from './AlertsModulePage'
 
 function ModulePage({ routeInfo }) {
   const { module, section, tab } = routeInfo
@@ -78,6 +79,12 @@ function ModulePage({ routeInfo }) {
     return <SmartTimerPage />
   }
 
+
+  const isAlertsPage = module.id === 'alerts' && section
+
+  if (isAlertsPage) {
+    return <AlertsModulePage sectionId={section.id} />
+  }
   const isModeSettingCouplingPage =
     module.id === 'settings' && section?.id === 'mode-setting' && tab?.id === 'coupling'
 
