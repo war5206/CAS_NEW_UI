@@ -613,7 +613,7 @@
 }
 
 .unit-layout-pending-scroller.is-empty {
-  grid-template-columns: 1fr;
+  grid-template-columns: 40px minmax(0, 1fr) 40px;
 }
 
 .unit-layout-pending-arrow {
@@ -634,7 +634,7 @@
 }
 
 .unit-layout-pending-scroller.is-empty .unit-layout-pending-arrow {
-  display: none;
+  display: inline-flex;
 }
 
 .unit-layout-pending-list {
@@ -706,8 +706,8 @@
 
 .unit-layout-pending-card img,
 .unit-layout-slot img {
-  width: 46px;
-  height: 46px;
+  width: 40px;
+  height: 40px;
 }
 
 .unit-layout-drag-preview {
@@ -823,6 +823,8 @@
 
 .unit-layout-slot.has-pump {
   background: #222a35;
+  flex-direction: column;
+  gap: 10px;
 }
 
 .unit-layout-slot.is-numbering.has-pump {
@@ -830,11 +832,10 @@
 }
 
 .unit-layout-slot-label {
-  position: absolute;
-  top: 10px;
-  left: 12px;
-  font-size: 30px;
+  position: static;
+  font-size: 20px;
   color: #1494ff;
+  line-height: 1;
 }
 
 body.unit-layout-drag-lock {
@@ -900,6 +901,7 @@ body.unit-layout-drag-lock {
   justify-content: center;
   font-size: 12px;
   font-weight: 600;
+  transform: translateY(-3px);
 }
 
 .unit-layout-flow__step-indicator.is-active span,
@@ -941,6 +943,16 @@ body.unit-layout-drag-lock {
   background: #080b12;
   color: rgba(255, 255, 255, 0.48);
   cursor: not-allowed;
+}
+
+.unit-layout-flow__step button.unit-layout-flow__smart-scan:disabled {
+  color: #fff;
+  cursor: pointer;
+}
+
+.unit-layout-flow__step button.unit-layout-flow__complete-layout:disabled {
+  color: #fff;
+  cursor: pointer;
 }
 
 .unit-layout-flow__step button.is-active {

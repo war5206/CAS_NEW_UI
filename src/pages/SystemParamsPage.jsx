@@ -95,7 +95,7 @@ const REGION_OPTIONS = [
 
 const UNIT_LAYOUT_COLS = 10
 const UNIT_LAYOUT_ROWS = 10
-const UNIT_TOTAL = 14
+const UNIT_TOTAL = 33
 const DATE_PICKER_YEARS = Array.from({ length: 61 }, (_, index) => 2000 + index)
 const DATE_PICKER_MONTHS = Array.from({ length: 12 }, (_, index) => index + 1)
 const DATE_PICKER_DAYS = Array.from({ length: 31 }, (_, index) => index + 1)
@@ -116,7 +116,7 @@ const initialProjectForm = {
   systemType: 'primary',
   province: 'jiangsu',
   city: 'lianyungang',
-  heatPumpCount: '12',
+  heatPumpCount: '33',
   heatingArea: '27000',
   heatingSeasonStart: '2024-06-01',
   heatingSeasonEnd: '',
@@ -179,8 +179,8 @@ function createInitialUnitSlots() {
 const INITIAL_UNIT_LAYOUT_STATE = {
   slots: createInitialUnitSlots(),
   pendingIds: [],
-  layoutLocked: false,
-  numberingDone: false,
+  layoutLocked: true,
+  numberingDone: true,
   numberingMap: {},
   showOriginalNo: false,
 }
@@ -198,7 +198,7 @@ function formatDateInput(value) {
 }
 
 function toNoLabel(id) {
-  return `NO${String(id).padStart(2, '0')}`
+  return `No${String(id).padStart(2, '0')}`
 }
 
 function deepClone(value) {
@@ -266,8 +266,8 @@ function SystemParamsPage({
   const [unitNumberingDone, setUnitNumberingDone] = useState(INITIAL_UNIT_LAYOUT_STATE.numberingDone)
   const [showOriginalNo, setShowOriginalNo] = useState(INITIAL_UNIT_LAYOUT_STATE.showOriginalNo)
   const [longPressedPendingIds, setLongPressedPendingIds] = useState(() => ({}))
-  const [smartScanDone, setSmartScanDone] = useState(false)
   const [smartScanEnabled, setSmartScanEnabled] = useState(false)
+  const [hasUnitLayoutReset, setHasUnitLayoutReset] = useState(false)
   const [manualDraggingPumpId, setManualDraggingPumpId] = useState(null)
   const [manualDraggingSource, setManualDraggingSource] = useState(null)
   const [manualDragPointer, setManualDragPointer] = useState({ x: 0, y: 0 })
@@ -294,6 +294,9 @@ function SystemParamsPage({
   const nextUnitNumber = useMemo(() => Object.keys(unitNumberingMap).length + 1, [unitNumberingMap])
   const canFinishLayout = pendingUnitIds.length === 0 && addedUnitIds.length > 0 && !unitLayoutLocked
   const canFinishNumbering = unitLayoutLocked && !unitNumberingDone && Object.keys(unitNumberingMap).length === addedUnitIds.length
+  const isAfterResetLayoutStage = hasUnitLayoutReset && !unitLayoutLocked
+  const isAfterLayoutCompleteStage = hasUnitLayoutReset && unitLayoutLocked && !unitNumberingDone
+  const canToggleOriginalNo = unitNumberingDone
   const datePickerValue = useMemo(() => {
     if (!datePickerField) {
       return []
@@ -472,8 +475,8 @@ function SystemParamsPage({
       setUnitNumberingMap({ ...INITIAL_UNIT_LAYOUT_STATE.numberingMap })
       setShowOriginalNo(INITIAL_UNIT_LAYOUT_STATE.showOriginalNo)
       setLongPressedPendingIds({})
-      setSmartScanDone(false)
       setSmartScanEnabled(false)
+      setHasUnitLayoutReset(false)
       setManualDraggingPumpId(null)
       setManualDraggingSource(null)
       draggingPumpIdRef.current = null
@@ -682,8 +685,8 @@ function SystemParamsPage({
     setUnitNumberingMap({})
     setShowOriginalNo(false)
     setLongPressedPendingIds({})
-    setSmartScanDone(false)
     setSmartScanEnabled(true)
+    setHasUnitLayoutReset(true)
     setManualDraggingPumpId(null)
     setManualDraggingSource(null)
     draggingPumpIdRef.current = null
@@ -750,7 +753,6 @@ function SystemParamsPage({
     setUnitNumberingDone(false)
     setUnitNumberingMap({})
     setShowOriginalNo(false)
-    setSmartScanDone(true)
     setManualDraggingPumpId(null)
     setManualDraggingSource(null)
     draggingPumpIdRef.current = null
@@ -1111,7 +1113,9 @@ function SystemParamsPage({
                   const displayLabel = pumpId
                     ? showOriginalNo
                       ? toNoLabel(pumpId)
-                      : unitNumberingMap[pumpId] ?? toNoLabel(pumpId)
+                      : unitLayoutLocked
+                        ? (unitNumberingMap[pumpId] ?? toNoLabel(pumpId))
+                        : toNoLabel(pumpId)
                     : ''
 
                   return (
@@ -1162,9 +1166,9 @@ function SystemParamsPage({
                 <small>读取处于激活状态的热泵</small>
                 <button
                   type="button"
-                  className={smartScanDone ? '' : 'is-active'}
+                  className={`unit-layout-flow__smart-scan${isAfterResetLayoutStage ? ' is-active' : ''}`}
                   onClick={handleSmartScan}
-                  disabled={!smartScanEnabled}
+                  disabled={!isAfterResetLayoutStage || !smartScanEnabled}
                 >
                   智能扫描
                 </button>
@@ -1179,7 +1183,14 @@ function SystemParamsPage({
               <div className="unit-layout-flow__step">
                 <div className="unit-layout-flow__title">热泵布局</div>
                 <small>布局完成不可更改</small>
-                <button type="button" className={canFinishLayout ? 'is-active' : ''} onClick={handleCompleteLayout}>布局完成</button>
+                <button
+                  type="button"
+                  className={`unit-layout-flow__complete-layout${isAfterResetLayoutStage ? ' is-active' : ''}`}
+                  onClick={handleCompleteLayout}
+                  disabled={!isAfterResetLayoutStage}
+                >
+                  布局完成
+                </button>
               </div>
             </div>
 
@@ -1192,7 +1203,8 @@ function SystemParamsPage({
                 <small>{unitLayoutLocked && !unitNumberingDone ? `点击热泵按顺序编号，下一位：${nextUnitNumber}` : '编号完成后可切换显示'}</small>
                 <button
                   type="button"
-                  className={unitLayoutLocked && !unitNumberingDone ? 'is-active' : ''}
+                  className={isAfterLayoutCompleteStage ? 'is-active' : ''}
+                  disabled={!isAfterLayoutCompleteStage}
                   onClick={() => {
                     if (unitLayoutLocked) {
                       setUnitNumberingDone(false)
@@ -1204,8 +1216,8 @@ function SystemParamsPage({
                   重新编号
                 </button>
                 <div className="unit-layout-flow__row">
-                  <button type="button" className={canFinishNumbering ? 'is-active' : ''} onClick={handleCompleteNumbering}>编号完成</button>
-                  <button type="button" className="unit-layout-flow__eye" onClick={() => setShowOriginalNo((prev) => !prev)}>
+                  <button type="button" className={isAfterLayoutCompleteStage ? 'is-active' : ''} onClick={handleCompleteNumbering} disabled={!isAfterLayoutCompleteStage}>编号完成</button>
+                  <button type="button" className="unit-layout-flow__eye" disabled={!canToggleOriginalNo} onClick={() => setShowOriginalNo((prev) => !prev)}>
                     {showOriginalNo ? <img src={hideIcon} alt="" aria-hidden="true" /> : <img src={showIcon} alt="" aria-hidden="true" />}
                   </button>
                 </div>
@@ -1438,4 +1450,3 @@ function SystemParamsPage({
 }
 
 export default SystemParamsPage
-
