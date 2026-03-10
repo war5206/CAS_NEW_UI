@@ -107,7 +107,7 @@ function ModulePage({
   const isAlertsPage = module.id === 'alerts' && section
 
   if (isAlertsPage) {
-    return <AlertsModulePage sectionId={section.id} />
+    return <AlertsModulePage sectionId={section.id} onDetailBreadcrumbChange={onDetailBreadcrumbChange} />
   }
   const isModeSettingCouplingPage =
     module.id === 'settings' && section?.id === 'mode-setting' && tab?.id === 'coupling'
