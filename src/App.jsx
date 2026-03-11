@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { BrowserRouter, Navigate, Route, Routes, useLocation } from 'react-router-dom'
+import { BrowserRouter, HashRouter, Navigate, Route, Routes, useLocation } from 'react-router-dom'
 import './App.css'
 import { createPageEntries, createRedirectEntries } from './config/navigation'
 import CasLayout from './layout/CasLayout'
@@ -26,6 +26,7 @@ const redirectEntries = createRedirectEntries()
 const HOME_PATH = '/home'
 const homeEntry = pageEntries.find((entry) => entry.module.id === 'home') ?? null
 const nonHomeEntries = pageEntries.filter((entry) => entry.module.id !== 'home')
+const AppRouter = typeof window !== 'undefined' && window.location.protocol === 'file:' ? HashRouter : BrowserRouter
 
 function AppRoutes({ homePageTitle, onHomePageTitleChange }) {
   const location = useLocation()
@@ -134,9 +135,9 @@ function App() {
     <div className="screen-adapter">
       <div className="screen-adapter-shell" style={stageStyle}>
         <div className="screen-adapter-stage">
-          <BrowserRouter>
+          <AppRouter>
             <AppRoutes homePageTitle={homePageTitle} onHomePageTitleChange={setHomePageTitle} />
-          </BrowserRouter>
+          </AppRouter>
         </div>
       </div>
     </div>

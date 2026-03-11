@@ -3,6 +3,8 @@ import * as echarts from 'echarts'
 import SelectDropdown from '../components/SelectDropdown'
 import TimePickerModal from '../components/TimePickerModal'
 import backIcon from '../assets/layout/back.svg'
+import dateIcon from '../assets/icons/date.svg'
+import { HEAT_PUMP_GRID_ITEMS } from '../config/homeHeatPumps'
 import { useDeferredVisible } from '../hooks/useDeferredVisible'
 import './AlertsModulePage.css'
 
@@ -42,15 +44,34 @@ const ANALYSIS_SCOPE_OPTIONS = [
   { value: 'device', label: '设备' },
 ]
 
+const HEAT_PUMP_FILTER_OPTIONS = [
+  { value: 'all', label: '全部' },
+  ...HEAT_PUMP_GRID_ITEMS.filter((item) => item.id).map((item) => ({
+    value: `hp-${item.id}`,
+    label: `热泵${item.id}`,
+  })),
+]
+
 const ROWS_PER_PAGE = 8
 const DATE_PICKER_YEARS = Array.from({ length: 11 }, (_, index) => 2021 + index)
 const DATE_PICKER_MONTHS = Array.from({ length: 12 }, (_, index) => index + 1)
 const DATE_PICKER_DAYS = Array.from({ length: 31 }, (_, index) => index + 1)
 
+const ANALYSIS_TREND_OPTIONS = [
+  { value: 'trend', label: '告警趋势' },
+  { value: 'category', label: '告警分类统计' },
+]
+
+const ANALYSIS_SCOPE_LABEL_OPTIONS = [
+  { value: 'heat-pump', label: '热泵' },
+  { value: 'system', label: '系统' },
+  { value: 'device', label: '设备' },
+]
+
 const SYSTEM_ALARM_ROWS = [
   {
     id: 'system-1',
-    deviceName: '空气源热泵 1#',
+    deviceName: '空气源热泵 1',
     alarmNameKey: 'high-pressure-protection',
     alarmName: '高压保护报警',
     level: '3',
@@ -61,7 +82,7 @@ const SYSTEM_ALARM_ROWS = [
   },
   {
     id: 'system-2',
-    deviceName: '空气源热泵 2#',
+    deviceName: '空气源热泵 2',
     alarmNameKey: 'low-pressure-protection',
     alarmName: '低压保护报警',
     level: '3',
@@ -72,7 +93,7 @@ const SYSTEM_ALARM_ROWS = [
   },
   {
     id: 'system-3',
-    deviceName: '空气源热泵 3#',
+    deviceName: '空气源热泵 3',
     alarmNameKey: 'compressor-overload',
     alarmName: '压缩机过载保护',
     level: '2',
@@ -83,7 +104,7 @@ const SYSTEM_ALARM_ROWS = [
   },
   {
     id: 'system-4',
-    deviceName: '空气源热泵 4#',
+    deviceName: '空气源热泵 4',
     alarmNameKey: 'outlet-sensor',
     alarmName: '出水温度传感器故障',
     level: '4',
@@ -94,18 +115,7 @@ const SYSTEM_ALARM_ROWS = [
   },
   {
     id: 'system-5',
-    deviceName: '一次侧循环泵 A',
-    alarmNameKey: 'pump-running',
-    alarmName: '循环泵运行故障',
-    level: '3',
-    levelText: '三级',
-    happenedAt: '2026-03-10 13:55:07',
-    heatingSeason: '2026-03-07',
-    suggestion: '检查水泵电源、控制信号和阀门开度。',
-  },
-  {
-    id: 'system-6',
-    deviceName: '一次侧循环泵 B',
+    deviceName: '热泵循环泵3',
     alarmNameKey: 'insufficient-flow',
     alarmName: '流量不足报警',
     level: '3',
@@ -119,7 +129,7 @@ const SYSTEM_ALARM_ROWS = [
 const HISTORY_ALARM_ROWS = [
   {
     id: 'history-1',
-    deviceName: '空气源热泵 5#',
+    deviceName: '空气源热泵 5',
     alarmNameKey: 'high-pressure-protection',
     alarmName: '高压保护报警',
     level: '2',
@@ -131,7 +141,7 @@ const HISTORY_ALARM_ROWS = [
   },
   {
     id: 'history-2',
-    deviceName: '空气源热泵 6#',
+    deviceName: '空气源热泵 6',
     alarmNameKey: 'outlet-sensor',
     alarmName: '出水温度传感器故障',
     level: '4',
@@ -216,15 +226,36 @@ function formatMonthValue(year, month) {
   return `${String(year).padStart(4, '0')}-${String(month).padStart(2, '0')}`
 }
 
-function buildAppliedFilters(name = 'all', level = 'all', heatingSeason = '') {
-  return { name, level, heatingSeason }
+function formatDateTriggerLabel(value, type = 'date') {
+  if (!value) {
+    return ''
+  }
+
+  if (type === 'month') {
+    const [year, month] = value.split('-')
+    if (!year || !month) {
+      return value
+    }
+    return `${year}.${month}`
+  }
+
+  const [year, month, day] = value.split('-')
+  if (!year || !month || !day) {
+    return value
+  }
+  return `${year}.${month}.${day}`
+}
+
+function buildAppliedFilters(name = 'all', level = 'all', startDate = '', endDate = '') {
+  return { name, level, startDate, endDate }
 }
 
 function matchAlarmRow(row, filters) {
   const matchesName = filters.name === 'all' || row.alarmNameKey === filters.name
   const matchesLevel = filters.level === 'all' || row.level === filters.level
-  const matchesHeatingSeason = !filters.heatingSeason || row.heatingSeason === filters.heatingSeason
-  return matchesName && matchesLevel && matchesHeatingSeason
+  const matchesStartDate = !filters.startDate || row.heatingSeason >= filters.startDate
+  const matchesEndDate = !filters.endDate || row.heatingSeason <= filters.endDate
+  return matchesName && matchesLevel && matchesStartDate && matchesEndDate
 }
 
 function buildAnalysisSeed(value) {
@@ -253,7 +284,7 @@ function buildMonthTrendData(startMonth, endMonth) {
 function buildCategoryData(period, query) {
   const seed =
     period === 'day'
-      ? buildAnalysisSeed(query.dayDate)
+      ? buildAnalysisSeed(`${query.dayStart}-${query.dayEnd}`)
       : buildAnalysisSeed(`${query.monthStart}-${query.monthEnd}`)
 
   return [
@@ -272,7 +303,7 @@ function buildScopedCategoryData(period, query, scope) {
   }
   const baseSeed =
     period === 'day'
-      ? buildAnalysisSeed(query.dayDate)
+      ? buildAnalysisSeed(`${query.dayStart}-${query.dayEnd}`)
       : buildAnalysisSeed(`${query.monthStart}-${query.monthEnd}`)
   const seed = baseSeed + (seedOffsetMap[scope] ?? 0)
 
@@ -291,28 +322,7 @@ function buildScopedCategoryData(period, query, scope) {
   }))
 }
 
-function buildDevicePieData(period, query) {
-  const seed =
-    period === 'day'
-      ? buildAnalysisSeed(query.dayDate)
-      : buildAnalysisSeed(`${query.monthStart}-${query.monthEnd}`)
-
-  const values = [
-    clampToMax100((seed % 12) + 18),
-    clampToMax100((seed % 15) + 14),
-    clampToMax100((seed % 11) + 11),
-    clampToMax100((seed % 9) + 8),
-  ]
-
-  return [
-    { name: '末端 1# 水泵故障', value: values[0], color: '#1f99ea' },
-    { name: '末端 2# 水泵故障', value: values[1], color: '#6840f4' },
-    { name: '用户侧回水温感故障', value: values[2], color: '#20c7a2' },
-    { name: '冷凝水管道温感故障', value: values[3], color: '#ec9b14' },
-  ]
-}
-
-function buildScopedPieData(period, query, scope) {
+function buildScopedPieData(period, query, scope, heatPumpFilter = 'all') {
   const seedOffsetMap = {
     'heat-pump': 3,
     system: 9,
@@ -320,29 +330,41 @@ function buildScopedPieData(period, query, scope) {
   }
   const baseSeed =
     period === 'day'
-      ? buildAnalysisSeed(query.dayDate)
+      ? buildAnalysisSeed(`${query.dayStart}-${query.dayEnd}`)
       : buildAnalysisSeed(`${query.monthStart}-${query.monthEnd}`)
   const seed = baseSeed + (seedOffsetMap[scope] ?? 0)
 
   const configMap = {
     'heat-pump': [
-      { name: '热泵 1# 高压故障', color: '#1f99ea' },
-      { name: '热泵 2# 低压故障', color: '#6840f4' },
-      { name: '热泵 3# 除霜异常', color: '#20c7a2' },
-      { name: '热泵 4# 传感器故障', color: '#ec9b14' },
+      { name: '热泵 1 高压故障', color: '#1f99ea' },
+      { name: '热泵 2 低压故障', color: '#6840f4' },
+      { name: '热泵 3 除霜异常', color: '#20c7a2' }
     ],
     system: [
-      { name: '一次泵系统故障', color: '#1f99ea' },
-      { name: '二次泵系统故障', color: '#6840f4' },
+      { name: '一次系统故障', color: '#1f99ea' },
       { name: '换热系统故障', color: '#20c7a2' },
       { name: '补水系统故障', color: '#ec9b14' },
     ],
     device: [
-      { name: '末端 1# 水泵故障', color: '#1f99ea' },
-      { name: '末端 2# 水泵故障', color: '#6840f4' },
+      { name: '热泵循环泵2故障', color: '#6840f4' },
       { name: '用户侧回水温感故障', color: '#20c7a2' },
       { name: '冷凝水管道温感故障', color: '#ec9b14' },
     ],
+  }
+
+  if (scope === 'heat-pump' && heatPumpFilter !== 'all') {
+    const pumpNumber = Number.parseInt(String(heatPumpFilter).replace('hp-', ''), 10) || 1
+    const heatPumpSeed = seed + pumpNumber * 17
+
+    return [
+      { name: `热泵 ${pumpNumber} 高压故障`, color: '#1f99ea' },
+      { name: `热泵 ${pumpNumber} 低压故障`, color: '#6840f4' },
+      { name: `热泵 ${pumpNumber} 回水温异常`, color: '#20c7a2' },
+      { name: `热泵 ${pumpNumber} 通讯故障`, color: '#ec9b14' },
+    ].map((item, index) => ({
+      ...item,
+      value: clampToMax100(((heatPumpSeed + index * 11) % 16) + 8 + index * 3),
+    }))
   }
 
   return (configMap[scope] ?? configMap.device).map((item, index) => ({
@@ -350,13 +372,15 @@ function buildScopedPieData(period, query, scope) {
     value: clampToMax100(((seed + index * 9) % 18) + 10 + index * 4),
   }))
 }
-
 function buildSummary(period, query) {
-  const trend = period === 'day' ? buildDayTrendData(query.dayDate) : buildMonthTrendData(query.monthStart, query.monthEnd)
+  const trend =
+    period === 'day'
+      ? buildDayTrendData(`${query.dayStart}-${query.dayEnd}`)
+      : buildMonthTrendData(query.monthStart, query.monthEnd)
   const categories = buildCategoryData(period, query)
   const total = clampToMax100(trend.reduce((sum, value) => sum + value, 0) / 6)
   const pending = clampToMax100(total * (period === 'day' ? 0.38 : 0.27))
-  const hottestDevice = period === 'day' ? '空气源热泵 2#' : '一次侧循环泵 A'
+  const hottestDevice = period === 'day' ? '空气源热泵 2' : '热泵循环泵3'
   const commonAlarm = categories.sort((a, b) => b.value - a.value)[0]?.name ?? '--'
 
   return {
@@ -389,6 +413,7 @@ function DatePickerTrigger({
   const [isOpen, setIsOpen] = useState(false)
   const isEmpty = !value
   const pickerValue = type === 'month' ? parseMonthValue(value) : parseDateValue(value)
+  const displayValue = isEmpty ? placeholder : formatDateTriggerLabel(value, type)
   const columns =
     type === 'month'
       ? [
@@ -408,7 +433,8 @@ function DatePickerTrigger({
         className={`alerts-date-trigger ${className} ${isEmpty ? 'is-placeholder' : ''}`.trim()}
         onClick={() => setIsOpen(true)}
       >
-        <span>{isEmpty ? placeholder : value}</span>
+        <span>{displayValue}</span>
+        <img src={dateIcon} alt="" aria-hidden="true" className="alerts-date-trigger__icon" />
       </button>
       <TimePickerModal
         isOpen={isOpen}
@@ -457,11 +483,11 @@ function DetailModal({ row, extraFields = [], onClose }) {
             <strong>{row.deviceName ?? row.code ?? '--'}</strong>
           </div>
           <div>
-            <span>{row.code ? '故障代码' : '报警名称'}</span>
+            <span>{row.code ? '故障代码' : '告警名称'}</span>
             <strong>{row.code ?? row.alarmName ?? '--'}</strong>
           </div>
           <div>
-            <span>报警等级</span>
+            <span>告警等级</span>
             <strong>{row.levelText ?? '--'}</strong>
           </div>
           <div>
@@ -470,7 +496,7 @@ function DetailModal({ row, extraFields = [], onClose }) {
           </div>
           {row.heatingSeason ? (
             <div>
-              <span>采暖季</span>
+              <span>时间范围</span>
               <strong>{row.heatingSeason}</strong>
             </div>
           ) : null}
@@ -513,7 +539,15 @@ function EmptyRow({ colSpan = 1, text = '暂无数据' }) {
   )
 }
 
-function BarChart({ xData, seriesData, max = 100, className = '' }) {
+function BarChart({
+  xData,
+  seriesData,
+  max = 100,
+  className = '',
+  xAxisLabelInterval,
+  xAxisLabelRotate,
+  xAxisLabelFontSize,
+}) {
   const chartRef = useRef(null)
   const shouldInitChart = useDeferredVisible(chartRef)
   const isDenseAxis = xData.length > 20
@@ -541,9 +575,9 @@ function BarChart({ xData, seriesData, max = 100, className = '' }) {
         axisLabel: {
           color: 'rgba(164, 179, 202, 0.92)',
           margin: 20,
-          fontSize: isDenseAxis ? 12 : 18,
-          interval: 0,
-          rotate: isDenseAxis ? 45 : 0,
+          fontSize: xAxisLabelFontSize ?? (isDenseAxis ? 12 : 18),
+          interval: xAxisLabelInterval ?? 0,
+          rotate: xAxisLabelRotate ?? (isDenseAxis ? 45 : 0),
         },
       },
       yAxis: {
@@ -580,7 +614,7 @@ function BarChart({ xData, seriesData, max = 100, className = '' }) {
       resizeObserver.disconnect()
       chart.dispose()
     }
-  }, [isDenseAxis, max, seriesData, shouldInitChart, xData])
+  }, [isDenseAxis, max, seriesData, shouldInitChart, xAxisLabelFontSize, xAxisLabelInterval, xAxisLabelRotate, xData])
 
   return <div ref={chartRef} className={`alerts-analysis__chart ${className}`.trim()} />
 }
@@ -607,9 +641,24 @@ function PieChart({ data }) {
       series: [
         {
           type: 'pie',
-          radius: ['46%', '70%'],
+          radius: ['34%', '68%'],
+          center: ['50%', '50%'],
           avoidLabelOverlap: false,
-          label: { show: false },
+          itemStyle: {
+            borderWidth: 0,
+          },
+          label: {
+            show: true,
+            position: 'inside',
+            formatter: ({ value }) => value,
+            color: '#FFFFFF',
+            fontSize: 18,
+            fontWeight: 500,
+          },
+          labelLine: { show: false },
+          emphasis: {
+            scale: false,
+          },
           data: data.map((item) => ({
             value: item.value,
             name: item.name,
@@ -645,12 +694,12 @@ function SystemAlarmPage({ onDetailBreadcrumbChange }) {
   const [liveFilters, setLiveFilters] = useState(() => buildAppliedFilters())
   const [historyFilters, setHistoryFilters] = useState(() => buildAppliedFilters())
   const [liveDraft, setLiveDraft] = useState(() => buildAppliedFilters())
-  const [historyDraft, setHistoryDraft] = useState(() => buildAppliedFilters('', '', ''))
+  const [historyDraft, setHistoryDraft] = useState(() => buildAppliedFilters())
   const [livePage, setLivePage] = useState(1)
   const [historyPage, setHistoryPage] = useState(1)
 
   useEffect(() => {
-    onDetailBreadcrumbChange?.(isHistoryView ? '历史报警' : '实时报警')
+    onDetailBreadcrumbChange?.(isHistoryView ? '历史告警' : '实时告警')
     return () => onDetailBreadcrumbChange?.(null)
   }, [isHistoryView, onDetailBreadcrumbChange])
 
@@ -662,23 +711,17 @@ function SystemAlarmPage({ onDetailBreadcrumbChange }) {
 
   const liveTotalPages = Math.max(1, Math.ceil(filteredLiveRows.length / ROWS_PER_PAGE))
   const historyTotalPages = Math.max(1, Math.ceil(filteredHistoryRows.length / ROWS_PER_PAGE))
+  const currentLivePage = Math.min(livePage, liveTotalPages)
+  const currentHistoryPage = Math.min(historyPage, historyTotalPages)
 
   const livePageRows = useMemo(
-    () => filteredLiveRows.slice((livePage - 1) * ROWS_PER_PAGE, livePage * ROWS_PER_PAGE),
-    [filteredLiveRows, livePage],
+    () => filteredLiveRows.slice((currentLivePage - 1) * ROWS_PER_PAGE, currentLivePage * ROWS_PER_PAGE),
+    [currentLivePage, filteredLiveRows],
   )
   const historyPageRows = useMemo(
-    () => filteredHistoryRows.slice((historyPage - 1) * ROWS_PER_PAGE, historyPage * ROWS_PER_PAGE),
-    [filteredHistoryRows, historyPage],
+    () => filteredHistoryRows.slice((currentHistoryPage - 1) * ROWS_PER_PAGE, currentHistoryPage * ROWS_PER_PAGE),
+    [currentHistoryPage, filteredHistoryRows],
   )
-
-  useEffect(() => {
-    setLivePage((previous) => Math.min(previous, liveTotalPages))
-  }, [liveTotalPages])
-
-  useEffect(() => {
-    setHistoryPage((previous) => Math.min(previous, historyTotalPages))
-  }, [historyTotalPages])
 
   const handleProcess = (row) => {
     setLiveRows((previous) => previous.filter((item) => item.id !== row.id))
@@ -686,7 +729,7 @@ function SystemAlarmPage({ onDetailBreadcrumbChange }) {
       {
         ...row,
         processedAt: formatDateTime(new Date()),
-        suggestion: `${row.suggestion} 已执行处理并归档到历史报警。`,
+        suggestion: `${row.suggestion} 已执行处理并归档到历史告警。`,
       },
       ...previous,
     ])
@@ -699,14 +742,14 @@ function SystemAlarmPage({ onDetailBreadcrumbChange }) {
           <button type="button" className="alerts-icon-button" onClick={() => setIsHistoryView(false)}>
             <img src={backIcon} alt="返回" />
           </button>
-          <h3>历史报警</h3>
+          <h3>历史告警</h3>
         </div>
       ) : null}
 
       {isHistoryView ? (
         <div className="alerts-filter-panel">
           <div className="alerts-filter-panel__row">
-            <LabeledFilterField label="名称">
+            <LabeledFilterField label="名称" className="alerts-filter-field--history-select">
               <SelectDropdown
                 options={ALARM_NAME_OPTIONS}
                 value={historyDraft.name}
@@ -714,10 +757,10 @@ function SystemAlarmPage({ onDetailBreadcrumbChange }) {
                 triggerClassName="alerts-filter-field__trigger"
                 dropdownClassName="alerts-filter-field__dropdown"
                 optionClassName="alerts-filter-field__option"
-                triggerAriaLabel="选择报警名称"
+                triggerAriaLabel="选择告警名称"
               />
             </LabeledFilterField>
-            <LabeledFilterField label="报警等级">
+            <LabeledFilterField label="告警等级" className="alerts-filter-field--history-select">
               <SelectDropdown
                 options={ALARM_LEVEL_OPTIONS}
                 value={historyDraft.level}
@@ -725,22 +768,32 @@ function SystemAlarmPage({ onDetailBreadcrumbChange }) {
                 triggerClassName="alerts-filter-field__trigger"
                 dropdownClassName="alerts-filter-field__dropdown"
                 optionClassName="alerts-filter-field__option"
-                triggerAriaLabel="选择报警等级"
+                triggerAriaLabel="选择告警等级"
               />
             </LabeledFilterField>
           </div>
           <div className="alerts-filter-panel__row">
-            <LabeledFilterField label="采暖季" className="alerts-filter-field--history-date">
-              <DatePickerTrigger
-                value={historyDraft.heatingSeason}
-                onChange={(value) => setHistoryDraft((previous) => ({ ...previous, heatingSeason: value }))}
-                className="alerts-filter-field__trigger"
-                title="采暖季选择"
-              />
-            </LabeledFilterField>
+            <div className="alerts-filter-range-field">
+              <span className="alerts-filter-range-field__label">时间范围</span>
+              <div className="alerts-filter-panel__range-group">
+                <DatePickerTrigger
+                  value={historyDraft.startDate}
+                  onChange={(value) => setHistoryDraft((previous) => ({ ...previous, startDate: value }))}
+                  className="alerts-filter-field__trigger alerts-filter-field--history-date"
+                  title="开始日期选择"
+                />
+                <span className="alerts-filter-panel__range-sep">-</span>
+                <DatePickerTrigger
+                  value={historyDraft.endDate}
+                  onChange={(value) => setHistoryDraft((previous) => ({ ...previous, endDate: value }))}
+                  className="alerts-filter-field__trigger alerts-filter-field--history-date"
+                  title="结束日期选择"
+                />
+              </div>
+            </div>
             <button
               type="button"
-              className="alerts-primary-btn"
+              className="alerts-primary-btn alerts-filter-panel__query-btn"
               onClick={() => {
                 setHistoryFilters(historyDraft)
                 setHistoryPage(1)
@@ -760,10 +813,10 @@ function SystemAlarmPage({ onDetailBreadcrumbChange }) {
               triggerClassName="alerts-filter-field__trigger"
               dropdownClassName="alerts-filter-field__dropdown"
               optionClassName="alerts-filter-field__option"
-              triggerAriaLabel="选择报警名称"
+              triggerAriaLabel="选择告警名称"
             />
           </LabeledFilterField>
-          <LabeledFilterField label="报警等级">
+          <LabeledFilterField label="告警等级">
             <SelectDropdown
               options={ALARM_LEVEL_OPTIONS}
               value={liveDraft.level}
@@ -771,7 +824,7 @@ function SystemAlarmPage({ onDetailBreadcrumbChange }) {
               triggerClassName="alerts-filter-field__trigger"
               dropdownClassName="alerts-filter-field__dropdown"
               optionClassName="alerts-filter-field__option"
-              triggerAriaLabel="选择报警等级"
+              triggerAriaLabel="选择告警等级"
             />
           </LabeledFilterField>
           <button
@@ -785,7 +838,7 @@ function SystemAlarmPage({ onDetailBreadcrumbChange }) {
             查询
           </button>
           <button type="button" className="alerts-link-btn" onClick={() => setIsHistoryView(true)}>
-            历史报警
+            历史告警
           </button>
         </div>
       )}
@@ -795,8 +848,8 @@ function SystemAlarmPage({ onDetailBreadcrumbChange }) {
           <thead>
             <tr>
               <th>设备名称</th>
-              <th>报警名称</th>
-              <th>报警等级</th>
+              <th>告警名称</th>
+              <th>告警等级</th>
               <th>发生时间</th>
               {isHistoryView ? <th>处理时间</th> : null}
               <th>处理建议</th>
@@ -831,7 +884,7 @@ function SystemAlarmPage({ onDetailBreadcrumbChange }) {
                         </button>
                       )}
                       <button type="button" className="alerts-dark-btn" onClick={() => setDetailRow(row)}>
-                        查询
+                        查看
                       </button>
                     </div>
                   </td>
@@ -846,26 +899,26 @@ function SystemAlarmPage({ onDetailBreadcrumbChange }) {
         <button
           type="button"
           className="alerts-pagination__btn"
-          disabled={(isHistoryView ? historyPage : livePage) <= 1}
+          disabled={(isHistoryView ? currentHistoryPage : currentLivePage) <= 1}
           onClick={() =>
             isHistoryView
-              ? setHistoryPage((previous) => Math.max(1, previous - 1))
-              : setLivePage((previous) => Math.max(1, previous - 1))
+              ? setHistoryPage(Math.max(1, currentHistoryPage - 1))
+              : setLivePage(Math.max(1, currentLivePage - 1))
           }
         >
           上一页
         </button>
         <span className="alerts-pagination__info">
-          {isHistoryView ? historyPage : livePage} / {isHistoryView ? historyTotalPages : liveTotalPages}
+          {isHistoryView ? currentHistoryPage : currentLivePage} / {isHistoryView ? historyTotalPages : liveTotalPages}
         </span>
         <button
           type="button"
           className="alerts-pagination__btn"
-          disabled={(isHistoryView ? historyPage : livePage) >= (isHistoryView ? historyTotalPages : liveTotalPages)}
+          disabled={(isHistoryView ? currentHistoryPage : currentLivePage) >= (isHistoryView ? historyTotalPages : liveTotalPages)}
           onClick={() =>
             isHistoryView
-              ? setHistoryPage((previous) => Math.min(historyTotalPages, previous + 1))
-              : setLivePage((previous) => Math.min(liveTotalPages, previous + 1))
+              ? setHistoryPage(Math.min(historyTotalPages, currentHistoryPage + 1))
+              : setLivePage(Math.min(liveTotalPages, currentLivePage + 1))
           }
         >
           下一页
@@ -911,7 +964,7 @@ function FaultTreePage({ onDetailBreadcrumbChange }) {
             triggerAriaLabel="选择故障代码"
           />
         </LabeledFilterField>
-        <LabeledFilterField label="报警等级">
+        <LabeledFilterField label="告警等级">
           <SelectDropdown
             options={ALARM_LEVEL_OPTIONS}
             value={draftFilters.level}
@@ -919,7 +972,7 @@ function FaultTreePage({ onDetailBreadcrumbChange }) {
             triggerClassName="alerts-filter-field__trigger"
             dropdownClassName="alerts-filter-field__dropdown"
             optionClassName="alerts-filter-field__option"
-            triggerAriaLabel="选择报警等级"
+            triggerAriaLabel="选择告警等级"
           />
         </LabeledFilterField>
         <button
@@ -939,7 +992,7 @@ function FaultTreePage({ onDetailBreadcrumbChange }) {
             <tr>
               <th>故障代码</th>
               <th>故障名称</th>
-              <th>报警等级</th>
+              <th>告警等级</th>
               <th>原因分析</th>
               <th>解决方案</th>
               <th>操作</th>
@@ -961,7 +1014,7 @@ function FaultTreePage({ onDetailBreadcrumbChange }) {
                       <td rowSpan={group.reasons.length}>
                         <div className="alerts-actions">
                           <button type="button" className="alerts-dark-btn" onClick={() => setDetailRow(group)}>
-                            查询
+                            查看
                           </button>
                         </div>
                       </td>
@@ -991,8 +1044,16 @@ function AlarmAnalysisPage({ onDetailBreadcrumbChange }) {
   const [mode, setMode] = useState('trend')
   const [categoryScope, setCategoryScope] = useState('system')
   const [pieScope, setPieScope] = useState('device')
+  const [selectedHeatPump, setSelectedHeatPump] = useState('all')
   const [query, setQuery] = useState({
-    dayDate: '2026-03-10',
+    dayStart: '2026-03-10',
+    dayEnd: '2026-03-10',
+    monthStart: '2026-01',
+    monthEnd: '2026-03',
+  })
+  const [draftQuery, setDraftQuery] = useState({
+    dayStart: '2026-03-10',
+    dayEnd: '2026-03-10',
     monthStart: '2026-01',
     monthEnd: '2026-03',
   })
@@ -1003,51 +1064,80 @@ function AlarmAnalysisPage({ onDetailBreadcrumbChange }) {
   }, [onDetailBreadcrumbChange])
 
   const trendData = useMemo(
-    () => (period === 'day' ? buildDayTrendData(query.dayDate) : buildMonthTrendData(query.monthStart, query.monthEnd)),
+    () =>
+      period === 'day'
+        ? buildDayTrendData(`${query.dayStart}-${query.dayEnd}`)
+        : buildMonthTrendData(query.monthStart, query.monthEnd),
     [period, query],
   )
   const trendXAxis = useMemo(
     () =>
       period === 'day'
-        ? ['00时', '02时', '04时', '06时', '08时', '10时', '12时', '14时', '16时', '18时', '20时', '22时']
+        ? ['00时', '01时', '02时',  '03时', '04时', '05时', '06时', '07时', '08时', '09时', '10时', '11时', '12时', '13时', '14时', '15时', '16时', '17时', '18时', '19时', '20时', '21时', '22时', '23时']
         : ['1月', '2月', '3月', '4月', '5月', '6月', '7月', '8月', '9月', '10月', '11月', '12月'],
     [period],
   )
   const categoryData = useMemo(() => buildScopedCategoryData(period, query, categoryScope), [categoryScope, period, query])
-  const pieData = useMemo(() => buildScopedPieData(period, query, pieScope), [period, pieScope, query])
+  const activeHeatPump = pieScope === 'heat-pump' ? selectedHeatPump : 'all'
+  const pieData = useMemo(
+    () => buildScopedPieData(period, query, pieScope, activeHeatPump),
+    [activeHeatPump, period, pieScope, query],
+  )
   const summary = useMemo(() => buildSummary(period, query), [period, query])
-  const pieTotal = pieData.reduce((sum, item) => sum + item.value, 0) || 1
 
   return (
     <div className="alerts-analysis">
       <div className="alerts-analysis__toolbar">
-        {period === 'day' ? (
-          <DatePickerTrigger
-            value={query.dayDate}
-            onChange={(value) => setQuery((previous) => ({ ...previous, dayDate: value }))}
-            className="alerts-analysis__date-btn"
-            title="日期选择"
-          />
-        ) : (
-          <>
-            <DatePickerTrigger
-              value={query.monthStart}
-              onChange={(value) => setQuery((previous) => ({ ...previous, monthStart: value }))}
-              type="month"
-              className="alerts-analysis__date-btn"
-              title="开始月份选择"
-            />
-            <span className="alerts-analysis__range-separator">-</span>
-            <DatePickerTrigger
-              value={query.monthEnd}
-              onChange={(value) => setQuery((previous) => ({ ...previous, monthEnd: value }))}
-              type="month"
-              className="alerts-analysis__date-btn"
-              placeholder="请选择月份"
-              title="结束月份选择"
-            />
-          </>
-        )}
+        <div className="alerts-analysis__range-field">
+          <span className="alerts-analysis__range-label">时间范围</span>
+          <div className="alerts-analysis__range-group">
+            {period === 'day' ? (
+              <>
+                <DatePickerTrigger
+                  value={draftQuery.dayStart}
+                  onChange={(value) => setDraftQuery((previous) => ({ ...previous, dayStart: value }))}
+                  className="alerts-analysis__date-btn"
+                  title="开始日期选择"
+                />
+                <span className="alerts-analysis__range-separator">-</span>
+                <DatePickerTrigger
+                  value={draftQuery.dayEnd}
+                  onChange={(value) => setDraftQuery((previous) => ({ ...previous, dayEnd: value }))}
+                  className="alerts-analysis__date-btn"
+                  title="结束日期选择"
+                />
+              </>
+            ) : (
+              <>
+                <DatePickerTrigger
+                  value={draftQuery.monthStart}
+                  onChange={(value) => setDraftQuery((previous) => ({ ...previous, monthStart: value }))}
+                  type="month"
+                  className="alerts-analysis__date-btn"
+                  title="开始月份选择"
+                />
+                <span className="alerts-analysis__range-separator">-</span>
+                <DatePickerTrigger
+                  value={draftQuery.monthEnd}
+                  onChange={(value) => setDraftQuery((previous) => ({ ...previous, monthEnd: value }))}
+                  type="month"
+                  className="alerts-analysis__date-btn"
+                  placeholder="请选择月份"
+                  title="结束月份选择"
+                />
+              </>
+            )}
+          </div>
+          <button
+            type="button"
+            className="alerts-primary-btn"
+            onClick={() => {
+              setQuery(draftQuery)
+            }}
+          >
+            查询
+          </button>
+        </div>
 
         <div className="alerts-analysis__period-switch">
           <button type="button" className={period === 'day' ? 'is-active' : ''} onClick={() => setPeriod('day')}>
@@ -1062,11 +1152,11 @@ function AlarmAnalysisPage({ onDetailBreadcrumbChange }) {
       <div className="alerts-analysis__summary">
         <article>
           <span>系统故障数量</span>
-          <strong>{summary.total} 个</strong>
+          <strong>{summary.total} 条</strong>
         </article>
         <article>
           <span>未处理告警数量</span>
-          <strong>{summary.pending} 个</strong>
+          <strong>{summary.pending} 条</strong>
         </article>
         <article>
           <span>高故障率设备</span>
@@ -1080,7 +1170,7 @@ function AlarmAnalysisPage({ onDetailBreadcrumbChange }) {
 
       <div className="alerts-analysis__mode-row">
         <SelectDropdown
-          options={TREND_TYPE_OPTIONS}
+          options={ANALYSIS_TREND_OPTIONS}
           value={mode}
           onChange={setMode}
           className="alerts-analysis__mode-select"
@@ -1091,14 +1181,14 @@ function AlarmAnalysisPage({ onDetailBreadcrumbChange }) {
       </div>
 
       {mode === 'trend' ? (
-        <BarChart xData={trendXAxis} seriesData={trendData} max={100} />
+        <BarChart xData={trendXAxis} seriesData={trendData} max={60} />
       ) : (
         <div className="alerts-analysis__category-grid">
           <div className="alerts-analysis__category-card">
             <div className="alerts-analysis__card-head">
               <div className="alerts-analysis__card-title">告警分类统计</div>
               <SelectDropdown
-                options={ANALYSIS_SCOPE_OPTIONS}
+                options={ANALYSIS_SCOPE_LABEL_OPTIONS}
                 value={categoryScope}
                 onChange={setCategoryScope}
                 className="alerts-analysis__card-select"
@@ -1111,39 +1201,50 @@ function AlarmAnalysisPage({ onDetailBreadcrumbChange }) {
             <BarChart
               xData={categoryData.map((item) => item.name)}
               seriesData={categoryData.map((item) => item.value)}
-              max={100}
+              max={40}
               className="alerts-analysis__chart--compact"
+              xAxisLabelInterval={categoryScope === 'heat-pump' ? (index) => index === 0 || (index + 1) % 5 === 0 : 0}
+              xAxisLabelRotate={categoryScope === 'heat-pump' ? 0 : undefined}
+              xAxisLabelFontSize={categoryScope === 'heat-pump' ? 14 : undefined}
             />
           </div>
-          <div className="alerts-analysis__category-card">
-            <div className="alerts-analysis__card-head">
-              <div className="alerts-analysis__card-title">设备故障分布</div>
-              <SelectDropdown
-                options={ANALYSIS_SCOPE_OPTIONS}
-                value={pieScope}
-                onChange={setPieScope}
-                className="alerts-analysis__card-select"
-                triggerClassName="alerts-analysis__card-trigger"
-                dropdownClassName="alerts-analysis__card-dropdown"
-                optionClassName="alerts-analysis__card-option"
-                triggerAriaLabel="选择设备故障分布范围"
-              />
+          <div className="alerts-analysis__category-card alerts-analysis__category-card--distribution">
+            <div className="alerts-analysis__card-head alerts-analysis__card-head--distribution">
+              <div className="alerts-analysis__card-title alerts-analysis__card-title--distribution">设备故障分布</div>
+              <div className="alerts-analysis__card-controls">
+                <SelectDropdown
+                  options={ANALYSIS_SCOPE_LABEL_OPTIONS}
+                  value={pieScope}
+                  onChange={setPieScope}
+                  className="alerts-analysis__card-select alerts-analysis__card-select--distribution"
+                  triggerClassName="alerts-analysis__card-trigger alerts-analysis__card-trigger--distribution"
+                  dropdownClassName="alerts-analysis__card-dropdown"
+                  optionClassName="alerts-analysis__card-option"
+                  triggerAriaLabel="选择告警占比统计范围"
+                />
+                {pieScope === 'heat-pump' ? (
+                  <SelectDropdown
+                    options={HEAT_PUMP_FILTER_OPTIONS}
+                    value={selectedHeatPump}
+                    onChange={setSelectedHeatPump}
+                    className="alerts-analysis__card-select alerts-analysis__card-select--distribution alerts-analysis__card-select--heat-pump"
+                    triggerClassName="alerts-analysis__card-trigger alerts-analysis__card-trigger--distribution"
+                    dropdownClassName="alerts-analysis__card-dropdown"
+                    optionClassName="alerts-analysis__card-option"
+                    triggerAriaLabel="选择热泵"
+                  />
+                ) : null}
+              </div>
             </div>
-            <div className="alerts-analysis__pie-wrap">
+            <div className="alerts-analysis__pie-wrap alerts-analysis__pie-wrap--distribution">
               <PieChart data={pieData} />
-              <ul>
-                {pieData.map((item) => {
-                  const ratio = ((item.value / pieTotal) * 100).toFixed(1)
-                  return (
-                    <li key={item.name}>
-                      <span style={{ background: item.color }} />
-                      <em>{item.name}</em>
-                      <strong>
-                        {item.value} 个 / {ratio}%
-                      </strong>
-                    </li>
-                  )
-                })}
+              <ul className="alerts-analysis__pie-legend">
+                {pieData.map((item) => (
+                  <li key={item.name}>
+                    <span style={{ background: item.color }} />
+                    <em>{item.name}</em>
+                  </li>
+                ))}
               </ul>
             </div>
           </div>
@@ -1152,7 +1253,6 @@ function AlarmAnalysisPage({ onDetailBreadcrumbChange }) {
     </div>
   )
 }
-
 function AlertsModulePage({ sectionId, onDetailBreadcrumbChange }) {
   if (sectionId === 'system-alarm') {
     return <SystemAlarmPage onDetailBreadcrumbChange={onDetailBreadcrumbChange} />

@@ -373,12 +373,20 @@
   min-width: 320px;
   border: none;
   cursor: pointer;
+  justify-content: space-between;
+  gap: 12px;
 }
 
 .system-params-date-value {
   display: inline-flex;
   align-items: center;
   line-height: 1;
+}
+
+.system-params-date-icon {
+  width: 32px;
+  height: 32px;
+  flex-shrink: 0;
 }
 
 .system-params-date-range em {

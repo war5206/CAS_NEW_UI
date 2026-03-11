@@ -18,6 +18,7 @@ import hideIcon from '../assets/icons/hide.svg'
 import longArrowDownBlueIcon from '../assets/long-arrow-down-blue.svg'
 import longArrowDownGrayIcon from '../assets/long-arrow-down-gray.svg'
 import addIcon from '../assets/icons/add.svg'
+import dateIcon from '../assets/icons/date.svg'
 import editIcon from '../assets/edit.svg'
 import { HEAT_PUMP_GRID_ITEMS } from '../config/homeHeatPumps'
 import './SystemParamsPage.css'
@@ -1170,10 +1171,12 @@ function SystemParamsPage({
           <div className="system-params-date-range">
             <button type="button" onClick={() => setDatePickerField('heatingSeasonStart')}>
               <span className="system-params-date-value">{formatDateInput(projectForm.heatingSeasonStart)}</span>
+              <img src={dateIcon} alt="" aria-hidden="true" className="system-params-date-icon" />
             </button>
             <em>-</em>
             <button type="button" onClick={() => setDatePickerField('heatingSeasonEnd')}>
               <span className="system-params-date-value">{formatDateInput(projectForm.heatingSeasonEnd)}</span>
+              <img src={dateIcon} alt="" aria-hidden="true" className="system-params-date-icon" />
             </button>
           </div>
         </div>

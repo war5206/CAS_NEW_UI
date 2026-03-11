@@ -17,13 +17,13 @@ const RESET_ACTIONS = [
   {
     id: 'parameter-reset',
     title: '参数复位',
-    description: '采集数据恢复默认值，配置数据',
+    description: '恢复默认参数配置，保留当前系统数据。',
     icon: 'refresh',
   },
   {
     id: 'factory-reset',
     title: '恢复出厂设置',
-    description: '采集数据恢复默认值并清空所有历史数据',
+    description: '恢复默认参数配置，并清空所有历史数据。',
     icon: 'factory',
   },
   {
@@ -37,14 +37,14 @@ const RESET_ACTIONS = [
 
 const OPERATION_LOG_ROWS = [
   {
-    time: '2026年3月14日 17:59:42',
-    type: '下置',
+    time: '2026年03月14日 17:59:42',
+    type: '下发',
     operator: '管理员',
     action: '气候补偿开启',
   },
   {
-    time: '2026年3月15日 14:23:00',
-    type: '下置',
+    time: '2026年03月15日 14:23:00',
+    type: '下发',
     operator: '管理员',
     action: '智能定时模式定时段一开启',
   },
@@ -92,9 +92,7 @@ function ActionIcon({ type }) {
 }
 
 function CalendarIcon() {
-  return (
-    <img src={dateIcon} alt="calendar" className="basic-setting-page__calendar-icon" />
-  )
+  return <img src={dateIcon} alt="calendar" className="basic-setting-page__calendar-icon" />
 }
 
 function LockIcon() {
@@ -154,7 +152,9 @@ function SystemResetView() {
         message={
           confirmAction ? (
             <>
-              确定要执行<span className="attention-modal__highlight">{confirmAction.title}</span>吗？
+              确定要执行
+              <span className="attention-modal__highlight">{confirmAction.title}</span>
+              吗？
             </>
           ) : (
             ''
@@ -194,7 +194,7 @@ function DeviceLockView() {
       <FeatureInfoCard
         icon={<LockIcon />}
         title="设备锁定"
-        description="开启时，终端设备操作被锁定"
+        description="开启时，终端设备操作将被锁定"
         selected={isDeviceLocked}
         onClick={handleClick}
         className="basic-setting-page__device-lock-card"
@@ -205,7 +205,9 @@ function DeviceLockView() {
         title="确认操作"
         message={
           <>
-            确定要<span className="attention-modal__highlight">{confirmActionName}</span>吗？
+            确定要
+            <span className="attention-modal__highlight">{confirmActionName}</span>
+            吗？
           </>
         }
         confirmText="确定"

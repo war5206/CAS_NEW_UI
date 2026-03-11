@@ -1,0 +1,5 @@
+@echo off
+cd /d "%~dp0"
+set ELECTRON_BUILDER_BINARIES_MIRROR=https://npmmirror.com/mirrors/electron-builder-binaries/
+call npm run build:exe
+pause
