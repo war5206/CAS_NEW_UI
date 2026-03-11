@@ -42,7 +42,7 @@
 
 .select-dropdown__menu {
   position: absolute;
-  top: 0;
+  top: -5px;
   left: 0;
   right: 0;
   z-index: var(--select-menu-z-index, 20);

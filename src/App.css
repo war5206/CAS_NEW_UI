@@ -126,7 +126,7 @@
   padding: 24px;
   border: none;
   border-radius: 50%;
-  background: linear-gradient(160deg, rgba(34, 108, 201, 0.92), rgba(24, 84, 164, 0.9));
+  background: #197CDF;
   color: #e7f1ff;
   display: flex;
   align-items: center;
@@ -1195,7 +1195,6 @@
   width: max-content;
   min-width: 100%;
   border-collapse: collapse;
-  font-size: 17px;
   line-height: 1.45;
 }
 
@@ -1221,6 +1220,7 @@
   background: #22262D;
   color: #FFF;
   font-weight: 500;
+  font-size: 24px;
 }
 
 .home-hp-summary-table th:first-child,
@@ -1247,6 +1247,7 @@
 
 .home-hp-summary-table tbody td {
   color: rgba(234, 241, 255, 0.95);
+  font-size: 20px;
 }
 
 .home-hp-summary-table tbody tr.is-empty td {
@@ -2150,8 +2151,11 @@
     padding: 12px 14px;
   }
 
-  .home-hp-summary-table {
-    font-size: 14px;
+  .home-hp-summary-table th {
+    font-size: 24px;
+  }
+  .home-hp-summary-table tbody td {
+    font-size: 20px;
   }
 
   .home-hp-summary-table tbody tr {

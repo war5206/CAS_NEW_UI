@@ -325,10 +325,7 @@ function TimePickerModal({
                 >
                   {column.options.map((optionValue, optionIndex) => {
                     const isSelected = optionIndex === selectedIndex
-                    const itemClassName = [
-                      'time-picker-modal__option',
-                      isSelected ? 'is-selected' : '',
-                    ]
+                    const itemClassName = ['time-picker-modal__option', isSelected ? 'is-selected' : '']
                       .filter(Boolean)
                       .join(' ')
 

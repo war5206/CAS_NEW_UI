@@ -131,6 +131,7 @@
 .basic-setting-page__range-sep {
   font-size: 40px;
   color: rgba(255, 255, 255, 0.7);
+  transform: translateY(-4px);
 }
 
 .basic-setting-page__search-button {

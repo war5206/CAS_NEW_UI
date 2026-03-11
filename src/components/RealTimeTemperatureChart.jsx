@@ -102,11 +102,20 @@ function RealTimeTemperatureChart() {
           symbol: 'none',
           data: supplyData,
           lineStyle: {
-            width: 3,
+            width: 2.5,
             color: SUPPLY_COLOR,
+            shadowBlur: 10,
+            shadowColor: 'rgba(240, 78, 42, 0.35)',
           },
           itemStyle: {
             color: SUPPLY_COLOR,
+          },
+          areaStyle: {
+            color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+              { offset: 0, color: 'rgba(240, 78, 42, 0.24)' },
+              { offset: 0.65, color: 'rgba(240, 78, 42, 0.08)' },
+              { offset: 1, color: 'rgba(240, 78, 42, 0)' },
+            ]),
           },
         },
         {
@@ -117,11 +126,20 @@ function RealTimeTemperatureChart() {
           symbol: 'none',
           data: returnData,
           lineStyle: {
-            width: 3,
+            width: 2.5,
             color: RETURN_COLOR,
+            shadowBlur: 8,
+            shadowColor: 'rgba(241, 191, 63, 0.28)',
           },
           itemStyle: {
             color: RETURN_COLOR,
+          },
+          areaStyle: {
+            color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+              { offset: 0, color: 'rgba(241, 191, 63, 0.16)' },
+              { offset: 0.7, color: 'rgba(241, 191, 63, 0.05)' },
+              { offset: 1, color: 'rgba(241, 191, 63, 0)' },
+            ]),
           },
         },
         {
@@ -132,11 +150,20 @@ function RealTimeTemperatureChart() {
           symbol: 'none',
           data: targetData,
           lineStyle: {
-            width: 3,
+            width: 2.5,
             color: TARGET_COLOR,
+            shadowBlur: 8,
+            shadowColor: 'rgba(54, 220, 100, 0.26)',
           },
           itemStyle: {
             color: TARGET_COLOR,
+          },
+          areaStyle: {
+            color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+              { offset: 0, color: 'rgba(54, 220, 100, 0.12)' },
+              { offset: 0.7, color: 'rgba(54, 220, 100, 0.04)' },
+              { offset: 1, color: 'rgba(54, 220, 100, 0)' },
+            ]),
           },
         },
       ],
