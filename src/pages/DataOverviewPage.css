@@ -1,0 +1,179 @@
+.data-overview-page {
+  padding: 16px 24px 24px;
+  height: 100%;
+  overflow: auto;
+  color: #fff;
+}
+
+.data-overview-page__title {
+  margin: 0;
+  font-size: 44px;
+  font-weight: 500;
+}
+
+.data-overview-page__tip {
+  margin: 8px 0 18px;
+  font-size: 32px;
+  color: rgba(255, 255, 255, 0.45);
+}
+
+.data-overview-page__cards {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.data-overview-page__card {
+  border-radius: 20px;
+  background: linear-gradient(95deg, rgba(37, 52, 70, 0.72) 0%, rgba(34, 44, 58, 0.52) 100%);
+  padding: 18px 26px;
+}
+
+.data-overview-page__card-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.data-overview-page__card-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: rgba(255, 255, 255, 0.64);
+  font-size: 36px;
+}
+
+.data-overview-page__card-label span {
+  width: 16px;
+  height: 16px;
+  border-radius: 4px;
+}
+
+.data-overview-page__card-value {
+  margin-top: 18px;
+  font-size: 52px;
+  font-weight: 600;
+  line-height: 1.2;
+  white-space: pre;
+}
+
+.data-overview-page__trend {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+  font-size: 44px;
+  font-weight: 600;
+}
+
+.data-overview-page__trend img {
+  width: 18px;
+  height: 18px;
+}
+
+.data-overview-page__trend.is-up {
+  color: #ff5d3a;
+}
+
+.data-overview-page__trend.is-down {
+  color: #34ddbb;
+}
+
+.data-overview-page__trend-placeholder {
+  font-size: 44px;
+  color: rgba(255, 255, 255, 0.55);
+}
+
+.data-overview-page__dots {
+  display: flex;
+  justify-content: center;
+  gap: 16px;
+  margin: 12px 0 18px;
+}
+
+.data-overview-page__dots span {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.6);
+}
+
+.data-overview-page__dots span.is-active {
+  background: #1f92ff;
+}
+
+.data-overview-filter-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 14px;
+}
+
+.data-overview-filter-bar__title {
+  min-width: 310px;
+  height: 64px;
+  border-radius: 16px;
+  background: rgba(34, 52, 71, 0.65);
+  padding: 0 24px;
+  display: inline-flex;
+  align-items: center;
+  font-size: 40px;
+}
+
+.data-overview-filter-bar__controls {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.data-overview-filter-bar__date,
+.data-overview-filter-bar__toggle,
+.data-overview-filter-bar__segment {
+  border: 1px solid rgba(86, 105, 128, 0.8);
+  background: rgba(35, 45, 58, 0.68);
+  border-radius: 16px;
+  height: 64px;
+}
+
+.data-overview-filter-bar__date {
+  width: 250px;
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 34px;
+  padding: 0 20px;
+  display: inline-flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.data-overview-filter-bar__date img {
+  width: 28px;
+  height: 28px;
+}
+
+.data-overview-filter-bar__segment {
+  display: inline-flex;
+  padding: 4px;
+}
+
+.data-overview-filter-bar__segment-btn,
+.data-overview-filter-bar__toggle {
+  border: none;
+  background: transparent;
+  color: rgba(255, 255, 255, 0.68);
+  min-width: 84px;
+  font-size: 38px;
+  border-radius: 12px;
+}
+
+.data-overview-filter-bar__segment-btn.is-active,
+.data-overview-filter-bar__toggle.is-active {
+  background: #2788ec;
+  color: #fff;
+}
+
+.data-overview-filter-bar__toggle {
+  padding: 0 24px;
+}
+
+.data-overview-chart {
+  height: 420px;
+}
