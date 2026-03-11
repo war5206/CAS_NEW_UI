@@ -14,6 +14,7 @@ import SmartStartStopPage from './SmartStartStopPage'
 import PeakValleyPage from './PeakValleyPage'
 import SmartTimerPage from './SmartTimerPage'
 import AlertsModulePage from './AlertsModulePage'
+import DataOverviewPage from './DataOverviewPage'
 
 function ModulePage({
   routeInfo,
@@ -104,6 +105,12 @@ function ModulePage({
   }
 
 
+
+  const isAnalysisDataOverviewPage = module.id === 'analysis' && section?.id === 'data-overview'
+
+  if (isAnalysisDataOverviewPage) {
+    return <DataOverviewPage />
+  }
   const isAlertsPage = module.id === 'alerts' && section
 
   if (isAlertsPage) {
