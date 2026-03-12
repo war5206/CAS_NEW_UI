@@ -20,6 +20,7 @@ const MONTH_COOLING_VALUES = [null, null, null, null, 560, 280, 380, 570, null, 
 const YEAR_BASE_VALUES = [2480, 2820, 3180, 3548.64, 3320, 3670]
 
 const DEVICE_LABELS = {
+  'total-power': '总电量',
   'heat-pump': '热泵',
   'water-pump': '水泵',
   'coupling-energy': '耦合能源',
@@ -69,6 +70,44 @@ function getMonthDays(monthValue) {
   return new Date(year, month, 0).getDate()
 }
 
+function buildMonthRange(startMonthValue, endMonthValue) {
+  const startValue = startMonthValue || endMonthValue || '2025-01'
+  const endValue = endMonthValue || startMonthValue || startValue
+  let [startYear, startMonth] = startValue.split('-').map(Number)
+  let [endYear, endMonth] = endValue.split('-').map(Number)
+
+  if (startYear > endYear || (startYear === endYear && startMonth > endMonth)) {
+    ;[startYear, endYear] = [endYear, startYear]
+    ;[startMonth, endMonth] = [endMonth, startMonth]
+  }
+
+  const months = []
+  let year = startYear
+  let month = startMonth
+
+  while (year < endYear || (year === endYear && month <= endMonth)) {
+    months.push({
+      value: `${year}-${String(month).padStart(2, '0')}`,
+      label: String(month).padStart(2, '0'),
+      monthIndex: month - 1,
+    })
+
+    month += 1
+    if (month > 12) {
+      month = 1
+      year += 1
+    }
+
+    if (months.length >= 24) {
+      break
+    }
+  }
+
+  return months.length > 0
+    ? months
+    : [{ value: startValue, label: String(startMonth).padStart(2, '0'), monthIndex: startMonth - 1 }]
+}
+
 function buildDaySeries(range, factor) {
   const monthValue = range.month || '2025-03'
   const days = getMonthDays(monthValue)
@@ -95,10 +134,12 @@ function buildDaySeries(range, factor) {
   }
 }
 
-function buildMonthSeries(factor) {
+function buildMonthSeries(range, factor) {
+  const monthRange = buildMonthRange(range.startMonth, range.endMonth)
+
   return {
-    labels: ['01', '02', '03', '04', '05', '06', '07', '08', '09', '10', '11', '12'],
-    tooltipLabels: ['01', '02', '03', '04', '05', '06', '07', '08', '09', '10', '11', '12'],
+    labels: monthRange.map((item) => item.label),
+    tooltipLabels: monthRange.map((item) => item.value),
     xAxisName: '月',
     yAxisMax: 1000,
     yAxisInterval: 200,
@@ -110,14 +151,14 @@ function buildMonthSeries(factor) {
       {
         name: '采暖耗电',
         type: 'bar',
-        data: MONTH_HEATING_VALUES.map((value) => scaleNullableValue(value, factor)),
+        data: monthRange.map((item) => scaleNullableValue(MONTH_HEATING_VALUES[item.monthIndex], factor)),
         colorKey: 'heating',
         barWidth: 26,
       },
       {
         name: '制冷耗电',
         type: 'bar',
-        data: MONTH_COOLING_VALUES.map((value) => scaleNullableValue(value, factor)),
+        data: monthRange.map((item) => scaleNullableValue(MONTH_COOLING_VALUES[item.monthIndex], factor)),
         colorKey: 'cooling',
         barWidth: 26,
       },
@@ -167,12 +208,12 @@ function buildSummaryCards(period, equipmentType, compareMode) {
   if (period === '日') {
     return [
       {
-        label: '当月总用电量（千瓦时）',
+        label: '当月总用电量（kWh）',
         value: String(Math.round(scaleNumber(655, factor))),
         color: '#723DFD',
       },
       {
-        label: '日均用电量（千瓦时）',
+        label: '日均用电量（kWh）',
         value: scaleNumber(6.12, factor).toFixed(2),
         color: '#723DFD',
       },
@@ -182,12 +223,12 @@ function buildSummaryCards(period, equipmentType, compareMode) {
   if (period === '月') {
     return [
       {
-        label: '年度总用电量（千瓦时）',
+        label: '年度总用电量（kWh）',
         value: scaleNumber(3548.64, factor).toFixed(2),
         color: '#723DFD',
       },
       {
-        label: '日均用电量（千瓦时）',
+        label: '日均用电量（kWh）',
         value: scaleNumber(5.12, factor).toFixed(2),
         color: '#723DFD',
       },
@@ -196,12 +237,12 @@ function buildSummaryCards(period, equipmentType, compareMode) {
 
   return [
     {
-      label: '区间总用电量（千瓦时）',
+      label: '区间总用电量（kWh）',
       value: scaleNumber(12860.52, factor).toFixed(2),
       color: '#723DFD',
     },
     {
-      label: '年均用电量（千瓦时）',
+      label: '年均用电量（kWh）',
       value: scaleNumber(2572.1, factor).toFixed(2),
       color: '#723DFD',
     },
@@ -210,6 +251,7 @@ function buildSummaryCards(period, equipmentType, compareMode) {
 
 export function getPowerTypeOptions() {
   return [
+    { label: DEVICE_LABELS['total-power'], value: 'total-power' },
     { label: DEVICE_LABELS['heat-pump'], value: 'heat-pump' },
     { label: DEVICE_LABELS['water-pump'], value: 'water-pump' },
     { label: DEVICE_LABELS['coupling-energy'], value: 'coupling-energy' },
@@ -225,7 +267,7 @@ export function buildPowerStatisticsViewModel({ period, range, compareMode, equi
   if (period === '日') {
     chart = buildDaySeries(range, factor)
   } else if (period === '月') {
-    chart = buildMonthSeries(factor)
+    chart = buildMonthSeries(range, factor)
   } else {
     chart = buildYearSeries(range, factor)
   }
@@ -234,7 +276,7 @@ export function buildPowerStatisticsViewModel({ period, range, compareMode, equi
     summaryCards: buildSummaryCards(period, equipmentType, compareMode),
     chartModel: {
       variant: 'power-statistics',
-      yAxisName: '千瓦时',
+      yAxisName: 'kWh',
       labels: chart.labels,
       tooltipLabels: chart.tooltipLabels,
       xAxisName: chart.xAxisName,

@@ -18,7 +18,7 @@ const PAGE_CONFIGS = {
     titleOptions: [],
     accentColor: '#1FA8FF',
     legendName: '用水量',
-    unit: '吨',
+    unit: 't',
     yAxisMaxDayMonth: 1000,
     yAxisIntervalDayMonth: 200,
     yAxisMaxYear: 20000,
@@ -29,9 +29,9 @@ const PAGE_CONFIGS = {
       { offset: 1, color: 'rgba(31, 168, 255, 0)' },
     ],
     cardLabels: {
-      day: ['当月总用水量（吨）', '日均用水量（吨）'],
-      month: ['年度总用水量（吨）', '日均用水量（吨）'],
-      year: ['区间总用水量（吨）', '年均用水量（吨）'],
+      day: ['当月总用水量（t）', '日均用水量（t）'],
+      month: ['年度总用水量（t）', '日均用水量（t）'],
+      year: ['区间总用水量（t）', '年均用水量（t）'],
     },
     summaryValues: {
       day: [655, 645.12],
@@ -45,7 +45,7 @@ const PAGE_CONFIGS = {
     titleOptions: [],
     accentColor: '#D247B1',
     legendName: '耗热量',
-    unit: '千瓦时',
+    unit: 'kWh',
     yAxisMaxDayMonth: 1000,
     yAxisIntervalDayMonth: 200,
     yAxisMaxYear: 20000,
@@ -56,9 +56,9 @@ const PAGE_CONFIGS = {
       { offset: 1, color: 'rgba(210, 71, 177, 0)' },
     ],
     cardLabels: {
-      day: ['当月总耗热量（千瓦时）', '日均耗热量（千瓦时）'],
-      month: ['年度总耗热量（千瓦时）', '日均耗热量（千瓦时）'],
-      year: ['区间总耗热量（千瓦时）', '年均耗热量（千瓦时）'],
+      day: ['当月总耗热量（kWh）', '日均耗热量（kWh）'],
+      month: ['年度总耗热量（kWh）', '日均耗热量（kWh）'],
+      year: ['区间总耗热量（kWh）', '年均耗热量（kWh）'],
     },
     summaryValues: {
       day: [655, 645.12],
@@ -72,7 +72,7 @@ const PAGE_CONFIGS = {
     titleOptions: [],
     accentColor: '#1E73FF',
     legendName: '制冷量',
-    unit: '千瓦时',
+    unit: 'kWh',
     yAxisMaxDayMonth: 1000,
     yAxisIntervalDayMonth: 200,
     yAxisMaxYear: 20000,
@@ -83,9 +83,9 @@ const PAGE_CONFIGS = {
       { offset: 1, color: 'rgba(30, 115, 255, 0)' },
     ],
     cardLabels: {
-      day: ['当月总制冷量（千瓦时）', '日均制冷量（千瓦时）'],
-      month: ['年度总制冷量（千瓦时）', '日均制冷量（千瓦时）'],
-      year: ['区间总制冷量（千瓦时）', '年均制冷量（千瓦时）'],
+      day: ['当月总制冷量（kWh）', '日均制冷量（kWh）'],
+      month: ['年度总制冷量（kWh）', '日均制冷量（kWh）'],
+      year: ['区间总制冷量（kWh）', '年均制冷量（kWh）'],
     },
     summaryValues: {
       day: [655, 645.12],
@@ -96,7 +96,12 @@ const PAGE_CONFIGS = {
   },
   cost: {
     title: '总费用',
-    titleOptions: [{ label: '总费用', value: 'total-cost' }],
+    titleOptions: [
+      { label: '总费用', value: 'total-cost' },
+      { label: '热泵', value: 'heat-pump' },
+      { label: '水泵', value: 'water-pump' },
+      { label: '耦合能源', value: 'coupling-energy' },
+    ],
     accentColor: '#F0A216',
     legendName: '费用',
     unit: '元',
@@ -132,6 +137,44 @@ function getMonthDays(monthValue) {
   return new Date(year, month, 0).getDate()
 }
 
+function buildMonthRange(startMonthValue, endMonthValue) {
+  const startValue = startMonthValue || endMonthValue || '2025-01'
+  const endValue = endMonthValue || startMonthValue || startValue
+  let [startYear, startMonth] = startValue.split('-').map(Number)
+  let [endYear, endMonth] = endValue.split('-').map(Number)
+
+  if (startYear > endYear || (startYear === endYear && startMonth > endMonth)) {
+    ;[startYear, endYear] = [endYear, startYear]
+    ;[startMonth, endMonth] = [endMonth, startMonth]
+  }
+
+  const months = []
+  let year = startYear
+  let month = startMonth
+
+  while (year < endYear || (year === endYear && month <= endMonth)) {
+    months.push({
+      value: `${year}-${String(month).padStart(2, '0')}`,
+      label: String(month).padStart(2, '0'),
+      monthIndex: month - 1,
+    })
+
+    month += 1
+    if (month > 12) {
+      month = 1
+      year += 1
+    }
+
+    if (months.length >= 24) {
+      break
+    }
+  }
+
+  return months.length > 0
+    ? months
+    : [{ value: startValue, label: String(startMonth).padStart(2, '0'), monthIndex: startMonth - 1 }]
+}
+
 function formatValue(value) {
   return Number.isInteger(value) ? String(value) : value.toFixed(2)
 }
@@ -156,18 +199,20 @@ function buildDayChart(config, range, factor) {
   }
 }
 
-function buildMonthChart(config, factor) {
+function buildMonthChart(config, range, factor) {
+  const monthRange = buildMonthRange(range.startMonth, range.endMonth)
+
   return {
-    labels: ['01', '02', '03', '04', '05', '06', '07', '08', '09', '10', '11', '12'],
-    tooltipLabels: ['01', '02', '03', '04', '05', '06', '07', '08', '09', '10', '11', '12'],
+    labels: monthRange.map((item) => item.label),
+    tooltipLabels: monthRange.map((item) => item.value),
     xAxisName: '月',
     yAxisMax: config.yAxisMaxDayMonth,
     yAxisInterval: config.yAxisIntervalDayMonth,
     series: [
       {
         name: config.legendName,
-        data: MONTH_BASE_VALUES.map((value) =>
-          scaleNumber((value / 4) * Math.max(config.valueScale, 0.85), factor)
+        data: monthRange.map((item) =>
+          scaleNumber((MONTH_BASE_VALUES[item.monthIndex] / 4) * Math.max(config.valueScale, 0.85), factor)
         ),
       },
     ],
@@ -224,7 +269,7 @@ export function buildResourceStatisticsViewModel({ pageType, period, range, comp
   if (period === '日') {
     chart = buildDayChart(config, range, factor)
   } else if (period === '月') {
-    chart = buildMonthChart(config, factor)
+    chart = buildMonthChart(config, range, factor)
   } else {
     chart = buildYearChart(config, range, factor)
   }

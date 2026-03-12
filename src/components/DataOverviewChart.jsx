@@ -105,6 +105,67 @@ function createGradient(stops) {
   return new echarts.graphic.LinearGradient(0, 0, 0, 1, stops)
 }
 
+function formatChartValue(value) {
+  const numericValue = Number(value)
+  if (!Number.isFinite(numericValue)) {
+    return '-'
+  }
+
+  return Number.isInteger(numericValue) ? String(numericValue) : numericValue.toFixed(2)
+}
+
+function resolveMarkerColor(item, chartModel, seriesColorMap) {
+  if (typeof item.color === 'string') {
+    return item.color
+  }
+
+  if (seriesColorMap?.[item.seriesName]) {
+    return seriesColorMap[item.seriesName]
+  }
+
+  return chartModel?.series.find((seriesItem) => seriesItem.name === item.seriesName)?.tooltipColor ?? '#7a46ff'
+}
+
+function buildSharedTooltipContent({ axisLabel, params, yoyPercentage, chartModel = null, seriesColorMap = null }) {
+  const rows = params
+    .filter((item) => item.value !== '-' && item.value != null)
+    .map((item) => {
+      const markerColor = resolveMarkerColor(item, chartModel, seriesColorMap)
+
+      return `
+        <div style="display:flex;align-items:center;gap:12px;min-width:220px;margin-top:12px;">
+          <span style="width:12px;height:12px;border-radius:999px;background:${markerColor};display:inline-block;flex:none;"></span>
+          <span style="color:rgba(255,255,255,0.78);">${item.seriesName}</span>
+          <span style="margin-left:auto;">${formatChartValue(item.value)}</span>
+        </div>
+      `
+    })
+
+  if (rows.length === 0) {
+    return ''
+  }
+
+  const percentageRow =
+    yoyPercentage == null
+      ? ''
+      : `
+        <div style="display:flex;align-items:center;gap:12px;min-width:220px;margin-top:12px;padding-top:12px;border-top:1px solid rgba(255,255,255,0.12);">
+          <span style="color:rgba(255,255,255,0.78);">同比占比</span>
+          <span style="margin-left:auto;color:${yoyPercentage >= 0 ? '#ff5d3a' : '#34ddbb'};">
+            ${yoyPercentage >= 0 ? '+' : ''}${yoyPercentage.toFixed(1)}%
+          </span>
+        </div>
+      `
+
+  return `
+    <div style="min-width:220px;">
+      <div style="font-size:18px;color:#FFFFFF;">${axisLabel}</div>
+      ${rows.join('')}
+      ${percentageRow}
+    </div>
+  `
+}
+
 function buildComparisonSeriesData(sourceData = []) {
   const normalized = sourceData.map((value, index) => {
     const numeric = Number(value ?? 0)
@@ -139,6 +200,15 @@ function buildPowerStatisticsOption(chartModel, compareMode) {
   const yoyPercentages = compareBasisData.map((value, index) =>
     Number((((value - yoyData[index]) / (yoyData[index] || 1)) * 100).toFixed(1))
   )
+  const seriesColorMap = Object.fromEntries(chartModel.legend.map((item) => [item.name, item.color]))
+
+  if (compareMode === 'mom') {
+    seriesColorMap[chartModel.compareLegendNames?.mom ?? '涓婁竴鍛ㄦ湡'] = '#FACC25'
+  }
+
+  if (compareMode === 'yoy') {
+    seriesColorMap[chartModel.compareLegendNames?.yoy ?? '鍘诲勾鍚屾湡'] = '#FACC25'
+  }
 
   const series = [...baseSeries]
   const legendData = chartModel.legend.map((item) => ({
@@ -179,35 +249,6 @@ function buildPowerStatisticsOption(chartModel, compareMode) {
         ]),
         borderRadius: [12, 12, 0, 0],
       },
-      label: {
-        show: true,
-        position: 'top',
-        distance: 18,
-        align: 'center',
-        verticalAlign: 'bottom',
-        formatter: ({ dataIndex }) => {
-          const value = yoyPercentages[dataIndex]
-          return value >= 0 ? `{positive|+${value.toFixed(1)}%}` : `{negative|${value.toFixed(1)}%}`
-        },
-        rich: {
-          positive: {
-            color: '#ff5d3a',
-            fontSize: 14,
-            fontWeight: 500,
-            align: 'center',
-            verticalAlign: 'middle',
-            lineHeight: 18,
-          },
-          negative: {
-            color: '#34ddbb',
-            fontSize: 14,
-            fontWeight: 500,
-            align: 'center',
-            verticalAlign: 'middle',
-            lineHeight: 18,
-          },
-        },
-      },
       z: 2,
     })
 
@@ -237,22 +278,17 @@ function buildPowerStatisticsOption(chartModel, compareMode) {
           return ''
         }
 
-        const numericValue = Number(activeItem.value)
-        const displayValue = Number.isInteger(numericValue) ? numericValue : numericValue.toFixed(2)
         const labelIndex = activeItem.dataIndex
         const axisLabel = chartModel.tooltipLabels?.[labelIndex] ?? activeItem.axisValueLabel
-        const markerColor =
-          typeof activeItem.color === 'string'
-            ? activeItem.color
-            : chartModel.series.find((item) => item.name === activeItem.seriesName)?.tooltipColor ?? '#7a46ff'
+        const percentage = compareMode === 'yoy' ? yoyPercentages[labelIndex] : null
 
-        return `
-          <div style="display:flex;align-items:center;gap:18px;min-width:172px;">
-            <span style="width:16px;height:16px;border-radius:999px;background:${markerColor};display:inline-block;"></span>
-            <span>${axisLabel}</span>
-            <span style="margin-left:auto;">${displayValue}</span>
-          </div>
-        `
+        return buildSharedTooltipContent({
+          axisLabel,
+          params,
+          yoyPercentage: percentage,
+          chartModel,
+          seriesColorMap,
+        })
       },
     },
     legend: {
@@ -317,6 +353,12 @@ function buildOverviewOption(period, compareMode, range) {
     { offset: 0.75, color: '#FACC25' },
     { offset: 1, color: 'rgba(250, 204, 37, 0)' },
   ])
+  const seriesColorMap = {
+    COP: '#E74828',
+    '褰撳墠鍛ㄦ湡 COP': '#E74828',
+    '涓婁竴鍛ㄦ湡 COP': '#FACC25',
+    '鍘诲勾鍚屾湡 COP': '#FACC25',
+  }
 
   const series = [
     {
@@ -357,35 +399,6 @@ function buildOverviewOption(period, compareMode, range) {
         color: barGradientYellow,
         borderRadius: [10, 10, 0, 0],
       },
-      label: {
-        show: true,
-        position: 'top',
-        distance: 18,
-        align: 'center',
-        verticalAlign: 'bottom',
-        formatter: ({ dataIndex }) => {
-          const value = yoyPercentages[dataIndex]
-          return value >= 0 ? `{positive|+${value.toFixed(1)}%}` : `{negative|${value.toFixed(1)}%}`
-        },
-        rich: {
-          positive: {
-            color: '#ff5d3a',
-            fontSize: 14,
-            fontWeight: 500,
-            align: 'center',
-            verticalAlign: 'middle',
-            lineHeight: 18,
-          },
-          negative: {
-            color: '#34ddbb',
-            fontSize: 14,
-            fontWeight: 500,
-            align: 'center',
-            verticalAlign: 'middle',
-            lineHeight: 18,
-          },
-        },
-      },
     })
     legendData.push('去年同期 COP')
   }
@@ -393,7 +406,35 @@ function buildOverviewOption(period, compareMode, range) {
   return {
     animation: false,
     grid: { left: 64, right: 28, top: 88, bottom: 42 },
-    tooltip: { trigger: 'axis' },
+    tooltip: {
+      trigger: 'axis',
+      backgroundColor: '#22262D',
+      borderColor: 'rgba(92, 111, 135, 0.44)',
+      borderWidth: 1,
+      padding: [18, 22],
+      textStyle: { color: '#FFFFFF', fontSize: 18 },
+      axisPointer: {
+        type: 'shadow',
+        shadowStyle: { color: 'rgba(123, 123, 123, 0.34)' },
+      },
+      formatter: (params) => {
+        const activeItem = params.find((item) => item.value !== '-' && item.value != null) ?? params[0]
+        if (!activeItem) {
+          return ''
+        }
+
+        const labelIndex = activeItem.dataIndex
+        const axisLabel = dataset.labels[labelIndex] ?? activeItem.axisValueLabel
+        const percentage = compareMode === 'yoy' ? yoyPercentages[labelIndex] : null
+
+        return buildSharedTooltipContent({
+          axisLabel,
+          params,
+          yoyPercentage: percentage,
+          seriesColorMap,
+        })
+      },
+    },
     legend: {
       top: 0,
       right: 0,
