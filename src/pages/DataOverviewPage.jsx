@@ -75,15 +75,13 @@ function DataOverviewPage() {
   const [compareMode, setCompareMode] = useState('none')
   const [filters, setFilters] = useState(DEFAULT_FILTERS)
 
-  const handlePeriodChange = (nextPeriod) => {
-    setPeriod(nextPeriod)
-  }
-
   const handleFilterChange = (nextRange) => {
+    const filterKey = period === '日' ? 'day' : period === '月' ? 'month' : 'year'
+
     setFilters((current) => ({
       ...current,
-      [period === '日' ? 'day' : period === '月' ? 'month' : 'year']: {
-        ...current[period === '日' ? 'day' : period === '月' ? 'month' : 'year'],
+      [filterKey]: {
+        ...current[filterKey],
         ...nextRange,
       },
     }))
@@ -120,7 +118,7 @@ function DataOverviewPage() {
 
       <DataOverviewFilterBar
         period={period}
-        onPeriodChange={handlePeriodChange}
+        onPeriodChange={setPeriod}
         compareMode={compareMode}
         onCompareModeChange={setCompareMode}
         range={activeRange}

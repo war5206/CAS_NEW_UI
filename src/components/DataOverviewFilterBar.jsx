@@ -1,5 +1,6 @@
 import dateIcon from '../assets/icons/date.svg'
 import DatePickerTrigger from './DatePickerTrigger'
+import SelectDropdown from './SelectDropdown'
 
 const PERIOD_OPTIONS = ['日', '月', '年']
 
@@ -10,6 +11,13 @@ function DataOverviewFilterBar({
   onCompareModeChange,
   range,
   onRangeChange,
+  title = 'COP 能效分析',
+  titleOptions = [],
+  titleValue,
+  onTitleChange,
+  titleAriaLabel = '选择分析对象',
+  className = '',
+  dateDisplayFormatter,
 }) {
   const renderDateControl = () => {
     if (period === '日') {
@@ -22,6 +30,7 @@ function DataOverviewFilterBar({
           placeholder="请选择年月"
           icon={dateIcon}
           className="data-overview-filter-bar__date"
+          displayFormatter={dateDisplayFormatter}
         />
       )
     }
@@ -37,6 +46,7 @@ function DataOverviewFilterBar({
             placeholder="开始月份"
             icon={dateIcon}
             className="data-overview-filter-bar__date-trigger"
+            displayFormatter={dateDisplayFormatter}
           />
           <span className="data-overview-filter-bar__range-separator">至</span>
           <DatePickerTrigger
@@ -47,6 +57,7 @@ function DataOverviewFilterBar({
             placeholder="结束月份"
             icon={dateIcon}
             className="data-overview-filter-bar__date-trigger"
+            displayFormatter={dateDisplayFormatter}
           />
         </div>
       )
@@ -62,6 +73,7 @@ function DataOverviewFilterBar({
           placeholder="开始年份"
           icon={dateIcon}
           className="data-overview-filter-bar__date-trigger"
+          displayFormatter={dateDisplayFormatter}
         />
         <span className="data-overview-filter-bar__range-separator">至</span>
         <DatePickerTrigger
@@ -72,14 +84,30 @@ function DataOverviewFilterBar({
           placeholder="结束年份"
           icon={dateIcon}
           className="data-overview-filter-bar__date-trigger"
+          displayFormatter={dateDisplayFormatter}
         />
       </div>
     )
   }
 
+  const rootClassName = ['data-overview-filter-bar', className].filter(Boolean).join(' ')
+
   return (
-    <section className="data-overview-filter-bar" aria-label="数据筛选">
-      <div className="data-overview-filter-bar__title">COP 能效分析</div>
+    <section className={rootClassName} aria-label="数据筛选">
+      {titleOptions.length > 0 ? (
+        <SelectDropdown
+          options={titleOptions}
+          value={titleValue}
+          onChange={onTitleChange}
+          triggerAriaLabel={titleAriaLabel}
+          className="data-overview-filter-bar__title-dropdown"
+          triggerClassName="data-overview-filter-bar__title-trigger"
+          dropdownClassName="data-overview-filter-bar__title-menu"
+          optionClassName="data-overview-filter-bar__title-option"
+        />
+      ) : (
+        <div className="data-overview-filter-bar__title">{title}</div>
+      )}
 
       <div className="data-overview-filter-bar__controls">
         {renderDateControl()}

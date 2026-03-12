@@ -1,9 +1,7 @@
 import { useEffect, useMemo, useRef } from 'react'
 import * as echarts from 'echarts'
-import upIcon from '../assets/icons/data-up.svg'
-import downIcon from '../assets/icons/data-down.svg'
 
-function createDayDataset(range) {
+function createOverviewDayDataset(range) {
   const monthValue = range.month || '2026-03'
   const [year, month] = monthValue.split('-')
   const monthNumber = Number(month)
@@ -20,7 +18,7 @@ function createDayDataset(range) {
   const yoyData = currentData.map((value, index) => Number((value - 0.32 + (index % 4) * 0.04).toFixed(2)))
 
   return {
-    title: `${year}年${monthNumber}月 日趋势`,
+    title: `${year}年${monthNumber}月日趋势`,
     labels,
     currentData,
     prevData,
@@ -28,7 +26,7 @@ function createDayDataset(range) {
   }
 }
 
-function createMonthDataset(range) {
+function createOverviewMonthDataset(range) {
   const start = range.startMonth || '2025-11'
   const end = range.endMonth || start
   const [startYear, startMonth] = start.split('-').map(Number)
@@ -66,7 +64,7 @@ function createMonthDataset(range) {
   }
 }
 
-function createYearDataset(range) {
+function createOverviewYearDataset(range) {
   const startYear = Number(range.startYear || '2024')
   const endYear = Number(range.endYear || range.startYear || '2024')
   const labels = []
@@ -91,160 +89,360 @@ function createYearDataset(range) {
   }
 }
 
-function buildDataset(period, range) {
+function buildOverviewDataset(period, range) {
   if (period === '日') {
-    return createDayDataset(range)
+    return createOverviewDayDataset(range)
   }
 
   if (period === '月') {
-    return createMonthDataset(range)
+    return createOverviewMonthDataset(range)
   }
 
-  return createYearDataset(range)
+  return createOverviewYearDataset(range)
 }
 
-function DataOverviewChart({ period, compareMode, range }) {
+function createGradient(stops) {
+  return new echarts.graphic.LinearGradient(0, 0, 0, 1, stops)
+}
+
+function buildComparisonSeriesData(sourceData = []) {
+  const normalized = sourceData.map((value, index) => {
+    const numeric = Number(value ?? 0)
+    return Number((numeric * (0.82 + (index % 4) * 0.03)).toFixed(2))
+  })
+
+  return {
+    prevData: normalized.map((value, index) => Number((value * (0.92 + (index % 3) * 0.015)).toFixed(2))),
+    yoyData: normalized.map((value, index) => Number((value * (0.78 + (index % 5) * 0.018)).toFixed(2))),
+  }
+}
+
+function buildPowerStatisticsOption(chartModel, compareMode) {
+  const baseSeries = chartModel.series.map((item) => ({
+    name: item.name,
+    type: item.type,
+    data: item.data.map((value) => (value == null ? '-' : value)),
+    barWidth: item.barWidth ?? 24,
+    barGap: item.type === 'bar' ? '-100%' : undefined,
+    itemStyle: {
+      color: createGradient(item.gradientStops),
+      borderRadius: [12, 12, 0, 0],
+    },
+  }))
+
+  const compareBasisData =
+    chartModel.compareBasisData?.map((value) => (value == null ? 0 : Number(value))) ??
+    chartModel.series[0]?.data.map((value) => (value == null ? 0 : Number(value))) ??
+    []
+
+  const { prevData, yoyData } = buildComparisonSeriesData(compareBasisData)
+  const yoyPercentages = compareBasisData.map((value, index) =>
+    Number((((value - yoyData[index]) / (yoyData[index] || 1)) * 100).toFixed(1))
+  )
+
+  const series = [...baseSeries]
+  const legendData = chartModel.legend.map((item) => ({
+    name: item.name,
+    itemStyle: { color: item.color },
+  }))
+
+  if (compareMode === 'mom') {
+    series.push({
+      name: chartModel.compareLegendNames?.mom ?? '上一周期',
+      type: 'line',
+      data: prevData,
+      smooth: false,
+      symbol: 'circle',
+      symbolSize: 8,
+      lineStyle: { color: '#FACC25', width: 2 },
+      itemStyle: { color: '#FACC25' },
+      z: 3,
+    })
+
+    legendData.push({
+      name: chartModel.compareLegendNames?.mom ?? '上一周期',
+      itemStyle: { color: '#FACC25' },
+    })
+  }
+
+  if (compareMode === 'yoy') {
+    series.push({
+      name: chartModel.compareLegendNames?.yoy ?? '去年同期',
+      type: 'bar',
+      data: yoyData,
+      barWidth: 16,
+      itemStyle: {
+        color: createGradient([
+          { offset: 0, color: '#FACC25' },
+          { offset: 0.75, color: '#FACC25' },
+          { offset: 1, color: 'rgba(250, 204, 37, 0)' },
+        ]),
+        borderRadius: [12, 12, 0, 0],
+      },
+      label: {
+        show: true,
+        position: 'top',
+        distance: 18,
+        align: 'center',
+        verticalAlign: 'bottom',
+        formatter: ({ dataIndex }) => {
+          const value = yoyPercentages[dataIndex]
+          return value >= 0 ? `{positive|+${value.toFixed(1)}%}` : `{negative|${value.toFixed(1)}%}`
+        },
+        rich: {
+          positive: {
+            color: '#ff5d3a',
+            fontSize: 14,
+            fontWeight: 500,
+            align: 'center',
+            verticalAlign: 'middle',
+            lineHeight: 18,
+          },
+          negative: {
+            color: '#34ddbb',
+            fontSize: 14,
+            fontWeight: 500,
+            align: 'center',
+            verticalAlign: 'middle',
+            lineHeight: 18,
+          },
+        },
+      },
+      z: 2,
+    })
+
+    legendData.push({
+      name: chartModel.compareLegendNames?.yoy ?? '去年同期',
+      itemStyle: { color: '#FACC25' },
+    })
+  }
+
+  return {
+    animation: false,
+    grid: { left: 76, right: 28, top: 76, bottom: 62 },
+    tooltip: {
+      trigger: 'axis',
+      backgroundColor: '#22262D',
+      borderColor: 'rgba(92, 111, 135, 0.44)',
+      borderWidth: 1,
+      padding: [18, 22],
+      textStyle: { color: '#FFFFFF', fontSize: 18 },
+      axisPointer: {
+        type: 'shadow',
+        shadowStyle: { color: 'rgba(123, 123, 123, 0.34)' },
+      },
+      formatter: (params) => {
+        const activeItem = params.find((item) => item.value !== '-' && item.value != null) ?? params[0]
+        if (!activeItem) {
+          return ''
+        }
+
+        const numericValue = Number(activeItem.value)
+        const displayValue = Number.isInteger(numericValue) ? numericValue : numericValue.toFixed(2)
+        const labelIndex = activeItem.dataIndex
+        const axisLabel = chartModel.tooltipLabels?.[labelIndex] ?? activeItem.axisValueLabel
+        const markerColor =
+          typeof activeItem.color === 'string'
+            ? activeItem.color
+            : chartModel.series.find((item) => item.name === activeItem.seriesName)?.tooltipColor ?? '#7a46ff'
+
+        return `
+          <div style="display:flex;align-items:center;gap:18px;min-width:172px;">
+            <span style="width:16px;height:16px;border-radius:999px;background:${markerColor};display:inline-block;"></span>
+            <span>${axisLabel}</span>
+            <span style="margin-left:auto;">${displayValue}</span>
+          </div>
+        `
+      },
+    },
+    legend: {
+      top: 8,
+      right: 8,
+      itemWidth: 16,
+      itemHeight: 16,
+      icon: 'roundRect',
+      textStyle: { color: 'rgba(255,255,255,0.78)', fontSize: 16 },
+      data: legendData,
+    },
+    xAxis: {
+      type: 'category',
+      data: chartModel.labels,
+      name: chartModel.xAxisName,
+      nameLocation: 'end',
+      nameGap: 28,
+      nameTextStyle: {
+        color: 'rgba(255,255,255,0.58)',
+        fontSize: 16,
+        padding: [0, 0, 0, 18],
+      },
+      axisTick: { show: false },
+      axisLabel: { color: 'rgba(192,203,214,0.84)', fontSize: 16, margin: 22 },
+      axisLine: { lineStyle: { color: 'rgba(255,255,255,0.52)' } },
+    },
+    yAxis: {
+      type: 'value',
+      name: chartModel.yAxisName,
+      min: 0,
+      max: chartModel.yAxisMax,
+      interval: chartModel.yAxisInterval,
+      nameLocation: 'end',
+      nameGap: 16,
+      nameRotate: 0,
+      nameTextStyle: {
+        color: 'rgba(255,255,255,0.76)',
+        fontSize: 18,
+        align: 'left',
+        padding: [0, 0, 18, -42],
+      },
+      axisLabel: { color: 'rgba(192,203,214,0.84)', fontSize: 16, margin: 18 },
+      splitLine: { lineStyle: { color: 'rgba(210, 219, 232, 0.6)', type: 'dashed' } },
+    },
+    series,
+  }
+}
+
+function buildOverviewOption(period, compareMode, range) {
+  const dataset = buildOverviewDataset(period, range)
+  const yoyPercentages = dataset.currentData.map((value, index) =>
+    Number((((value - dataset.yoyData[index]) / (dataset.yoyData[index] || 1)) * 100).toFixed(1))
+  )
+
+  const barGradient = createGradient([
+    { offset: 0, color: '#E74828' },
+    { offset: 0.75, color: '#E74828' },
+    { offset: 1, color: 'rgba(231, 72, 40, 0)' },
+  ])
+  const barGradientYellow = createGradient([
+    { offset: 0, color: '#FACC25' },
+    { offset: 0.75, color: '#FACC25' },
+    { offset: 1, color: 'rgba(250, 204, 37, 0)' },
+  ])
+
+  const series = [
+    {
+      name: compareMode === 'yoy' ? '当前周期 COP' : 'COP',
+      type: 'bar',
+      data: dataset.currentData,
+      barWidth: compareMode === 'yoy' ? 16 : 22,
+      itemStyle: {
+        color: barGradient,
+        borderRadius: [10, 10, 0, 0],
+      },
+    },
+  ]
+
+  const legendData = [series[0].name]
+
+  if (compareMode === 'mom') {
+    series.push({
+      name: '上一周期 COP',
+      type: 'line',
+      data: dataset.prevData,
+      smooth: false,
+      symbol: 'circle',
+      symbolSize: 8,
+      lineStyle: { color: '#FACC25', width: 2 },
+      itemStyle: { color: '#FACC25' },
+    })
+    legendData.push('上一周期 COP')
+  }
+
+  if (compareMode === 'yoy') {
+    series.push({
+      name: '去年同期 COP',
+      type: 'bar',
+      data: dataset.yoyData,
+      barWidth: 16,
+      itemStyle: {
+        color: barGradientYellow,
+        borderRadius: [10, 10, 0, 0],
+      },
+      label: {
+        show: true,
+        position: 'top',
+        distance: 18,
+        align: 'center',
+        verticalAlign: 'bottom',
+        formatter: ({ dataIndex }) => {
+          const value = yoyPercentages[dataIndex]
+          return value >= 0 ? `{positive|+${value.toFixed(1)}%}` : `{negative|${value.toFixed(1)}%}`
+        },
+        rich: {
+          positive: {
+            color: '#ff5d3a',
+            fontSize: 14,
+            fontWeight: 500,
+            align: 'center',
+            verticalAlign: 'middle',
+            lineHeight: 18,
+          },
+          negative: {
+            color: '#34ddbb',
+            fontSize: 14,
+            fontWeight: 500,
+            align: 'center',
+            verticalAlign: 'middle',
+            lineHeight: 18,
+          },
+        },
+      },
+    })
+    legendData.push('去年同期 COP')
+  }
+
+  return {
+    animation: false,
+    grid: { left: 64, right: 28, top: 88, bottom: 42 },
+    tooltip: { trigger: 'axis' },
+    legend: {
+      top: 0,
+      right: 0,
+      textStyle: { color: 'rgba(255,255,255,0.72)', fontSize: 18 },
+      itemWidth: 14,
+      itemHeight: 14,
+      data: legendData,
+    },
+    title: {
+      text: dataset.title,
+      left: 0,
+      top: 0,
+      textStyle: {
+        color: 'rgba(255,255,255,0.82)',
+        fontSize: 18,
+        fontWeight: 500,
+      },
+    },
+    xAxis: {
+      type: 'category',
+      data: dataset.labels,
+      axisLabel: { color: 'rgba(255,255,255,0.45)', fontSize: 16, margin: 14 },
+      axisLine: { lineStyle: { color: 'rgba(255,255,255,0.2)' } },
+    },
+    yAxis: [
+      {
+        name: 'COP',
+        min: 0,
+        max: 4,
+        interval: 0.5,
+        nameTextStyle: { color: 'rgba(255,255,255,0.72)', fontSize: 20, padding: [0, 0, 10, -8] },
+        axisLabel: { color: 'rgba(255,255,255,0.72)', fontSize: 16, margin: 12 },
+        splitLine: { lineStyle: { color: 'rgba(255,255,255,0.18)', type: 'dashed' } },
+      },
+    ],
+    series,
+  }
+}
+
+function DataOverviewChart({ period, compareMode, range, chartModel = null }) {
   const chartRef = useRef(null)
 
   const chartOption = useMemo(() => {
-    const dataset = buildDataset(period, range)
-    const yoyPercentages = dataset.currentData.map((value, index) =>
-      Number((((value - dataset.yoyData[index]) / (dataset.yoyData[index] || 1)) * 100).toFixed(1))
-    )
-
-    const barGradient = new echarts.graphic.LinearGradient(0, 0, 0, 1, [
-      { offset: 0, color: '#E74828' },
-      { offset: 0.75, color: '#E74828' },
-      { offset: 1, color: 'rgba(231, 72, 40, 0)' },
-    ])
-
-    const series = [
-      {
-        name: compareMode === 'yoy' ? '当前周期 COP' : 'COP',
-        type: 'bar',
-        data: dataset.currentData,
-        barWidth: compareMode === 'yoy' ? 16 : 22,
-        itemStyle: {
-          color: barGradient,
-          borderRadius: [10, 10, 0, 0],
-        },
-      },
-    ]
-
-    const legendData = [series[0].name]
-
-    if (compareMode === 'mom') {
-      series.push({
-        name: '上一周期 COP',
-        type: 'line',
-        data: dataset.prevData,
-        smooth: false,
-        symbol: 'circle',
-        symbolSize: 8,
-        lineStyle: { color: '#FACB25', width: 2 },
-        itemStyle: { color: '#FACB25' },
-      })
-      legendData.push('上一周期 COP')
+    if (chartModel?.variant === 'power-statistics') {
+      return buildPowerStatisticsOption(chartModel, compareMode)
     }
 
-    if (compareMode === 'yoy') {
-      series.push({
-        name: '去年同期 COP',
-        type: 'bar',
-        data: dataset.yoyData,
-        barWidth: 16,
-        itemStyle: {
-          color: '#FACB25',
-          borderRadius: [10, 10, 0, 0],
-        },
-        label: {
-          show: true,
-          position: 'top',
-          distance: 18,
-          align: 'center',
-          verticalAlign: 'bottom',
-          formatter: ({ dataIndex }) => {
-            const value = yoyPercentages[dataIndex]
-            const iconKey = value >= 0 ? 'upIcon' : 'downIcon'
-            const absValue = Math.abs(value).toFixed(1)
-            return `{${iconKey}|}{value|${absValue}%}`
-          },
-          rich: {
-            upIcon: {
-              width: 16,
-              height: 16,
-              align: 'center',
-              verticalAlign: 'middle',
-              backgroundColor: {
-                image: upIcon,
-              },
-            },
-            downIcon: {
-              width: 16,
-              height: 16,
-              align: 'center',
-              verticalAlign: 'middle',
-              backgroundColor: {
-                image: downIcon,
-              },
-            },
-            value: {
-              color: '#F5F7FA',
-              fontSize: 14,
-              fontWeight: 500,
-              align: 'center',
-              verticalAlign: 'middle',
-              padding: [0, 0, 0, 6],
-              lineHeight: 18,
-            },
-          },
-        },
-      })
-      legendData.push('去年同期 COP')
-    }
-
-    return {
-      animation: false,
-      grid: { left: 64, right: 28, top: 88, bottom: 42 },
-      tooltip: { trigger: 'axis' },
-      legend: {
-        top: 0,
-        right: 0,
-        textStyle: { color: 'rgba(255,255,255,0.72)', fontSize: 18 },
-        itemWidth: 14,
-        itemHeight: 14,
-        data: legendData,
-      },
-      title: {
-        text: dataset.title,
-        left: 0,
-        top: 0,
-        textStyle: {
-          color: 'rgba(255,255,255,0.82)',
-          fontSize: 18,
-          fontWeight: 500,
-        },
-      },
-      xAxis: {
-        type: 'category',
-        data: dataset.labels,
-        axisLabel: { color: 'rgba(255,255,255,0.45)', fontSize: 16, margin: 14 },
-        axisLine: { lineStyle: { color: 'rgba(255,255,255,0.2)' } },
-      },
-      yAxis: [
-        {
-          name: 'COP',
-          min: 0,
-          max: 4,
-          interval: 0.5,
-          nameTextStyle: { color: 'rgba(255,255,255,0.72)', fontSize: 20, padding: [0, 0, 10, -8] },
-          axisLabel: { color: 'rgba(255,255,255,0.72)', fontSize: 16, margin: 12 },
-          splitLine: { lineStyle: { color: 'rgba(255,255,255,0.18)', type: 'dashed' } },
-        },
-      ],
-      series,
-    }
-  }, [compareMode, period, range])
+    return buildOverviewOption(period, compareMode, range)
+  }, [chartModel, compareMode, period, range])
 
   useEffect(() => {
     if (!chartRef.current) {

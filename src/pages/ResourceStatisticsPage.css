@@ -1,0 +1,116 @@
+.resource-statistics-page {
+  width: 100%;
+  height: 100%;
+  padding: 10px 24px 24px;
+  overflow: auto;
+  color: #fff;
+}
+
+.resource-statistics-page__cards {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.resource-statistics-page__card {
+  min-height: 143px;
+  border-radius: 20px;
+  background: #22262d;
+  padding: 28px 34px;
+}
+
+.resource-statistics-page__card-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  color: rgba(221, 230, 240, 0.78);
+  font-size: 20px;
+}
+
+.resource-statistics-page__card-label span {
+  width: 16px;
+  height: 16px;
+  border-radius: 4px;
+}
+
+.resource-statistics-page__card-value {
+  margin-top: 26px;
+  color: #ffffff;
+  font-size: 36px;
+  font-weight: 600;
+  line-height: 1;
+}
+
+.resource-statistics-filter-bar {
+  margin: 28px 0 10px;
+}
+
+.resource-statistics-page .data-overview-filter-bar__title {
+  min-width: 328px;
+  padding: 0 24px;
+  background: #22262d;
+}
+
+.resource-statistics-page .data-overview-filter-bar__title-dropdown {
+  width: 328px;
+}
+
+.resource-statistics-page .data-overview-filter-bar__title-trigger {
+  height: 64px;
+  border: none;
+  border-radius: 16px;
+  background: #22262d;
+  color: #ffffff;
+  font-size: 20px;
+  padding: 0 24px;
+}
+
+.resource-statistics-page .data-overview-filter-bar__title-trigger::after {
+  right: 26px;
+}
+
+.resource-statistics-page .data-overview-filter-bar__title-menu {
+  background: #22262d;
+  border-radius: 18px;
+  padding: 10px;
+}
+
+.resource-statistics-page .data-overview-filter-bar__title-option {
+  min-height: 52px;
+  padding: 0 18px;
+  font-size: 18px;
+}
+
+.resource-statistics-page .data-overview-filter-bar__title-option.is-selected {
+  background: rgba(49, 55, 67, 0.92);
+}
+
+.resource-statistics-page .data-overview-filter-bar__date {
+  min-width: 328px;
+  padding: 0 24px;
+}
+
+.resource-statistics-page .data-overview-filter-bar__date--range {
+  min-width: 440px;
+  padding: 0 20px;
+}
+
+.resource-statistics-page .data-overview-filter-bar__date,
+.resource-statistics-page .data-overview-filter-bar__segment,
+.resource-statistics-page .data-overview-filter-bar__title-trigger {
+  background: #22262d;
+}
+
+.resource-statistics-page .data-overview-filter-bar__date > span,
+.resource-statistics-page .data-overview-filter-bar__date-trigger > span {
+  color: rgba(255, 255, 255, 0.95);
+  font-size: 20px;
+}
+
+.resource-statistics-page__chart-panel {
+  margin-top: 4px;
+}
+
+.resource-statistics-page .data-overview-chart {
+  height: 660px;
+}

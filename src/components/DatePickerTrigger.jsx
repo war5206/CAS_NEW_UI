@@ -11,7 +11,15 @@ function padNumber(value) {
 
 function parseValue(value, type) {
   if (!value) {
-    return type === 'year' ? [YEAR_OPTIONS[0]] : type === 'month' ? [YEAR_OPTIONS[0], 1] : [YEAR_OPTIONS[0], 1, 1]
+    if (type === 'year') {
+      return [YEAR_OPTIONS[0]]
+    }
+
+    if (type === 'month') {
+      return [YEAR_OPTIONS[0], 1]
+    }
+
+    return [YEAR_OPTIONS[0], 1, 1]
   }
 
   if (type === 'year') {
@@ -41,7 +49,7 @@ function formatValue(nextValue, type) {
   return `${year}-${padNumber(month)}-${padNumber(day)}`
 }
 
-function formatLabel(value, type, placeholder) {
+function defaultFormatLabel(value, type, placeholder) {
   if (!value) {
     return placeholder
   }
@@ -67,6 +75,7 @@ function DatePickerTrigger({
   placeholder = '请选择',
   className = '',
   icon,
+  displayFormatter,
 }) {
   const [isOpen, setIsOpen] = useState(false)
 
@@ -89,11 +98,16 @@ function DatePickerTrigger({
     ]
   }, [type])
 
+  const displayLabel =
+    typeof displayFormatter === 'function'
+      ? displayFormatter(value, type, placeholder)
+      : defaultFormatLabel(value, type, placeholder)
+
   return (
     <>
       <button type="button" className={className} onClick={() => setIsOpen(true)}>
         {icon ? <img src={icon} alt="" aria-hidden="true" /> : null}
-        <span>{formatLabel(value, type, placeholder)}</span>
+        <span>{displayLabel}</span>
       </button>
 
       <TimePickerModal
