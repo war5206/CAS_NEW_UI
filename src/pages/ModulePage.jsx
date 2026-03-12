@@ -20,6 +20,8 @@ import WaterStatisticsPage from './WaterStatisticsPage'
 import HeatStatisticsPage from './HeatStatisticsPage'
 import ColdStatisticsPage from './ColdStatisticsPage'
 import CostAnalysisPage from './CostAnalysisPage'
+import OperationsSystemManagementPage from './OperationsSystemManagementPage'
+import OperationsDeviceManagementPage from './OperationsDeviceManagementPage'
 
 function ModulePage({
   routeInfo,
@@ -152,6 +154,21 @@ function ModulePage({
   if (isAlertsPage) {
     return <AlertsModulePage sectionId={section.id} onDetailBreadcrumbChange={onDetailBreadcrumbChange} />
   }
+
+  const isOperationsSystemManagementPage =
+    module.id === 'operations' && section?.id === 'system-management' && tab
+
+  if (isOperationsSystemManagementPage) {
+    return <OperationsSystemManagementPage tabId={tab.id} />
+  }
+
+  const isOperationsDeviceManagementPage =
+    module.id === 'operations' && section?.id === 'device-management' && tab
+
+  if (isOperationsDeviceManagementPage) {
+    return <OperationsDeviceManagementPage tabId={tab.id} />
+  }
+
   const isModeSettingCouplingPage =
     module.id === 'settings' && section?.id === 'mode-setting' && tab?.id === 'coupling'
 
