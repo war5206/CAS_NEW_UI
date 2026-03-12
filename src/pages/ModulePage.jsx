@@ -14,6 +14,12 @@ import SmartStartStopPage from './SmartStartStopPage'
 import PeakValleyPage from './PeakValleyPage'
 import SmartTimerPage from './SmartTimerPage'
 import AlertsModulePage from './AlertsModulePage'
+import DataOverviewPage from './DataOverviewPage'
+import PowerStatisticsPage from './PowerStatisticsPage'
+import WaterStatisticsPage from './WaterStatisticsPage'
+import HeatStatisticsPage from './HeatStatisticsPage'
+import ColdStatisticsPage from './ColdStatisticsPage'
+import CostAnalysisPage from './CostAnalysisPage'
 
 function ModulePage({
   routeInfo,
@@ -103,6 +109,43 @@ function ModulePage({
     return <SmartTimerPage />
   }
 
+
+
+  const isAnalysisDataOverviewPage = module.id === 'analysis' && section?.id === 'data-overview'
+
+  if (isAnalysisDataOverviewPage) {
+    return <DataOverviewPage />
+  }
+
+  const isAnalysisPowerStatisticsPage = module.id === 'analysis' && section?.id === 'power'
+
+  if (isAnalysisPowerStatisticsPage) {
+    return <PowerStatisticsPage />
+  }
+
+  const isAnalysisWaterStatisticsPage = module.id === 'analysis' && section?.id === 'water'
+
+  if (isAnalysisWaterStatisticsPage) {
+    return <WaterStatisticsPage />
+  }
+
+  const isAnalysisHeatStatisticsPage = module.id === 'analysis' && section?.id === 'heat'
+
+  if (isAnalysisHeatStatisticsPage) {
+    return <HeatStatisticsPage />
+  }
+
+  const isAnalysisColdStatisticsPage = module.id === 'analysis' && section?.id === 'cold'
+
+  if (isAnalysisColdStatisticsPage) {
+    return <ColdStatisticsPage />
+  }
+
+  const isAnalysisCostAnalysisPage = module.id === 'analysis' && section?.id === 'cost'
+
+  if (isAnalysisCostAnalysisPage) {
+    return <CostAnalysisPage />
+  }
 
   const isAlertsPage = module.id === 'alerts' && section
 
