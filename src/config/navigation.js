@@ -21,7 +21,6 @@ import iconSystemManagement from '../assets/navigation/systemManagement.svg'
 import iconDeviceManagement from '../assets/navigation/deviceManagement.svg'
 import iconDocManagement from '../assets/navigation/docManagement.svg'
 import iconSystemInstruction from '../assets/navigation/systemInstruction.svg'
-import iconDetectorInstruction from '../assets/navigation/detectorInstruction.svg'
 
 export const modules = [
   {
@@ -47,7 +46,7 @@ export const modules = [
           { id: 'climate', label: '气候补偿', path: 'climate-compensation' },
           { id: 'timer', label: '智能定时', path: 'smart-timer' },
           { id: 'start-stop', label: '智能启停', path: 'smart-start-stop' },
-          { id: 'peak', label: '峰谷调节', path: 'peak-valley' },
+          { id: 'peak', label: '热电协同', path: 'peak-valley' },
           { id: 'coupling', label: '耦合能源', path: 'coupling-energy' },
         ],
       },
@@ -132,7 +131,6 @@ export const modules = [
       },
       { id: 'archive', label: '档案管理', path: 'archive-management', tabs: [] },
       { id: 'manual', label: '系统说明书', path: 'system-manual', tabs: [] },
-      { id: 'sensor-manual', label: '探头型号说明书', path: 'sensor-manual', tabs: [] },
     ],
   },
   {
@@ -162,7 +160,6 @@ const sectionIconMap = {
   'device-management': iconDeviceManagement,
   archive: iconDocManagement,
   manual: iconSystemInstruction,
-  'sensor-manual': iconDetectorInstruction,
 }
 
 for (const module of modules) {

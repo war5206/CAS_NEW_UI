@@ -3,6 +3,7 @@ import DataOverviewFilterBar from '../components/DataOverviewFilterBar'
 import DataOverviewChart from '../components/DataOverviewChart'
 import upIcon from '../assets/icons/data-up.svg'
 import downIcon from '../assets/icons/data-down.svg'
+import { syncMonthRange } from '../utils/analysisFilterUtils'
 import './DataOverviewPage.css'
 
 const metrics = [
@@ -78,13 +79,17 @@ function DataOverviewPage() {
   const handleFilterChange = (nextRange) => {
     const filterKey = period === '日' ? 'day' : period === '月' ? 'month' : 'year'
 
-    setFilters((current) => ({
-      ...current,
-      [filterKey]: {
+    setFilters((current) => {
+      const mergedRange = {
         ...current[filterKey],
         ...nextRange,
-      },
-    }))
+      }
+
+      return {
+        ...current,
+        [filterKey]: filterKey === 'month' ? syncMonthRange(mergedRange, Object.keys(nextRange)[0]) : mergedRange,
+      }
+    })
   }
 
   const activeRange = period === '日' ? filters.day : period === '月' ? filters.month : filters.year

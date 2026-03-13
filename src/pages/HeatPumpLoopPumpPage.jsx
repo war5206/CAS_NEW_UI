@@ -14,42 +14,48 @@ function HeatPumpLoopPumpPage() {
     <main className="hp-loop-pump-page">
       <FeatureInfoCard
         icon={waterPumpIcon}
-        iconAlt={'水泵'}
-        title={'水泵间隔循环节能功能'}
-        description={'开启时，水泵按照间隔启/停的节能方式运行'}
+        iconAlt="水泵"
+        title="水泵间隔循环节能功能"
+        description="开启时，水泵按间隔启停的节能方式运行"
         selected={isIntervalSavingEnabled}
         onClick={() => setIsIntervalSavingEnabled((previous) => !previous)}
+        confirmConfig={({ nextSelected }) => ({
+          message: `确认${nextSelected ? '开启' : '关闭'}水泵间隔循环节能功能吗？`,
+        })}
       />
 
       <section className={`hp-loop-pump-page__rows${!isIntervalSavingEnabled ? ' is-disabled' : ''}`}>
-        <h3 className="hp-loop-pump-page__section-title">{'循环设置'}</h3>
+        <h3 className="hp-loop-pump-page__section-title">循环设置</h3>
         <div className="hp-loop-pump-page__row-list">
           <LabeledSelectRow
-            label={'循环泵间隔启动时间（分钟）'}
-            description={'节能功能开启后，所有机组停机后循环泵持续运行时间'}
+            label="循环泵间隔启动时间（分钟）"
+            description="节能功能开启后，所有机组停机后循环泵持续运行时间"
             value={startMinutes}
-            suffix={'分钟'}
+            suffix="分钟"
             onChange={setStartMinutes}
             disabled={!isIntervalSavingEnabled}
             useModeCardControl
+            confirmConfig={({ nextValue }) => ({ message: `确认将循环泵间隔启动时间设置为 ${nextValue} 分钟吗？` })}
           />
           <LabeledSelectRow
-            label={'循环泵间隔停止时间（分钟）'}
-            description={'节能功能开启后，循环泵持续停止时间'}
+            label="循环泵间隔停止时间（分钟）"
+            description="节能功能开启后，循环泵持续停止时间"
             value={stopMinutes}
-            suffix={'分钟'}
+            suffix="分钟"
             onChange={setStopMinutes}
             disabled={!isIntervalSavingEnabled}
             useModeCardControl
+            confirmConfig={({ nextValue }) => ({ message: `确认将循环泵间隔停止时间设置为 ${nextValue} 分钟吗？` })}
           />
           <LabeledSelectRow
-            label={'热泵循环轮值时间（天）'}
-            description={'循环泵主备相互切换的时间'}
+            label="热泵循环轮值时间（天）"
+            description="循环泵主备相互切换的时间"
             value={rotationDays}
-            suffix={'天'}
+            suffix="天"
             onChange={setRotationDays}
             disabled={!isIntervalSavingEnabled}
             useModeCardControl
+            confirmConfig={({ nextValue }) => ({ message: `确认将热泵循环轮值时间设置为 ${nextValue} 天吗？` })}
           />
         </div>
       </section>

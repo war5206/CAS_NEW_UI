@@ -13,6 +13,7 @@ import closeIcon from '../assets/icons/close.svg'
 import weatherCompensateDividerIcon from '../assets/weather-compensate-divider.svg'
 import weatherCompensateCurveIcon from '../assets/weather-compensate-curve.svg'
 import { useDeferredVisible } from '../hooks/useDeferredVisible'
+import { useActionConfirm } from '../hooks/useActionConfirm'
 import { getStoredClimateMode, setStoredClimateMode } from '../utils/climateModeState'
 import { getStoredTemperatureMode } from '../utils/temperatureModeState'
 import './ClimateCompensationPage.css'
@@ -79,7 +80,22 @@ function cloneAdvancedCurves(curves) {
   }))
 }
 
+function clampCurveValueWithNeighbors(values, index, nextValue, tempMin, tempMax) {
+  let safeNextValue = clampCurveTemp(nextValue, tempMin, tempMax)
+
+  if (index > 0) {
+    safeNextValue = Math.min(safeNextValue, values[index - 1])
+  }
+
+  if (index < values.length - 1) {
+    safeNextValue = Math.max(safeNextValue, values[index + 1])
+  }
+
+  return safeNextValue
+}
+
 function ClimateCompensationPage() {
+  const { requestConfirm, confirmModal } = useActionConfirm()
   const [selectedMode, setSelectedMode] = useState(() => getStoredClimateMode())
   const [regulateType, setRegulateType] = useState(REGULATION_OPTIONS[0].value)
   const [smartAdjustType, setSmartAdjustType] = useState(SMART_ADJUST_OPTIONS[0].value)
@@ -110,21 +126,27 @@ function ClimateCompensationPage() {
   const [draftAdvancedCurves, setDraftAdvancedCurves] = useState([])
   const [draftActiveAdvancedCurveId, setDraftActiveAdvancedCurveId] = useState(null)
   const [constantReturnTemp, setConstantReturnTemp] = useState('10')
+  const levelSliderStartRef = useRef(8)
+  const isLevelSliderDraggingRef = useRef(false)
+  const curveValuesRef = useRef([])
+  const curveDragStateRef = useRef({ active: false, index: -1, startValue: null })
   const chartRef = useRef(null)
   const shouldInitChart = useDeferredVisible(chartRef)
   const levelRatio = (levelValue - 1) / (levelLabels.length - 1)
   const isLevelSliderDisabled = regulateType === 'smart' && smartAdjustType === 'auto-calibration'
-  const isCurveDragDisabled = regulateType === 'custom' && smartAdjustType === 'auto-calibration'
   const curveTotalPages = Math.ceil(curveXAxisList.length / CURVE_PAGE_SIZE)
   const safeCurvePageIndex = Math.min(curvePageIndex, Math.max(0, curveTotalPages - 1))
   const curveStartIndex = safeCurvePageIndex * CURVE_PAGE_SIZE
+  const activeAdvancedCurve = advancedCurves.find((curve) => curve.id === activeAdvancedCurveId) ?? null
+  const effectiveCurveValues = advancedEnabled && activeAdvancedCurve ? activeAdvancedCurve.values : curveValues
+  const isCurveDragDisabled = regulateType === 'custom' && smartAdjustType === 'auto-calibration'
   const visibleCurveItems = curveXAxisList.slice(curveStartIndex, curveStartIndex + CURVE_PAGE_SIZE).map(
     (outdoorTemp, localIndex) => {
       const index = curveStartIndex + localIndex
       return {
         index,
         outdoorTemp,
-        value: curveValues[index],
+        value: effectiveCurveValues[index],
       }
     },
   )
@@ -144,8 +166,31 @@ function ClimateCompensationPage() {
   )
 
   const updateCurveValue = (index, nextValue) => {
+    if (advancedEnabled && activeAdvancedCurve) {
+      setAdvancedCurves((previous) =>
+        previous.map((curve) => {
+          if (curve.id !== activeAdvancedCurve.id) {
+            return curve
+          }
+
+          const safeNextValue = clampCurveValueWithNeighbors(curve.values, index, nextValue, curveTempMin, curveTempMax)
+          if (curve.values[index] === safeNextValue) {
+            return curve
+          }
+
+          const nextValues = [...curve.values]
+          nextValues[index] = safeNextValue
+          return {
+            ...curve,
+            values: nextValues,
+          }
+        }),
+      )
+      return
+    }
+
     setCurveValues((prev) => {
-      const safeNextValue = clampCurveTemp(nextValue, curveTempMin, curveTempMax)
+      const safeNextValue = clampCurveValueWithNeighbors(prev, index, nextValue, curveTempMin, curveTempMax)
       if (prev[index] === safeNextValue) {
         return prev
       }
@@ -174,6 +219,11 @@ function ClimateCompensationPage() {
 
     const dragArea = event.currentTarget
     const rect = dragArea.getBoundingClientRect()
+    curveDragStateRef.current = {
+      active: true,
+      index,
+      startValue: effectiveCurveValues[index],
+    }
     const updateByClientY = (clientY) => {
       updateCurveValue(index, resolveCurveValueByPointer(clientY, rect))
     }
@@ -196,6 +246,48 @@ function ClimateCompensationPage() {
       dragArea.removeEventListener('pointermove', handlePointerMove)
       dragArea.removeEventListener('pointerup', handlePointerEnd)
       dragArea.removeEventListener('pointercancel', handlePointerEnd)
+
+      const dragState = curveDragStateRef.current
+      curveDragStateRef.current = { active: false, index: -1, startValue: null }
+
+      if (!dragState.active || dragState.index !== index) {
+        return
+      }
+
+      const nextValue = advancedEnabled && activeAdvancedCurve ? activeAdvancedCurve.values[index] : curveValuesRef.current[index]
+      if (dragState.startValue === nextValue) {
+        return
+      }
+
+      requestConfirm(
+        { message: `确认将环境温度 ${curveXAxisList[index]}℃ 对应的目标温度设置为 ${nextValue}℃吗？` },
+        () => {},
+        () => {
+          if (advancedEnabled && activeAdvancedCurve) {
+            setAdvancedCurves((previous) =>
+              previous.map((curve) => {
+                if (curve.id !== activeAdvancedCurve.id) {
+                  return curve
+                }
+
+                const nextValues = [...curve.values]
+                nextValues[index] = dragState.startValue
+                return {
+                  ...curve,
+                  values: nextValues,
+                }
+              }),
+            )
+            return
+          }
+
+          setCurveValues((previous) => {
+            const next = [...previous]
+            next[index] = dragState.startValue
+            return next
+          })
+        },
+      )
     }
 
     dragArea.addEventListener('pointermove', handlePointerMove)
@@ -214,7 +306,7 @@ function ClimateCompensationPage() {
           return curve
         }
 
-        const safeNextValue = clampCurveTemp(nextValue, curveTempMin, curveTempMax)
+        const safeNextValue = clampCurveValueWithNeighbors(curve.values, index, nextValue, curveTempMin, curveTempMax)
         if (curve.values[index] === safeNextValue) {
           return curve
         }
@@ -314,20 +406,22 @@ function ClimateCompensationPage() {
     setAdvancedCurvePageIndex(0)
   }
 
-  const handleConfirmAdvancedCurve = () => {
+  const commitAdvancedCurve = () => {
     const nextCurves = cloneAdvancedCurves(draftAdvancedCurves)
     const fallbackActiveId = draftActiveAdvancedCurveId ?? nextCurves[0]?.id ?? null
-    const nextActiveCurve = nextCurves.find((curve) => curve.id === fallbackActiveId) ?? null
 
     setAdvancedEnabled(draftAdvancedEnabled)
     setAdvancedCurves(nextCurves)
     setActiveAdvancedCurveId(fallbackActiveId)
 
-    if (draftAdvancedEnabled && nextActiveCurve) {
-      setCurveValues([...nextActiveCurve.values])
-    }
-
     setIsAdvancedModalOpen(false)
+  }
+
+  const handleConfirmAdvancedCurve = () => {
+    requestConfirm(
+      { message: '确认应用当前高级调节设置吗？' },
+      commitAdvancedCurve,
+    )
   }
 
   useEffect(() => {
@@ -348,6 +442,35 @@ function ClimateCompensationPage() {
     window.addEventListener('keydown', handleEscape)
     return () => window.removeEventListener('keydown', handleEscape)
   }, [isAdvancedModalOpen])
+
+  useEffect(() => {
+    curveValuesRef.current = curveValues
+  }, [curveValues])
+
+  const handleLevelSliderPointerDown = () => {
+    isLevelSliderDraggingRef.current = true
+    levelSliderStartRef.current = levelValue
+  }
+
+  const handleLevelSliderPointerEnd = () => {
+    if (!isLevelSliderDraggingRef.current) {
+      return
+    }
+
+    isLevelSliderDraggingRef.current = false
+    const previousValue = levelSliderStartRef.current
+    const nextValue = levelValue
+
+    if (previousValue === nextValue) {
+      return
+    }
+
+    requestConfirm(
+      { message: `确认将温度档位设定为 ${nextValue} 档吗？` },
+      () => {},
+      () => setLevelValue(previousValue),
+    )
+  }
 
   useEffect(() => {
     if (selectedMode !== 'climate' || regulateType === 'custom' || !shouldInitChart || !chartRef.current) {
@@ -477,6 +600,7 @@ function ClimateCompensationPage() {
           selectedBadgePosition="start"
           onClick={() => setSelectedMode('climate')}
           className="climate-page__mode-card"
+          confirmConfig={selectedMode === 'climate' ? null : { message: '确认切换为气候补偿模式吗？' }}
         />
         <FeatureInfoCard
           icon={thermometerIcon}
@@ -485,6 +609,7 @@ function ClimateCompensationPage() {
           selected={selectedMode === 'constant'}
           onClick={() => setSelectedMode('constant')}
           className="climate-page__mode-card"
+          confirmConfig={selectedMode === 'constant' ? null : { message: '确认切换为定温模式吗？' }}
         />
       </section>
 
@@ -509,6 +634,10 @@ function ClimateCompensationPage() {
                 }))}
                 value={regulateType}
                 onChange={setRegulateType}
+                confirmConfig={({ nextValue }) => {
+                  const nextOption = REGULATION_OPTIONS.find((item) => item.value === nextValue)
+                  return nextOption ? { message: `确认切换为${nextOption.label}吗？` } : null
+                }}
                 showSelectedCheck
                 selectedCheckIcon={checkMarkIcon}
                 triggerAriaLabel="选择调节模式"
@@ -530,6 +659,10 @@ function ClimateCompensationPage() {
                   options={SMART_ADJUST_OPTIONS}
                   value={smartAdjustType}
                   onChange={setSmartAdjustType}
+                  confirmConfig={({ nextValue }) => {
+                    const nextOption = SMART_ADJUST_OPTIONS.find((item) => item.value === nextValue)
+                    return nextOption ? { message: `确认切换为${nextOption.label}吗？` } : null
+                  }}
                   showSelectedCheck
                   selectedCheckIcon={checkMarkIcon}
                   triggerAriaLabel="选择智能调节方式"
@@ -549,20 +682,26 @@ function ClimateCompensationPage() {
                   onToggle={() => setTerminalLinked((prev) => !prev)}
                   className="climate-page__terminal-switch"
                   ariaLabel={`末端联调${terminalLinked ? '关闭' : '开启'}`}
+                  confirmConfig={({ nextChecked }) => ({
+                    message: `确认${nextChecked ? '开启' : '关闭'}末端联调吗？`,
+                  })}
                 />
               </div>
             </div>
           </section>
 
-          <section className="climate-page__panel climate-page__panel--indoor-temp">
-            <LabeledSelectRow
-              label="室内温度设定"
-              value={indoorTempSetting}
-              onChange={setIndoorTempSetting}
-              suffix="℃"
-              className="climate-page__indoor-temp-setting"
-            />
-          </section>
+          {terminalLinked ? (
+            <section className="climate-page__panel climate-page__panel--indoor-temp">
+              <LabeledSelectRow
+                label="室内温度设定"
+                value={indoorTempSetting}
+                onChange={setIndoorTempSetting}
+                suffix="℃"
+                className="climate-page__indoor-temp-setting"
+                confirmConfig={({ nextValue }) => ({ message: `确认将室内温度设定为 ${nextValue} ℃吗？` })}
+              />
+            </section>
+          ) : null}
 
           {regulateType === 'custom' ? (
             <section className="climate-page__panel climate-page__panel--curve">
@@ -677,6 +816,9 @@ function ClimateCompensationPage() {
                       step={1}
                       value={levelValue}
                       onChange={(event) => setLevelValue(Number(event.target.value))}
+                      onPointerDown={handleLevelSliderPointerDown}
+                      onPointerUp={handleLevelSliderPointerEnd}
+                      onPointerCancel={handleLevelSliderPointerEnd}
                       className="climate-page__level-slider-input"
                       disabled={isLevelSliderDisabled}
                     />
@@ -711,6 +853,7 @@ function ClimateCompensationPage() {
             onChange={setConstantReturnTemp}
             suffix="℃"
             className="climate-page__constant-row"
+            confirmConfig={({ nextValue }) => ({ message: `确认将回水温度设定为 ${nextValue} ℃吗？` })}
           />
         </section>
       )}
@@ -874,6 +1017,7 @@ function ClimateCompensationPage() {
         </section>
       </div>
     ) : null}
+    {confirmModal}
     </>
   )
 }

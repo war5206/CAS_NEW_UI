@@ -1,18 +1,20 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+﻿import { useEffect, useMemo, useRef, useState } from 'react'
 import * as echarts from 'echarts'
 import SelectDropdown from '../components/SelectDropdown'
 import TimePickerModal from '../components/TimePickerModal'
 import backIcon from '../assets/layout/back.svg'
 import dateIcon from '../assets/icons/date.svg'
 import { HEAT_PUMP_GRID_ITEMS } from '../config/homeHeatPumps'
+import { useActionConfirm } from '../hooks/useActionConfirm'
 import { useDeferredVisible } from '../hooks/useDeferredVisible'
+import { deleteHistoryAlarm, processLiveAlarm, useAlertsStore } from './alertsStore'
 import './AlertsModulePage.css'
 
 const ALARM_NAME_OPTIONS = [
   { value: 'all', label: '全部' },
   { value: 'high-pressure-protection', label: '高压保护报警' },
   { value: 'low-pressure-protection', label: '低压保护报警' },
-  { value: 'compressor-overload', label: '压缩机过载保护' },
+  { value: 'compressor-overload', label: '压缩机过载保护报警' },
   { value: 'outlet-sensor', label: '出水温度传感器故障' },
   { value: 'pump-running', label: '循环泵运行故障' },
   { value: 'insufficient-flow', label: '流量不足报警' },
@@ -66,91 +68,6 @@ const ANALYSIS_SCOPE_LABEL_OPTIONS = [
   { value: 'heat-pump', label: '热泵' },
   { value: 'system', label: '系统' },
   { value: 'device', label: '设备' },
-]
-
-const SYSTEM_ALARM_ROWS = [
-  {
-    id: 'system-1',
-    deviceName: '空气源热泵 1',
-    alarmNameKey: 'high-pressure-protection',
-    alarmName: '高压保护报警',
-    level: '3',
-    levelText: '三级',
-    happenedAt: '2026-03-10 17:22:59',
-    heatingSeason: '2026-03-10',
-    suggestion: '检查冷凝器是否堵塞，并确认冷凝风机运行正常。',
-  },
-  {
-    id: 'system-2',
-    deviceName: '空气源热泵 2',
-    alarmNameKey: 'low-pressure-protection',
-    alarmName: '低压保护报警',
-    level: '3',
-    levelText: '三级',
-    happenedAt: '2026-03-10 16:48:12',
-    heatingSeason: '2026-03-10',
-    suggestion: '检查系统是否存在制冷剂泄漏，并确认蒸发器结霜情况。',
-  },
-  {
-    id: 'system-3',
-    deviceName: '空气源热泵 3',
-    alarmNameKey: 'compressor-overload',
-    alarmName: '压缩机过载保护',
-    level: '2',
-    levelText: '二级',
-    happenedAt: '2026-03-10 15:32:41',
-    heatingSeason: '2026-03-09',
-    suggestion: '检查压缩机电流、电压和回油情况。',
-  },
-  {
-    id: 'system-4',
-    deviceName: '空气源热泵 4',
-    alarmNameKey: 'outlet-sensor',
-    alarmName: '出水温度传感器故障',
-    level: '4',
-    levelText: '四级',
-    happenedAt: '2026-03-10 14:20:33',
-    heatingSeason: '2026-03-08',
-    suggestion: '检查传感器接线、信号及标定状态。',
-  },
-  {
-    id: 'system-5',
-    deviceName: '热泵循环泵3',
-    alarmNameKey: 'insufficient-flow',
-    alarmName: '流量不足报警',
-    level: '3',
-    levelText: '三级',
-    happenedAt: '2026-03-10 13:12:25',
-    heatingSeason: '2026-03-06',
-    suggestion: '检查过滤器、阀门开度和管路是否存在气堵。',
-  },
-]
-
-const HISTORY_ALARM_ROWS = [
-  {
-    id: 'history-1',
-    deviceName: '空气源热泵 5',
-    alarmNameKey: 'high-pressure-protection',
-    alarmName: '高压保护报警',
-    level: '2',
-    levelText: '二级',
-    happenedAt: '2026-03-08 09:41:12',
-    heatingSeason: '2026-03-08',
-    processedAt: '2026-03-08 10:05:02',
-    suggestion: '已清洗冷凝器并复位。',
-  },
-  {
-    id: 'history-2',
-    deviceName: '空气源热泵 6',
-    alarmNameKey: 'outlet-sensor',
-    alarmName: '出水温度传感器故障',
-    level: '4',
-    levelText: '四级',
-    happenedAt: '2026-03-06 18:12:40',
-    heatingSeason: '2026-03-06',
-    processedAt: '2026-03-06 18:40:11',
-    suggestion: '已更换传感器并校准。',
-  },
 ]
 
 const FAULT_TREE_ROWS = [
@@ -268,24 +185,104 @@ function clampToMax100(value) {
   return Math.min(100, Math.max(1, Math.round(value)))
 }
 
-function buildDayTrendData(dateValue) {
-  const seed = buildAnalysisSeed(dateValue)
-  return Array.from({ length: 12 }, (_, index) => clampToMax100(((seed + index * 7) % 28) + (index % 4) * 3 + 6))
+function getMonthDayCount(year, month) {
+  return new Date(year, month, 0).getDate()
+}
+
+function parseMonthParts(value) {
+  if (!value || !/^\d{4}-\d{2}$/.test(value)) {
+    return { year: 2026, month: 3 }
+  }
+
+  const [year, month] = value.split('-').map(Number)
+  return { year, month }
+}
+
+function compareMonthValue(left, right) {
+  const leftParts = parseMonthParts(left)
+  const rightParts = parseMonthParts(right)
+
+  if (leftParts.year !== rightParts.year) {
+    return leftParts.year - rightParts.year
+  }
+
+  return leftParts.month - rightParts.month
+}
+
+function enumerateMonthRange(startMonth, endMonth) {
+  if (compareMonthValue(startMonth, endMonth) > 0) {
+    return []
+  }
+
+  const { year: startYear, month: startMonthValue } = parseMonthParts(startMonth)
+  const { year: endYear, month: endMonthValue } = parseMonthParts(endMonth)
+  const months = []
+
+  let cursorYear = startYear
+  let cursorMonth = startMonthValue
+
+  while (cursorYear < endYear || (cursorYear === endYear && cursorMonth <= endMonthValue)) {
+    months.push(formatMonthValue(cursorYear, cursorMonth))
+    cursorMonth += 1
+
+    if (cursorMonth > 12) {
+      cursorMonth = 1
+      cursorYear += 1
+    }
+  }
+
+  return months
+}
+
+function formatMonthAxisLabel(value) {
+  if (!value) {
+    return ''
+  }
+
+  const [year, month] = value.split('-')
+  return `${year}.${month}`
+}
+
+function getCurrentDateInfo() {
+  const now = new Date()
+  return {
+    year: now.getFullYear(),
+    month: now.getMonth() + 1,
+    day: now.getDate(),
+  }
+}
+
+function buildDayTrendData(monthValue, currentDateInfo) {
+  const seed = buildAnalysisSeed(monthValue)
+  const { year, month } = parseMonthParts(monthValue)
+  const daysInMonth = getMonthDayCount(year, month)
+  const isCurrentMonth = currentDateInfo.year === year && currentDateInfo.month === month
+  const isFutureMonth =
+    year > currentDateInfo.year || (year === currentDateInfo.year && month > currentDateInfo.month)
+  const maxAvailableDay = isFutureMonth ? 0 : isCurrentMonth ? currentDateInfo.day - 1 : daysInMonth
+
+  return Array.from({ length: daysInMonth }, (_, index) =>
+    index + 1 <= maxAvailableDay ? clampToMax100(((seed + index * 7) % 28) + (index % 4) * 3 + 6) : null,
+  )
 }
 
 function buildMonthTrendData(startMonth, endMonth) {
+  const monthRange = enumerateMonthRange(startMonth, endMonth)
   const startSeed = buildAnalysisSeed(startMonth)
   const endSeed = buildAnalysisSeed(endMonth)
-  return Array.from({ length: 12 }, (_, index) =>
+  return monthRange.map((_, index) =>
     clampToMax100(((startSeed + endSeed + index * 11) % 40) + (index % 3) * 6 + 12),
   )
 }
 
+function buildPeriodSeed(period, query) {
+  return period === 'day'
+    ? buildAnalysisSeed(query.dayMonth)
+    : buildAnalysisSeed(`${query.monthStart}-${query.monthEnd}`)
+}
+
 function buildCategoryData(period, query) {
-  const seed =
-    period === 'day'
-      ? buildAnalysisSeed(`${query.dayStart}-${query.dayEnd}`)
-      : buildAnalysisSeed(`${query.monthStart}-${query.monthEnd}`)
+  const seed = buildPeriodSeed(period, query)
 
   return [
     { name: '高压类故障', value: clampToMax100((seed % 25) + 18) },
@@ -301,10 +298,7 @@ function buildScopedCategoryData(period, query, scope) {
     system: 11,
     device: 17,
   }
-  const baseSeed =
-    period === 'day'
-      ? buildAnalysisSeed(`${query.dayStart}-${query.dayEnd}`)
-      : buildAnalysisSeed(`${query.monthStart}-${query.monthEnd}`)
+  const baseSeed = buildPeriodSeed(period, query)
   const seed = baseSeed + (seedOffsetMap[scope] ?? 0)
 
   const configMap = {
@@ -328,17 +322,14 @@ function buildScopedPieData(period, query, scope, heatPumpFilter = 'all') {
     system: 9,
     device: 15,
   }
-  const baseSeed =
-    period === 'day'
-      ? buildAnalysisSeed(`${query.dayStart}-${query.dayEnd}`)
-      : buildAnalysisSeed(`${query.monthStart}-${query.monthEnd}`)
+  const baseSeed = buildPeriodSeed(period, query)
   const seed = baseSeed + (seedOffsetMap[scope] ?? 0)
 
   const configMap = {
     'heat-pump': [
       { name: '热泵 1 高压故障', color: '#1f99ea' },
       { name: '热泵 2 低压故障', color: '#6840f4' },
-      { name: '热泵 3 除霜异常', color: '#20c7a2' }
+      { name: '热泵 3 除霜异常', color: '#20c7a2' },
     ],
     system: [
       { name: '一次系统故障', color: '#1f99ea' },
@@ -346,7 +337,7 @@ function buildScopedPieData(period, query, scope, heatPumpFilter = 'all') {
       { name: '补水系统故障', color: '#ec9b14' },
     ],
     device: [
-      { name: '热泵循环泵2故障', color: '#6840f4' },
+      { name: '热泵循环泵故障', color: '#6840f4' },
       { name: '用户侧回水温感故障', color: '#20c7a2' },
       { name: '冷凝水管道温感故障', color: '#ec9b14' },
     ],
@@ -372,15 +363,25 @@ function buildScopedPieData(period, query, scope, heatPumpFilter = 'all') {
     value: clampToMax100(((seed + index * 9) % 18) + 10 + index * 4),
   }))
 }
-function buildSummary(period, query) {
+function buildSummary(period, query, currentDateInfo) {
   const trend =
     period === 'day'
-      ? buildDayTrendData(`${query.dayStart}-${query.dayEnd}`)
+      ? buildDayTrendData(query.dayMonth, currentDateInfo)
       : buildMonthTrendData(query.monthStart, query.monthEnd)
   const categories = buildCategoryData(period, query)
-  const total = clampToMax100(trend.reduce((sum, value) => sum + value, 0) / 6)
+  const numericTrend = trend.filter((value) => typeof value === 'number')
+  if (numericTrend.length === 0) {
+    return {
+      total: 0,
+      pending: 0,
+      hottestDevice: period === 'day' ? '空气源热泵2' : '热泵循环泵',
+      commonAlarm: categories.sort((a, b) => b.value - a.value)[0]?.name ?? '--',
+    }
+  }
+  const divisor = period === 'day' ? Math.max(1, numericTrend.length * 0.42) : Math.max(1, numericTrend.length * 0.6)
+  const total = clampToMax100(numericTrend.reduce((sum, value) => sum + value, 0) / divisor)
   const pending = clampToMax100(total * (period === 'day' ? 0.38 : 0.27))
-  const hottestDevice = period === 'day' ? '空气源热泵 2' : '热泵循环泵3'
+  const hottestDevice = period === 'day' ? '空气源热泵2' : '热泵循环泵'
   const commonAlarm = categories.sort((a, b) => b.value - a.value)[0]?.name ?? '--'
 
   return {
@@ -409,6 +410,7 @@ function DatePickerTrigger({
   className = '',
   placeholder = '请选择时间',
   title,
+  confirmConfig,
 }) {
   const [isOpen, setIsOpen] = useState(false)
   const isEmpty = !value
@@ -442,6 +444,7 @@ function DatePickerTrigger({
         columns={columns}
         value={pickerValue}
         onClose={() => setIsOpen(false)}
+        confirmConfig={confirmConfig}
         onConfirm={(nextValue) => {
           if (type === 'month') {
             const [year, month] = nextValue
@@ -633,7 +636,7 @@ function PieChart({ data }) {
       backgroundColor: 'transparent',
       tooltip: {
         trigger: 'item',
-        formatter: ({ name, value, percent }) => `${name}<br/>数量：${value}<br/>占比：${percent}%`,
+        formatter: ({ name, value, percent }) => name + '<br/>数量：' + value + '<br/>占比：' + percent + '%',
         backgroundColor: 'rgba(15, 22, 34, 0.95)',
         borderColor: 'rgba(88, 109, 142, 0.72)',
         textStyle: { color: '#eaf1ff' },
@@ -687,9 +690,9 @@ function PieChart({ data }) {
 }
 
 function SystemAlarmPage({ onDetailBreadcrumbChange }) {
+  const { requestConfirm, confirmModal } = useActionConfirm()
+  const { liveRows, historyRows } = useAlertsStore()
   const [isHistoryView, setIsHistoryView] = useState(false)
-  const [liveRows, setLiveRows] = useState(SYSTEM_ALARM_ROWS)
-  const [historyRows, setHistoryRows] = useState(HISTORY_ALARM_ROWS)
   const [detailRow, setDetailRow] = useState(null)
   const [liveFilters, setLiveFilters] = useState(() => buildAppliedFilters())
   const [historyFilters, setHistoryFilters] = useState(() => buildAppliedFilters())
@@ -724,15 +727,11 @@ function SystemAlarmPage({ onDetailBreadcrumbChange }) {
   )
 
   const handleProcess = (row) => {
-    setLiveRows((previous) => previous.filter((item) => item.id !== row.id))
-    setHistoryRows((previous) => [
-      {
-        ...row,
-        processedAt: formatDateTime(new Date()),
-        suggestion: `${row.suggestion} 已执行处理并归档到历史告警。`,
-      },
-      ...previous,
-    ])
+    processLiveAlarm({
+      ...row,
+      processedAt: formatDateTime(new Date()),
+      suggestion: row.suggestion + ' 已执行处理并归档到历史告警。',
+    })
   }
 
   return (
@@ -754,6 +753,7 @@ function SystemAlarmPage({ onDetailBreadcrumbChange }) {
                 options={ALARM_NAME_OPTIONS}
                 value={historyDraft.name}
                 onChange={(value) => setHistoryDraft((previous) => ({ ...previous, name: value }))}
+
                 triggerClassName="alerts-filter-field__trigger"
                 dropdownClassName="alerts-filter-field__dropdown"
                 optionClassName="alerts-filter-field__option"
@@ -765,6 +765,7 @@ function SystemAlarmPage({ onDetailBreadcrumbChange }) {
                 options={ALARM_LEVEL_OPTIONS}
                 value={historyDraft.level}
                 onChange={(value) => setHistoryDraft((previous) => ({ ...previous, level: value }))}
+
                 triggerClassName="alerts-filter-field__trigger"
                 dropdownClassName="alerts-filter-field__dropdown"
                 optionClassName="alerts-filter-field__option"
@@ -798,6 +799,8 @@ function SystemAlarmPage({ onDetailBreadcrumbChange }) {
                 setHistoryFilters(historyDraft)
                 setHistoryPage(1)
               }}
+
+
             >
               查询
             </button>
@@ -810,6 +813,7 @@ function SystemAlarmPage({ onDetailBreadcrumbChange }) {
               options={ALARM_NAME_OPTIONS}
               value={liveDraft.name}
               onChange={(value) => setLiveDraft((previous) => ({ ...previous, name: value }))}
+
               triggerClassName="alerts-filter-field__trigger"
               dropdownClassName="alerts-filter-field__dropdown"
               optionClassName="alerts-filter-field__option"
@@ -821,6 +825,7 @@ function SystemAlarmPage({ onDetailBreadcrumbChange }) {
               options={ALARM_LEVEL_OPTIONS}
               value={liveDraft.level}
               onChange={(value) => setLiveDraft((previous) => ({ ...previous, level: value }))}
+
               triggerClassName="alerts-filter-field__trigger"
               dropdownClassName="alerts-filter-field__dropdown"
               optionClassName="alerts-filter-field__option"
@@ -834,6 +839,8 @@ function SystemAlarmPage({ onDetailBreadcrumbChange }) {
               setLiveFilters(liveDraft)
               setLivePage(1)
             }}
+
+
           >
             查询
           </button>
@@ -874,12 +881,12 @@ function SystemAlarmPage({ onDetailBreadcrumbChange }) {
                         <button
                           type="button"
                           className="alerts-primary-btn is-mini is-danger"
-                          onClick={() => setHistoryRows((previous) => previous.filter((item) => item.id !== row.id))}
+                          onClick={() => requestConfirm({ message: '确认删除告警 ' + row.alarmName + ' 吗？' }, () => deleteHistoryAlarm(row.id))}
                         >
                           删除
                         </button>
                       ) : (
-                        <button type="button" className="alerts-primary-btn is-mini" onClick={() => handleProcess(row)}>
+                        <button type="button" className="alerts-primary-btn is-mini" onClick={() => requestConfirm({ message: '确认处理告警 ' + row.alarmName + ' 吗？' }, () => handleProcess(row))}>
                           处理
                         </button>
                       )}
@@ -926,6 +933,7 @@ function SystemAlarmPage({ onDetailBreadcrumbChange }) {
       </div>
 
       <DetailModal row={detailRow} onClose={() => setDetailRow(null)} />
+      {confirmModal}
     </div>
   )
 }
@@ -958,6 +966,7 @@ function FaultTreePage({ onDetailBreadcrumbChange }) {
             options={FAULT_CODE_OPTIONS}
             value={draftFilters.code}
             onChange={(value) => setDraftFilters((previous) => ({ ...previous, code: value }))}
+
             triggerClassName="alerts-filter-field__trigger"
             dropdownClassName="alerts-filter-field__dropdown"
             optionClassName="alerts-filter-field__option"
@@ -969,6 +978,7 @@ function FaultTreePage({ onDetailBreadcrumbChange }) {
             options={ALARM_LEVEL_OPTIONS}
             value={draftFilters.level}
             onChange={(value) => setDraftFilters((previous) => ({ ...previous, level: value }))}
+
             triggerClassName="alerts-filter-field__trigger"
             dropdownClassName="alerts-filter-field__dropdown"
             optionClassName="alerts-filter-field__option"
@@ -978,9 +988,11 @@ function FaultTreePage({ onDetailBreadcrumbChange }) {
         <button
           type="button"
           className="alerts-primary-btn"
-          onClick={() => {
-            setFilters(draftFilters)
-          }}
+          onClick={() => setFilters(draftFilters)}
+
+
+
+
         >
           查询
         </button>
@@ -1004,7 +1016,7 @@ function FaultTreePage({ onDetailBreadcrumbChange }) {
             ) : (
               filteredGroups.map((group) =>
                 group.reasons.map((reason, index) => (
-                  <tr key={`${group.code}-${index}`}>
+                  <tr key={group.code + '-' + index}>
                     {index === 0 ? <td rowSpan={group.reasons.length}>{group.code}</td> : null}
                     {index === 0 ? <td rowSpan={group.reasons.length}>{group.name}</td> : null}
                     {index === 0 ? <td rowSpan={group.reasons.length}>{group.levelText}</td> : null}
@@ -1035,25 +1047,26 @@ function FaultTreePage({ onDetailBreadcrumbChange }) {
         ]}
         onClose={() => setDetailRow(null)}
       />
+
     </div>
   )
 }
 
 function AlarmAnalysisPage({ onDetailBreadcrumbChange }) {
+  const { requestConfirm, confirmModal } = useActionConfirm()
   const [period, setPeriod] = useState('day')
   const [mode, setMode] = useState('trend')
   const [categoryScope, setCategoryScope] = useState('system')
   const [pieScope, setPieScope] = useState('device')
   const [selectedHeatPump, setSelectedHeatPump] = useState('all')
+  const [currentDateInfo, setCurrentDateInfo] = useState(() => getCurrentDateInfo())
   const [query, setQuery] = useState({
-    dayStart: '2026-03-10',
-    dayEnd: '2026-03-10',
+    dayMonth: '2026-03',
     monthStart: '2026-01',
     monthEnd: '2026-03',
   })
   const [draftQuery, setDraftQuery] = useState({
-    dayStart: '2026-03-10',
-    dayEnd: '2026-03-10',
+    dayMonth: '2026-03',
     monthStart: '2026-01',
     monthEnd: '2026-03',
   })
@@ -1063,19 +1076,32 @@ function AlarmAnalysisPage({ onDetailBreadcrumbChange }) {
     return () => onDetailBreadcrumbChange?.(null)
   }, [onDetailBreadcrumbChange])
 
+  useEffect(() => {
+    const timer = window.setInterval(() => setCurrentDateInfo(getCurrentDateInfo()), 60_000)
+    return () => window.clearInterval(timer)
+  }, [])
+
+  const dayXAxis = useMemo(() => {
+    const { year, month } = parseMonthParts(query.dayMonth)
+    const daysInMonth = getMonthDayCount(year, month)
+    return Array.from({ length: daysInMonth }, (_, index) => `${index + 1}号`)
+  }, [query.dayMonth])
+
+  const monthXAxis = useMemo(
+    () => enumerateMonthRange(query.monthStart, query.monthEnd).map((value) => formatMonthAxisLabel(value)),
+    [query.monthEnd, query.monthStart],
+  )
+
   const trendData = useMemo(
     () =>
       period === 'day'
-        ? buildDayTrendData(`${query.dayStart}-${query.dayEnd}`)
+        ? buildDayTrendData(query.dayMonth, currentDateInfo)
         : buildMonthTrendData(query.monthStart, query.monthEnd),
-    [period, query],
+    [currentDateInfo, period, query],
   )
   const trendXAxis = useMemo(
-    () =>
-      period === 'day'
-        ? ['00时', '01时', '02时',  '03时', '04时', '05时', '06时', '07时', '08时', '09时', '10时', '11时', '12时', '13时', '14时', '15时', '16时', '17时', '18时', '19时', '20时', '21时', '22时', '23时']
-        : ['1月', '2月', '3月', '4月', '5月', '6月', '7月', '8月', '9月', '10月', '11月', '12月'],
-    [period],
+    () => (period === 'day' ? dayXAxis : monthXAxis),
+    [dayXAxis, monthXAxis, period],
   )
   const categoryData = useMemo(() => buildScopedCategoryData(period, query, categoryScope), [categoryScope, period, query])
   const activeHeatPump = pieScope === 'heat-pump' ? selectedHeatPump : 'all'
@@ -1083,35 +1109,45 @@ function AlarmAnalysisPage({ onDetailBreadcrumbChange }) {
     () => buildScopedPieData(period, query, pieScope, activeHeatPump),
     [activeHeatPump, period, pieScope, query],
   )
-  const summary = useMemo(() => buildSummary(period, query), [period, query])
+  const summary = useMemo(() => buildSummary(period, query, currentDateInfo), [currentDateInfo, period, query])
+
+  const handleAnalysisQuery = () => {
+    if (period === 'month' && compareMonthValue(draftQuery.monthStart, draftQuery.monthEnd) > 0) {
+      requestConfirm(
+        {
+          title: '提示',
+          message: '结束时间必须大于等于开始时间。',
+          confirmText: '知道了',
+          showCancel: false,
+        },
+        undefined,
+      )
+      return
+    }
+
+    setQuery(draftQuery)
+  }
 
   return (
     <div className="alerts-analysis">
       <div className="alerts-analysis__toolbar">
         <div className="alerts-analysis__range-field">
-          <span className="alerts-analysis__range-label">时间范围</span>
+          <span className="alerts-analysis__range-label">{period === 'day' ? '年月' : '时间范围'}</span>
           <div className="alerts-analysis__range-group">
             {period === 'day' ? (
-              <>
-                <DatePickerTrigger
-                  value={draftQuery.dayStart}
-                  onChange={(value) => setDraftQuery((previous) => ({ ...previous, dayStart: value }))}
-                  className="alerts-analysis__date-btn"
-                  title="开始日期选择"
-                />
-                <span className="alerts-analysis__range-separator">-</span>
-                <DatePickerTrigger
-                  value={draftQuery.dayEnd}
-                  onChange={(value) => setDraftQuery((previous) => ({ ...previous, dayEnd: value }))}
-                  className="alerts-analysis__date-btn"
-                  title="结束日期选择"
-                />
-              </>
+              <DatePickerTrigger
+                value={draftQuery.dayMonth}
+                onChange={(value) => setDraftQuery((previous) => ({ ...previous, dayMonth: value }))}
+                type="month"
+                className="alerts-analysis__date-btn alerts-analysis__date-btn--single"
+                title="年月选择"
+              />
             ) : (
               <>
                 <DatePickerTrigger
                   value={draftQuery.monthStart}
                   onChange={(value) => setDraftQuery((previous) => ({ ...previous, monthStart: value }))}
+
                   type="month"
                   className="alerts-analysis__date-btn"
                   title="开始月份选择"
@@ -1120,6 +1156,7 @@ function AlarmAnalysisPage({ onDetailBreadcrumbChange }) {
                 <DatePickerTrigger
                   value={draftQuery.monthEnd}
                   onChange={(value) => setDraftQuery((previous) => ({ ...previous, monthEnd: value }))}
+
                   type="month"
                   className="alerts-analysis__date-btn"
                   placeholder="请选择月份"
@@ -1131,9 +1168,7 @@ function AlarmAnalysisPage({ onDetailBreadcrumbChange }) {
           <button
             type="button"
             className="alerts-primary-btn"
-            onClick={() => {
-              setQuery(draftQuery)
-            }}
+            onClick={handleAnalysisQuery}
           >
             查询
           </button>
@@ -1173,6 +1208,7 @@ function AlarmAnalysisPage({ onDetailBreadcrumbChange }) {
           options={ANALYSIS_TREND_OPTIONS}
           value={mode}
           onChange={setMode}
+
           className="alerts-analysis__mode-select"
           triggerClassName="alerts-analysis__mode-trigger"
           dropdownClassName="alerts-analysis__mode-dropdown"
@@ -1191,6 +1227,7 @@ function AlarmAnalysisPage({ onDetailBreadcrumbChange }) {
                 options={ANALYSIS_SCOPE_LABEL_OPTIONS}
                 value={categoryScope}
                 onChange={setCategoryScope}
+
                 className="alerts-analysis__card-select"
                 triggerClassName="alerts-analysis__card-trigger"
                 dropdownClassName="alerts-analysis__card-dropdown"
@@ -1216,6 +1253,7 @@ function AlarmAnalysisPage({ onDetailBreadcrumbChange }) {
                   options={ANALYSIS_SCOPE_LABEL_OPTIONS}
                   value={pieScope}
                   onChange={setPieScope}
+
                   className="alerts-analysis__card-select alerts-analysis__card-select--distribution"
                   triggerClassName="alerts-analysis__card-trigger alerts-analysis__card-trigger--distribution"
                   dropdownClassName="alerts-analysis__card-dropdown"
@@ -1227,6 +1265,7 @@ function AlarmAnalysisPage({ onDetailBreadcrumbChange }) {
                     options={HEAT_PUMP_FILTER_OPTIONS}
                     value={selectedHeatPump}
                     onChange={setSelectedHeatPump}
+
                     className="alerts-analysis__card-select alerts-analysis__card-select--distribution alerts-analysis__card-select--heat-pump"
                     triggerClassName="alerts-analysis__card-trigger alerts-analysis__card-trigger--distribution"
                     dropdownClassName="alerts-analysis__card-dropdown"
@@ -1250,6 +1289,8 @@ function AlarmAnalysisPage({ onDetailBreadcrumbChange }) {
           </div>
         </div>
       )}
+
+      {confirmModal}
     </div>
   )
 }
@@ -1270,3 +1311,4 @@ function AlertsModulePage({ sectionId, onDetailBreadcrumbChange }) {
 }
 
 export default AlertsModulePage
+

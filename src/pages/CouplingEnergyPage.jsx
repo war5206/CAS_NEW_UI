@@ -4,9 +4,7 @@ import couplingEnergyIcon from '../assets/icons/couple-energy.svg'
 import './CouplingEnergyPage.css'
 
 function CouplingEnergyIcon() {
-  return (
-    <img src={couplingEnergyIcon} alt="" aria-hidden="true" />
-  )
+  return <img src={couplingEnergyIcon} alt="" aria-hidden="true" />
 }
 
 function CouplingEnergyPage() {
@@ -21,6 +19,9 @@ function CouplingEnergyPage() {
         selected={isCouplingEnabled}
         onClick={() => setIsCouplingEnabled((previous) => !previous)}
         className="coupling-energy-page__card"
+        confirmConfig={({ nextSelected }) => ({
+          message: `确认${nextSelected ? '开启' : '关闭'}耦合能源吗？`,
+        })}
       />
     </main>
   )

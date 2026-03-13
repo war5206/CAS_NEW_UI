@@ -228,7 +228,7 @@
 .smart-timer-page__timeline-tick.is-middle {
   width: 0;
   transform: translateX(0);
-  height: 1em;
+  height: 16px;
   white-space: normal;
 }
 
@@ -296,13 +296,13 @@
   display: none;
 }
 
-@container (min-width: 8em) {
+@container (min-width: 128px) {
   .smart-timer-page__timeline-segment.is-constant > span {
     display: block;
   }
 }
 
-@container (min-width: 9.5em) {
+@container (min-width: 152px) {
   .smart-timer-page__timeline-segment.is-climate > span {
     display: block;
   }
@@ -730,7 +730,7 @@
   .smart-timer-page__period-temperature span,
   .smart-timer-page__add-cycle-btn,
   .smart-timer-page__editor-action {
-    font-size: 26px;
+    font-size: 22px;
   }
 }
 

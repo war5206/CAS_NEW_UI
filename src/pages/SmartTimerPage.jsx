@@ -5,6 +5,7 @@ import TimePickerModal from '../components/TimePickerModal'
 import NumericKeypadModal from '../components/NumericKeypadModal'
 import AttentionModal from '../components/AttentionModal'
 import ToggleSwitch from '../components/ToggleSwitch'
+import { useActionConfirm } from '../hooks/useActionConfirm'
 import intelligentTimeSettingIcon from '../assets/intelligent-time-setting.svg'
 import day24Icon from '../assets/24hour.svg'
 import editIcon from '../assets/edit.svg'
@@ -561,7 +562,7 @@ function resolveLowerTickMinuteKeys(ticks) {
   return lowerTickMinuteKeys
 }
 
-function SmartTimerPlanCard({ plan, onEdit, onToggle }) {
+function SmartTimerPlanCard({ plan, onEdit, onToggle, toggleConfirmConfig }) {
   return (
     <article className="smart-timer-page__plan-card">
       <header className="smart-timer-page__plan-head">
@@ -575,6 +576,7 @@ function SmartTimerPlanCard({ plan, onEdit, onToggle }) {
         <ToggleSwitch
           checked={plan.enabled}
           onToggle={onToggle}
+          confirmConfig={toggleConfirmConfig}
           className="smart-timer-page__plan-switch"
           ariaLabel={`${plan.name}${plan.enabled ? '关闭' : '开启'}`}
         />
@@ -662,6 +664,7 @@ function SmartTimerPlanCard({ plan, onEdit, onToggle }) {
 }
 
 function SmartTimerPage() {
+  const { requestConfirm, confirmModal } = useActionConfirm()
   const [pageMode, setPageMode] = useState('smart')
   const [plans, setPlans] = useState(() => {
     const seededPlans = INITIAL_PLANS.map((plan) => createPlan(plan))
@@ -1108,6 +1111,7 @@ function SmartTimerPage() {
             selected={pageMode === 'smart'}
             selectedBadgePosition="start"
             onClick={() => setPageMode('smart')}
+            confirmConfig={pageMode === 'smart' ? null : { message: '确认切换为智能定时模式吗？' }}
             className="smart-timer-page__mode-card"
           />
           <FeatureInfoCard
@@ -1116,6 +1120,7 @@ function SmartTimerPage() {
             description="7*24小时全天候运行"
             selected={pageMode === 'all-day'}
             onClick={() => setPageMode('all-day')}
+            confirmConfig={pageMode === 'all-day' ? null : { message: '确认切换为全天候模式吗？' }}
             className="smart-timer-page__mode-card"
           />
         </section>
@@ -1152,6 +1157,9 @@ function SmartTimerPage() {
                         ),
                       )
                     }
+                    toggleConfirmConfig={({ nextChecked }) => ({
+                      message: `确认${nextChecked ? '开启' : '关闭'}${plan.name}吗？`,
+                    })}
                   />
                 ))
               ) : (
@@ -1338,7 +1346,7 @@ function SmartTimerPage() {
                     取消
                   </button>
                 )}
-                <button type="button" className="smart-timer-page__editor-action is-confirm" onClick={handleConfirmEditor}>
+                <button type="button" className="smart-timer-page__editor-action is-confirm" onClick={() => requestConfirm({ message: '确认保存当前定时方案吗？', zIndex: 320 }, handleConfirmEditor)}>
                   确定
                 </button>
               </footer>
@@ -1387,6 +1395,7 @@ function SmartTimerPage() {
         onConfirm={closeAttentionModal}
         zIndex={300}
       />
+      {confirmModal}
     </>
   )
 }

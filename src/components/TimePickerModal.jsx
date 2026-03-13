@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useActionConfirm } from '../hooks/useActionConfirm'
 import './TimePickerModal.css'
 
 function sanitizeColumns(columns) {
@@ -48,6 +49,28 @@ function resolveInitialIndices(sanitizedColumns, value) {
   })
 }
 
+function resolveNestedConfirmConfig(config, modalZIndex) {
+  if (!config) {
+    return config
+  }
+
+  const elevatedZIndex = Number.isFinite(modalZIndex) ? modalZIndex + 20 : 520
+
+  if (typeof config === 'string') {
+    return {
+      message: config,
+      showBackdrop: false,
+      zIndex: elevatedZIndex,
+    }
+  }
+
+  return {
+    ...config,
+    showBackdrop: config.showBackdrop ?? false,
+    zIndex: config.zIndex ?? elevatedZIndex,
+  }
+}
+
 function TimePickerModal({
   isOpen = false,
   title = '时间选择器',
@@ -59,7 +82,9 @@ function TimePickerModal({
   zIndex,
   onClose,
   onConfirm,
+  confirmConfig,
 }) {
+  const { requestConfirm, confirmModal } = useActionConfirm()
   const sanitizedColumns = useMemo(() => sanitizeColumns(columns), [columns])
   const [draftIndices, setDraftIndices] = useState([])
   const columnRefs = useRef([])
@@ -106,7 +131,6 @@ function TimePickerModal({
       return
     }
     const nextIndices = resolveInitialIndices(sanitizedColumns, value)
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     setDraftIndices(nextIndices)
     requestAnimationFrame(() => {
       nextIndices.forEach((index, columnIndex) => {
@@ -274,6 +298,21 @@ function TimePickerModal({
       const optionIndex = clampIndex(rawIndex, column.options.length)
       return column.options[optionIndex]
     })
+    const rawConfirmConfig =
+      typeof confirmConfig === 'function'
+        ? confirmConfig({
+            currentValue: value,
+            nextValue,
+            title,
+          })
+        : confirmConfig
+    const resolvedConfirmConfig = resolveNestedConfirmConfig(rawConfirmConfig, zIndex)
+
+    if (resolvedConfirmConfig) {
+      requestConfirm(resolvedConfirmConfig, () => onConfirm?.(nextValue))
+      return
+    }
+
     onConfirm?.(nextValue)
   }
 
@@ -287,76 +326,79 @@ function TimePickerModal({
   const backdropStyle = Number.isFinite(zIndex) ? { zIndex } : undefined
 
   return (
-    <div className={backdropClassName} style={backdropStyle} role="presentation" onClick={onClose}>
-      <section
-        className="time-picker-modal"
-        role="dialog"
-        aria-modal="true"
-        aria-label={title}
-        onClick={(event) => event.stopPropagation()}
-      >
-        <header className="time-picker-modal__header">
-          <h3 className="time-picker-modal__title">{title}</h3>
-        </header>
+    <>
+      <div className={backdropClassName} style={backdropStyle} role="presentation" onClick={onClose}>
+        <section
+          className="time-picker-modal"
+          role="dialog"
+          aria-modal="true"
+          aria-label={title}
+          onClick={(event) => event.stopPropagation()}
+        >
+          <header className="time-picker-modal__header">
+            <h3 className="time-picker-modal__title">{title}</h3>
+          </header>
 
-        <div className="time-picker-modal__body">
-          <div className="time-picker-modal__highlight" aria-hidden="true" />
-          <div
-            className="time-picker-modal__columns"
-            data-columns={sanitizedColumns.length}
-            style={{ gridTemplateColumns: `repeat(${sanitizedColumns.length}, minmax(0, 1fr))` }}
-          >
-            {sanitizedColumns.map((column, columnIndex) => {
-              const selectedIndex = clampIndex(draftIndices[columnIndex] ?? 0, column.options.length)
+          <div className="time-picker-modal__body">
+            <div className="time-picker-modal__highlight" aria-hidden="true" />
+            <div
+              className="time-picker-modal__columns"
+              data-columns={sanitizedColumns.length}
+              style={{ gridTemplateColumns: `repeat(${sanitizedColumns.length}, minmax(0, 1fr))` }}
+            >
+              {sanitizedColumns.map((column, columnIndex) => {
+                const selectedIndex = clampIndex(draftIndices[columnIndex] ?? 0, column.options.length)
 
-              return (
-                <div
-                  key={column.key}
-                  className="time-picker-modal__column"
-                  ref={(element) => {
-                    columnRefs.current[columnIndex] = element
-                  }}
-                  onScroll={() => handleColumnScroll(columnIndex)}
-                  onPointerDown={(event) => handlePointerDown(columnIndex, event)}
-                  onPointerMove={(event) => handlePointerMove(columnIndex, event)}
-                  onPointerUp={(event) => endPointerDrag(columnIndex, event)}
-                  onPointerCancel={(event) => endPointerDrag(columnIndex, event)}
-                  onLostPointerCapture={() => endPointerDrag(columnIndex)}
-                >
-                  {column.options.map((optionValue, optionIndex) => {
-                    const isSelected = optionIndex === selectedIndex
-                    const itemClassName = ['time-picker-modal__option', isSelected ? 'is-selected' : '']
-                      .filter(Boolean)
-                      .join(' ')
+                return (
+                  <div
+                    key={column.key}
+                    className="time-picker-modal__column"
+                    ref={(element) => {
+                      columnRefs.current[columnIndex] = element
+                    }}
+                    onScroll={() => handleColumnScroll(columnIndex)}
+                    onPointerDown={(event) => handlePointerDown(columnIndex, event)}
+                    onPointerMove={(event) => handlePointerMove(columnIndex, event)}
+                    onPointerUp={(event) => endPointerDrag(columnIndex, event)}
+                    onPointerCancel={(event) => endPointerDrag(columnIndex, event)}
+                    onLostPointerCapture={() => endPointerDrag(columnIndex)}
+                  >
+                    {column.options.map((optionValue, optionIndex) => {
+                      const isSelected = optionIndex === selectedIndex
+                      const itemClassName = ['time-picker-modal__option', isSelected ? 'is-selected' : '']
+                        .filter(Boolean)
+                        .join(' ')
 
-                    return (
-                      <button
-                        key={`${column.key}-${optionIndex}`}
-                        type="button"
-                        className={itemClassName}
-                        onClick={() => handleOptionSelect(columnIndex, optionIndex)}
-                        data-option-index={optionIndex}
-                      >
-                        {column.formatter(optionValue, optionIndex)}
-                      </button>
-                    )
-                  })}
-                </div>
-              )
-            })}
+                      return (
+                        <button
+                          key={`${column.key}-${optionIndex}`}
+                          type="button"
+                          className={itemClassName}
+                          onClick={() => handleOptionSelect(columnIndex, optionIndex)}
+                          data-option-index={optionIndex}
+                        >
+                          {column.formatter(optionValue, optionIndex)}
+                        </button>
+                      )
+                    })}
+                  </div>
+                )
+              })}
+            </div>
           </div>
-        </div>
 
-        <div className="time-picker-modal__actions">
-          <button type="button" className="time-picker-modal__action is-cancel" onClick={onClose}>
-            {cancelText}
-          </button>
-          <button type="button" className="time-picker-modal__action is-confirm" onClick={handleConfirm}>
-            {confirmText}
-          </button>
-        </div>
-      </section>
-    </div>
+          <div className="time-picker-modal__actions">
+            <button type="button" className="time-picker-modal__action is-cancel" onClick={onClose}>
+              {cancelText}
+            </button>
+            <button type="button" className="time-picker-modal__action is-confirm" onClick={handleConfirm}>
+              {confirmText}
+            </button>
+          </div>
+        </section>
+      </div>
+      {confirmModal}
+    </>
   )
 }
 

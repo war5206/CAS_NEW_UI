@@ -36,7 +36,7 @@
 }
 
 .ops-system-page__select-trigger {
-  background: #202734;
+  background: #22262D;
 }
 
 .ops-system-page__select-menu {
@@ -44,7 +44,7 @@
 }
 
 .ops-system-page__select-option.is-selected {
-  background: rgba(25, 140, 255, 0.16);
+  background: rgba(49, 55, 67, 0.92);
   color: #ffffff;
 }
 
@@ -141,8 +141,9 @@
   color: #ffffff;
   font-size: 28px;
   font-weight: 500;
-  line-height: 1;
+  line-height: 1.2;
   text-align: center;
+  word-break: break-word;
 }
 
 .ops-device-table {
@@ -216,15 +217,52 @@
   color: transparent;
 }
 
+.ops-device-pagination {
+  margin-top: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 14px;
+}
+
+.ops-device-pagination__button {
+  min-width: 110px;
+  height: 42px;
+  border: 1px solid rgba(110, 133, 171, 0.45);
+  border-radius: 12px;
+  background: #22262d;
+  color: #ffffff;
+  font-size: 18px;
+  cursor: pointer;
+  transition: background-color 0.2s ease, border-color 0.2s ease, opacity 0.2s ease;
+}
+
+.ops-device-pagination__button:hover:not(:disabled) {
+  background: #2a3140;
+  border-color: rgba(110, 133, 171, 0.7);
+}
+
+.ops-device-pagination__button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.ops-device-pagination__info {
+  min-width: 112px;
+  color: rgba(244, 248, 255, 0.92);
+  font-size: 18px;
+  text-align: center;
+}
+
 .ops-trend-modal__backdrop {
   position: fixed;
   inset: 0;
-  z-index: 120;
-  background: rgba(0, 0, 0, 0.6);
+  z-index: 240;
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 28px;
+  padding: 24px;
+  background: rgba(6, 10, 18, 0.74);
 }
 
 .ops-trend-modal {
@@ -339,19 +377,34 @@
 
 .ops-trend-modal__chart {
   position: relative;
+  height: 430px;
+  overflow: visible;
+}
+
+.ops-trend-modal__echart {
+  width: 100%;
+  height: 100%;
+}
+
+.ops-trend-modal__chart .ops-trend-modal__grid,
+.ops-trend-modal__chart .ops-trend-modal__svg,
+.ops-trend-modal__chart .ops-trend-modal__xaxis {
+  display: none;
 }
 
 .ops-trend-modal__grid {
   display: grid;
   gap: 0;
+  height: 364px;
+  grid-template-rows: repeat(var(--ops-grid-rows, 6), minmax(0, 1fr));
 }
 
 .ops-trend-modal__grid-row {
-  height: 81px;
   display: grid;
   grid-template-columns: 58px 1fr;
   align-items: center;
   gap: 6px;
+  min-height: 0;
 }
 
 .ops-trend-modal__grid-row span {
@@ -369,7 +422,9 @@
   inset: 0 0 66px 64px;
   width: calc(100% - 64px);
   height: calc(100% - 66px);
-  pointer-events: none;
+  overflow: visible;
+  pointer-events: auto;
+  cursor: crosshair;
 }
 
 .ops-trend-modal__xaxis {

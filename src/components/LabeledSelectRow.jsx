@@ -49,6 +49,7 @@ function LabeledSelectRow({
   useModeCardControl = false,
   popupType = 'keyboard',
   className = '',
+  confirmConfig,
 }) {
   const [isModalOpen, setIsModalOpen] = useState(false)
   const currentValue = sanitizeText(value)
@@ -127,6 +128,7 @@ function LabeledSelectRow({
           ]}
           value={parseTimeValue(currentValue)}
           onClose={closeKeyboard}
+          confirmConfig={confirmConfig}
           onConfirm={(nextValue) => {
             const [hour = 0, minute = 0] = Array.isArray(nextValue) ? nextValue : []
             handleConfirm(`${formatTwoDigits(hour)}:${formatTwoDigits(minute)}`)
@@ -138,6 +140,7 @@ function LabeledSelectRow({
           initialValue={currentValue}
           title={resolveKeypadTitle(label)}
           onClose={closeKeyboard}
+          confirmConfig={confirmConfig}
           onConfirm={handleConfirm}
         />
       )}

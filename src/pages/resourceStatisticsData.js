@@ -1,3 +1,11 @@
+import {
+  enumerateMonthRange,
+  formatMonthAxisLabel,
+  getCurrentDateInfo,
+  getMaxAvailableDay,
+  getMonthDayCount,
+} from '../utils/analysisFilterUtils'
+
 const COMPARE_FACTORS = {
   none: 1,
   mom: 0.94,
@@ -132,78 +140,40 @@ function scaleNumber(value, factor) {
   return Number((value * factor).toFixed(2))
 }
 
-function getMonthDays(monthValue) {
-  const [year, month] = (monthValue || '2025-03').split('-').map(Number)
-  return new Date(year, month, 0).getDate()
-}
-
-function buildMonthRange(startMonthValue, endMonthValue) {
-  const startValue = startMonthValue || endMonthValue || '2025-01'
-  const endValue = endMonthValue || startMonthValue || startValue
-  let [startYear, startMonth] = startValue.split('-').map(Number)
-  let [endYear, endMonth] = endValue.split('-').map(Number)
-
-  if (startYear > endYear || (startYear === endYear && startMonth > endMonth)) {
-    ;[startYear, endYear] = [endYear, startYear]
-    ;[startMonth, endMonth] = [endMonth, startMonth]
-  }
-
-  const months = []
-  let year = startYear
-  let month = startMonth
-
-  while (year < endYear || (year === endYear && month <= endMonth)) {
-    months.push({
-      value: `${year}-${String(month).padStart(2, '0')}`,
-      label: String(month).padStart(2, '0'),
-      monthIndex: month - 1,
-    })
-
-    month += 1
-    if (month > 12) {
-      month = 1
-      year += 1
-    }
-
-    if (months.length >= 24) {
-      break
-    }
-  }
-
-  return months.length > 0
-    ? months
-    : [{ value: startValue, label: String(startMonth).padStart(2, '0'), monthIndex: startMonth - 1 }]
-}
-
 function formatValue(value) {
   return Number.isInteger(value) ? String(value) : value.toFixed(2)
 }
 
 function buildDayChart(config, range, factor) {
   const monthValue = range.month || '2025-03'
-  const days = getMonthDays(monthValue)
-  const labels = Array.from({ length: days }, (_, index) => String(index + 1).padStart(2, '0'))
+  const days = getMonthDayCount(monthValue)
+  const maxAvailableDay = getMaxAvailableDay(monthValue, getCurrentDateInfo())
+  const labels = Array.from({ length: days }, (_, index) => `${index + 1}号`)
 
   return {
     labels,
-    tooltipLabels: labels.map((label) => `${monthValue}-${label}`),
+    tooltipLabels: Array.from({ length: days }, (_, index) => `${monthValue}-${String(index + 1).padStart(2, '0')}`),
     xAxisName: '日',
     yAxisMax: config.yAxisMaxDayMonth,
     yAxisInterval: config.yAxisIntervalDayMonth,
     series: [
       {
         name: config.legendName,
-        data: DAY_BASE_VALUES.slice(0, days).map((value) => scaleNumber(value * config.valueScale, factor)),
+        data: Array.from({ length: days }, (_, index) =>
+          index + 1 <= maxAvailableDay
+            ? scaleNumber(DAY_BASE_VALUES[index % DAY_BASE_VALUES.length] * config.valueScale, factor)
+            : null,
+        ),
       },
     ],
   }
 }
 
 function buildMonthChart(config, range, factor) {
-  const monthRange = buildMonthRange(range.startMonth, range.endMonth)
+  const monthRange = enumerateMonthRange(range.startMonth, range.endMonth)
 
   return {
-    labels: monthRange.map((item) => item.label),
+    labels: monthRange.map((item) => formatMonthAxisLabel(item.value)),
     tooltipLabels: monthRange.map((item) => item.value),
     xAxisName: '月',
     yAxisMax: config.yAxisMaxDayMonth,
@@ -212,7 +182,7 @@ function buildMonthChart(config, range, factor) {
       {
         name: config.legendName,
         data: monthRange.map((item) =>
-          scaleNumber((MONTH_BASE_VALUES[item.monthIndex] / 4) * Math.max(config.valueScale, 0.85), factor)
+          scaleNumber((MONTH_BASE_VALUES[item.month - 1] / 4) * Math.max(config.valueScale, 0.85), factor)
         ),
       },
     ],

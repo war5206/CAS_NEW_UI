@@ -1,5 +1,6 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import NumericKeypadModal from './NumericKeypadModal'
+import { useActionConfirm } from '../hooks/useActionConfirm'
 import './SliderSettingRow.css'
 
 function toNumber(value, fallback) {
@@ -29,28 +30,93 @@ function SliderSettingRow({
   keypadTitle = '输入',
   className = '',
   showInput = true,
+  confirmConfig,
 }) {
+  const { requestConfirm, confirmModal } = useActionConfirm()
   const [isModalOpen, setIsModalOpen] = useState(false)
   const safeValue = normalizeValue(value, min, max, step)
+  const [draftSliderValue, setDraftSliderValue] = useState(safeValue)
+  const isSliderDraggingRef = useRef(false)
+  const sliderStartValueRef = useRef(safeValue)
+
+  useEffect(() => {
+    setDraftSliderValue(safeValue)
+  }, [safeValue])
+
   const ratio = useMemo(() => {
     if (max <= min) {
       return 0
     }
-    return (safeValue - min) / (max - min)
-  }, [max, min, safeValue])
+    return (draftSliderValue - min) / (max - min)
+  }, [draftSliderValue, max, min])
 
   const rowClassName = ['slider-setting-row', className].filter(Boolean).join(' ')
-  const textValue = String(safeValue).padStart(2, '0')
+  const textValue = String(draftSliderValue).padStart(2, '0')
   const suffixText = suffix == null ? '' : String(suffix).trim()
   const rangeText = suffixText ? `${min}${suffixText}-${max}${suffixText}` : `${min}-${max}`
 
   const emitChange = (nextValue) => {
     const normalized = normalizeValue(nextValue, min, max, step)
-    onChange?.(String(normalized))
+    const nextTextValue = String(normalized)
+    setDraftSliderValue(normalized)
+    onChange?.(nextTextValue)
   }
 
   const stopPointerEvent = (event) => {
     event.stopPropagation()
+  }
+
+  const handleSliderPointerDown = (event) => {
+    stopPointerEvent(event)
+    isSliderDraggingRef.current = true
+    sliderStartValueRef.current = safeValue
+  }
+
+  const handleSliderChange = (event) => {
+    setDraftSliderValue(normalizeValue(event.target.value, min, max, step))
+  }
+
+  const handleSliderPointerEnd = (event) => {
+    stopPointerEvent(event)
+
+    if (!isSliderDraggingRef.current) {
+      return
+    }
+
+    isSliderDraggingRef.current = false
+    const previousValue = normalizeValue(sliderStartValueRef.current, min, max, step)
+    const nextValue = normalizeValue(draftSliderValue, min, max, step)
+
+    if (previousValue === nextValue) {
+      setDraftSliderValue(nextValue)
+      return
+    }
+
+    const previousTextValue = String(previousValue)
+    const nextTextValue = String(nextValue)
+    const resolvedConfirmConfig =
+      typeof confirmConfig === 'function'
+        ? confirmConfig({
+            currentValue: previousTextValue,
+            nextValue: nextTextValue,
+            label,
+          })
+        : confirmConfig
+
+    if (resolvedConfirmConfig) {
+      requestConfirm(
+        resolvedConfirmConfig,
+        () => {
+          onChange?.(nextTextValue)
+        },
+        () => {
+          setDraftSliderValue(previousValue)
+        },
+      )
+      return
+    }
+
+    onChange?.(nextTextValue)
   }
 
   return (
@@ -80,12 +146,12 @@ function SliderSettingRow({
               min={min}
               max={max}
               step={step}
-              value={safeValue}
-              onPointerDown={stopPointerEvent}
+              value={draftSliderValue}
+              onPointerDown={handleSliderPointerDown}
               onPointerMove={stopPointerEvent}
-              onPointerUp={stopPointerEvent}
-              onPointerCancel={stopPointerEvent}
-              onChange={(event) => emitChange(event.target.value)}
+              onPointerUp={handleSliderPointerEnd}
+              onPointerCancel={handleSliderPointerEnd}
+              onChange={handleSliderChange}
             />
           </div>
           <div className="slider-setting-row__range-text">{`（${rangeText}）`}</div>
@@ -98,12 +164,14 @@ function SliderSettingRow({
           title={keypadTitle}
           initialValue={String(safeValue)}
           onClose={() => setIsModalOpen(false)}
+          confirmConfig={confirmConfig}
           onConfirm={(nextValue) => {
             emitChange(nextValue)
             setIsModalOpen(false)
           }}
         />
       ) : null}
+      {confirmModal}
     </>
   )
 }

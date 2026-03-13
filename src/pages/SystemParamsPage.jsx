@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import SelectDropdown from '../components/SelectDropdown'
 import NumericKeypadModal from '../components/NumericKeypadModal'
 import TimePickerModal from '../components/TimePickerModal'
@@ -360,6 +361,7 @@ function SystemParamsPage({
   const unitLayoutLockedRef = useRef(unitLayoutLocked)
   const movePumpToSlotRef = useRef(null)
   const dragStartPointRef = useRef({ x: 0, y: 0 })
+  const dragPreviewOffsetRef = useRef({ x: 52, y: 50 })
   const didManualDragMoveRef = useRef(false)
   const suppressNextClickRef = useRef(false)
   const previousActiveViewRef = useRef(activeView)
@@ -432,6 +434,15 @@ function SystemParamsPage({
   }, [])
 
   useEffect(() => {
+    const getPreviewPosition = (clientX, clientY) => {
+      const offset = dragPreviewOffsetRef.current
+
+      return {
+        x: clientX - offset.x,
+        y: clientY - offset.y,
+      }
+    }
+
     const dropByClientPoint = (clientX, clientY, source) => {
       const dragId = draggingPumpIdRef.current
       if (!dragId || unitLayoutLockedRef.current || !manualDraggingPumpIdRef.current) {
@@ -459,7 +470,11 @@ function SystemParamsPage({
       draggingPumpIdRef.current = null
       setManualDraggingPumpId(null)
       setManualDraggingSource(null)
-      clearPendingLongPressTimer()
+      dragPreviewOffsetRef.current = { x: 52, y: 50 }
+      if (pendingLongPressTimerRef.current) {
+        clearTimeout(pendingLongPressTimerRef.current)
+        pendingLongPressTimerRef.current = null
+      }
     }
 
     const handleGlobalMouseMove = (event) => {
@@ -473,7 +488,7 @@ function SystemParamsPage({
           didManualDragMoveRef.current = true
         }
       }
-      setManualDragPointer({ x: event.clientX, y: event.clientY })
+      setManualDragPointer(getPreviewPosition(event.clientX, event.clientY))
     }
 
     const handleGlobalTouchMove = (event) => {
@@ -492,7 +507,7 @@ function SystemParamsPage({
         }
       }
       event.preventDefault()
-      setManualDragPointer({ x: point.clientX, y: point.clientY })
+      setManualDragPointer(getPreviewPosition(point.clientX, point.clientY))
     }
 
     const handleGlobalMouseUp = (event) => {
@@ -947,7 +962,20 @@ function SystemParamsPage({
     setManualDraggingSource(source)
     const pointer = event?.touches?.[0] ?? event
     if (pointer?.clientX != null && pointer?.clientY != null) {
-      setManualDragPointer({ x: pointer.clientX, y: pointer.clientY })
+      const targetElement = event?.currentTarget
+      if (targetElement instanceof HTMLElement) {
+        const rect = targetElement.getBoundingClientRect()
+        dragPreviewOffsetRef.current = {
+          x: pointer.clientX - rect.left,
+          y: pointer.clientY - rect.top,
+        }
+      } else {
+        dragPreviewOffsetRef.current = { x: 52, y: 50 }
+      }
+      setManualDragPointer({
+        x: pointer.clientX - dragPreviewOffsetRef.current.x,
+        y: pointer.clientY - dragPreviewOffsetRef.current.y,
+      })
       dragStartPointRef.current = { x: pointer.clientX, y: pointer.clientY }
     }
     didManualDragMoveRef.current = false
@@ -1776,15 +1804,22 @@ function SystemParamsPage({
         onConfirm={handleDateConfirm}
       />
 
-      {manualDraggingPumpId ? (
-        <div
-          className={`unit-layout-drag-preview${longPressedPendingIds[manualDraggingPumpId] ? ' is-long-press' : ''}`}
-          style={{ left: manualDragPointer.x, top: manualDragPointer.y }}
-        >
-          <span>{toNoLabel(manualDraggingPumpId)}</span>
-          <img src={longPressedPendingIds[manualDraggingPumpId] ? hpRunningIcon : hpNullIcon} alt="" aria-hidden="true" />
-        </div>
-      ) : null}
+      {manualDraggingPumpId && typeof document !== 'undefined'
+        ? createPortal(
+            <div
+              className={`unit-layout-drag-preview${longPressedPendingIds[manualDraggingPumpId] ? ' is-long-press' : ''}`}
+              style={{ left: manualDragPointer.x, top: manualDragPointer.y }}
+            >
+              <span>{toNoLabel(manualDraggingPumpId)}</span>
+              <img
+                src={longPressedPendingIds[manualDraggingPumpId] ? hpRunningIcon : hpNullIcon}
+                alt=""
+                aria-hidden="true"
+              />
+            </div>,
+            document.body,
+          )
+        : null}
 
       <AttentionModal
         isOpen={confirmDialog.open}

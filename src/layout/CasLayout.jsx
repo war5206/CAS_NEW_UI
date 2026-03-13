@@ -1,10 +1,13 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Link, NavLink } from 'react-router-dom'
+import { Link, NavLink, useNavigate } from 'react-router-dom'
+import AttentionModal from '../components/AttentionModal'
 import casLogo from '../assets/brand/cas-logo.png'
 import userAvatar from '../assets/layout/user_avatar.svg'
 import iconPower from '../assets/layout/boot.svg'
 import iconHasAlert from '../assets/layout/hasAlert.svg'
+import iconNoAlert from '../assets/layout/no-alert.svg'
 import { buildTabPath, getModuleDefaultPath, getSectionDefaultPath, modules } from '../config/navigation'
+import { ignoreAllAlerts, useAlertsStore } from '../pages/alertsStore'
 
 const WEEK_LABELS = ['周日', '周一', '周二', '周三', '周四', '周五', '周六']
 
@@ -30,11 +33,18 @@ function CasLayout({
   hideModuleTabs = false,
   extraBreadcrumbLabel = null,
 }) {
+  const navigate = useNavigate()
   const [now, setNow] = useState(() => new Date())
+  const [isAlertModalOpen, setIsAlertModalOpen] = useState(false)
+  const [pendingPrimaryNavTarget, setPendingPrimaryNavTarget] = useState(null)
+  const [isSystemPoweredOn, setIsSystemPoweredOn] = useState(true)
+  const [pendingPowerAction, setPendingPowerAction] = useState(null)
   const activeModule = routeInfo.module
   const activeSection = routeInfo.section
   const activeTab = routeInfo.tab
   const isHomeLayout = activeModule.id === 'home'
+  const isMonitorLayout = activeModule.id === 'monitor'
+  const { liveRows: activeAlerts, ignored: isAlertIgnored } = useAlertsStore()
 
   useEffect(() => {
     const updateTime = () => setNow(new Date())
@@ -61,11 +71,20 @@ function CasLayout({
   const tabList = activeSection?.tabs ?? []
   const showSecondaryNav = !hideSecondaryNav && (sectionList.length > 0 || !isHomeLayout)
   const hasTabs = !hideModuleTabs && tabList.length > 0
+  const hasActiveAlerts = activeAlerts.length > 0 && !isAlertIgnored
+  const alertIcon = hasActiveAlerts ? iconHasAlert : iconNoAlert
+  const alertIconClassName = hasActiveAlerts ? 'is-has-alert' : 'is-no-alert'
   const { dateLabel, timeLabel } = formatDateTime(now)
+
   const alertIndicator = (
-    <div className="alert-indicator" title="hasAlert">
-      <img src={iconHasAlert} alt="hasAlert" />
-    </div>
+    <button
+      type="button"
+      className="alert-indicator"
+      title={hasActiveAlerts ? '查看告警' : '当前无告警'}
+      onClick={() => setIsAlertModalOpen(true)}
+    >
+      <img src={alertIcon} alt="" aria-hidden="true" className={alertIconClassName} />
+    </button>
   )
 
   const breadcrumb = (
@@ -84,6 +103,9 @@ function CasLayout({
       <span className="time-label">{timeLabel}</span>
     </div>
   )
+  const powerButtonTitle = isSystemPoweredOn ? '一键关机' : '一键开机'
+  const powerConfirmTitle = isSystemPoweredOn ? '确认关机' : '确认开机'
+  const powerConfirmMessage = isSystemPoweredOn ? '确认关闭系统吗？' : '确认开启系统吗？'
 
   return (
     <div className="app">
@@ -102,9 +124,15 @@ function CasLayout({
               className={`nav-item${module.id === activeModule.id ? ' is-active' : ''}`}
               onClick={(event) => {
                 const shouldConfirm = unsavedGuard?.active && module.id !== 'settings'
-                if (shouldConfirm && !window.confirm(unsavedGuard?.message || '当前内容未保存，是否退出？')) {
-                  event.preventDefault()
+                if (!shouldConfirm) {
+                  return
                 }
+
+                event.preventDefault()
+                setPendingPrimaryNavTarget({
+                  to: getModuleDefaultPath(module),
+                  message: unsavedGuard?.message || '当前内容未保存，是否退出？',
+                })
               }}
             >
               <img src={module.icon} alt="" aria-hidden="true" />
@@ -112,71 +140,56 @@ function CasLayout({
             </Link>
           ))}
         </nav>
-        <button type="button" className="power-button" aria-label="一键开关机" title="一键开关机">
+        <button
+          type="button"
+          className={`power-button${isSystemPoweredOn ? '' : ' is-off'}`}
+          aria-label={powerButtonTitle}
+          title={powerButtonTitle}
+          onClick={() => setPendingPowerAction(isSystemPoweredOn ? 'shutdown' : 'startup')}
+        >
           <img src={iconPower} alt="" aria-hidden="true" />
         </button>
       </aside>
 
-      <div className={`main${isHomeLayout ? '' : ' is-module-layout'}`}>
-        {isHomeLayout ? (
-          <header className="top-bar">
-            {alertIndicator}
-            {breadcrumb}
-            {dateTime}
-          </header>
-        ) : null}
-
-        <div className={`content${showSecondaryNav ? ' has-secondary' : ''}${!isHomeLayout ? ' is-module-layout' : ''}`}>
-          {showSecondaryNav ? (
-            <aside className={`secondary-nav${isHomeLayout ? '' : ' is-module-layout'}`}>
-              {!isHomeLayout ? <div className="secondary-alert-wrap">{alertIndicator}</div> : null}
-              <div className="secondary-title">{activeModule.breadcrumb ?? activeModule.label}</div>
-              {sectionList.length ? (
-                <div className="secondary-list">
-                  {sectionList.map((section) => (
-                    <NavLink
-                      key={section.id}
-                      to={getSectionDefaultPath(activeModule, section)}
-                      className={`secondary-item${section.id === activeSection?.id ? ' is-active' : ''}`}
-                    >
-                      {section.icon ? <img className="secondary-item-icon" src={section.icon} alt="" aria-hidden="true" /> : null}
-                      <span className="secondary-item-label">{section.label}</span>
-                    </NavLink>
-                  ))}
-                </div>
-              ) : null}
-            </aside>
+      {isMonitorLayout ? (
+        <div className="main is-module-layout">
+          <div className="monitor-layout-content">{children}</div>
+        </div>
+      ) : (
+        <div className={`main${isHomeLayout ? '' : ' is-module-layout'}`}>
+          {isHomeLayout ? (
+            <header className="top-bar">
+              {alertIndicator}
+              {breadcrumb}
+              {dateTime}
+            </header>
           ) : null}
 
-          <section className="stage">
-            {isHomeLayout && hasTabs ? (
-              <div className="tabs">
-                {tabList.map((tab) => (
-                  <NavLink
-                    key={tab.id}
-                    to={buildTabPath(activeModule, activeSection, tab)}
-                    className={`tab-item${tab.id === activeTab?.id ? ' is-active' : ''}`}
-                  >
-                    {tab.label}
-                  </NavLink>
-                ))}
-              </div>
-            ) : null}
-            <div className={`stage-body${isHomeLayout ? '' : ' stage-body--module'}`}>
-              {!isHomeLayout ? (
-                <div className="stage-meta">
-                  <div className="breadcrumb stage-breadcrumb">
-                    {breadcrumbParts.map((item, index) => (
-                      <span key={`${item}-${index}`} className={`crumb${index === breadcrumbParts.length - 1 ? ' current' : ''}`}>
-                        {item}
-                      </span>
+          <div className={`content${showSecondaryNav ? ' has-secondary' : ''}${!isHomeLayout ? ' is-module-layout' : ''}`}>
+            {showSecondaryNav ? (
+              <aside className={`secondary-nav${isHomeLayout ? '' : ' is-module-layout'}`}>
+                {!isHomeLayout ? <div className="secondary-alert-wrap">{alertIndicator}</div> : null}
+                <div className="secondary-title">{activeModule.breadcrumb ?? activeModule.label}</div>
+                {sectionList.length ? (
+                  <div className="secondary-list">
+                    {sectionList.map((section) => (
+                      <NavLink
+                        key={section.id}
+                        to={getSectionDefaultPath(activeModule, section)}
+                        className={`secondary-item${section.id === activeSection?.id ? ' is-active' : ''}`}
+                      >
+                        {section.icon ? <img className="secondary-item-icon" src={section.icon} alt="" aria-hidden="true" /> : null}
+                        <span className="secondary-item-label">{section.label}</span>
+                      </NavLink>
                     ))}
                   </div>
-                  {dateTime}
-                </div>
-              ) : null}
-              {!isHomeLayout && hasTabs ? (
-                <div className="tabs stage-tabs">
+                ) : null}
+              </aside>
+            ) : null}
+
+            <section className="stage">
+              {isHomeLayout && hasTabs ? (
+                <div className="tabs">
                   {tabList.map((tab) => (
                     <NavLink
                       key={tab.id}
@@ -188,11 +201,124 @@ function CasLayout({
                   ))}
                 </div>
               ) : null}
-              <div className="stage-content">{children}</div>
+              <div className={`stage-body${isHomeLayout ? '' : ' stage-body--module'}`}>
+                {!isHomeLayout ? (
+                  <div className="stage-meta">
+                    <div className="breadcrumb stage-breadcrumb">
+                      {breadcrumbParts.map((item, index) => (
+                        <span key={`${item}-${index}`} className={`crumb${index === breadcrumbParts.length - 1 ? ' current' : ''}`}>
+                          {item}
+                        </span>
+                      ))}
+                    </div>
+                    {dateTime}
+                  </div>
+                ) : null}
+                {!isHomeLayout && hasTabs ? (
+                  <div className="tabs stage-tabs">
+                    {tabList.map((tab) => (
+                      <NavLink
+                        key={tab.id}
+                        to={buildTabPath(activeModule, activeSection, tab)}
+                        className={`tab-item${tab.id === activeTab?.id ? ' is-active' : ''}`}
+                      >
+                        {tab.label}
+                      </NavLink>
+                    ))}
+                  </div>
+                ) : null}
+                <div className="stage-content">{children}</div>
+              </div>
+            </section>
+          </div>
+        </div>
+      )}
+
+      {isAlertModalOpen ? (
+        <div className="alert-preview-modal__backdrop" onClick={() => setIsAlertModalOpen(false)}>
+          <section className="alert-preview-modal" onClick={(event) => event.stopPropagation()}>
+            <header className="alert-preview-modal__header">
+              <h3>故障提示</h3>
+              <button type="button" aria-label="关闭" onClick={() => setIsAlertModalOpen(false)}>
+                ×
+              </button>
+            </header>
+
+            <div className="alert-preview-modal__body">
+              <div className="alert-preview-modal__title">系统报警（{activeAlerts.length}）</div>
+
+              <div className="alert-preview-modal__list">
+                {activeAlerts.length === 0 ? (
+                  <div className="alert-preview-modal__empty">当前暂无系统报警</div>
+                ) : (
+                  activeAlerts.map((item) => (
+                    <article key={item.id} className="alert-preview-modal__item">
+                      <span className="alert-preview-modal__badge">!</span>
+                      <span>{item.alarmName}</span>
+                    </article>
+                  ))
+                )}
+              </div>
             </div>
+
+            <footer className="alert-preview-modal__footer">
+              <button
+                type="button"
+                className="alert-preview-modal__action is-muted"
+                onClick={() => {
+                  ignoreAllAlerts()
+                  setIsAlertModalOpen(false)
+                }}
+              >
+                全部忽略
+              </button>
+              <button
+                type="button"
+                className="alert-preview-modal__action"
+                onClick={() => {
+                  setIsAlertModalOpen(false)
+                  navigate('/alerts/system-alarm')
+                }}
+              >
+                查看全部
+              </button>
+            </footer>
           </section>
         </div>
-      </div>
+      ) : null}
+
+      <AttentionModal
+        isOpen={Boolean(pendingPrimaryNavTarget)}
+        title="确认退出"
+        message={pendingPrimaryNavTarget?.message ?? ''}
+        confirmText="确定"
+        cancelText="取消"
+        showCancel
+        onClose={() => setPendingPrimaryNavTarget(null)}
+        onCancel={() => setPendingPrimaryNavTarget(null)}
+        onConfirm={() => {
+          const target = pendingPrimaryNavTarget
+          setPendingPrimaryNavTarget(null)
+          if (target?.to) {
+            navigate(target.to)
+          }
+        }}
+      />
+
+      <AttentionModal
+        isOpen={Boolean(pendingPowerAction)}
+        title={powerConfirmTitle}
+        message={powerConfirmMessage}
+        confirmText="确定"
+        cancelText="取消"
+        showCancel
+        onClose={() => setPendingPowerAction(null)}
+        onCancel={() => setPendingPowerAction(null)}
+        onConfirm={() => {
+          setIsSystemPoweredOn((previous) => !previous)
+          setPendingPowerAction(null)
+        }}
+      />
     </div>
   )
 }
