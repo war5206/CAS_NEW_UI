@@ -1,5 +1,6 @@
 import selectedLeftIcon from '../assets/function-selected-left.svg'
 import selectedRightIcon from '../assets/function-selected-right.svg'
+import { useActionConfirm } from '../hooks/useActionConfirm'
 import './SettingCards.css'
 
 function renderIcon(icon, iconAlt, className) {
@@ -29,7 +30,9 @@ function FeatureInfoCard({
   disabled = false,
   className = '',
   checkIcon,
+  confirmConfig,
 }) {
+  const { requestConfirm, confirmModal } = useActionConfirm()
   const isClickable = typeof onClick === 'function' && !disabled
   const Root = isClickable ? 'button' : 'div'
   const selectedBadgeIcon = checkIcon ?? (selectedBadgePosition === 'start' ? selectedLeftIcon : selectedRightIcon)
@@ -44,31 +47,52 @@ function FeatureInfoCard({
     .filter(Boolean)
     .join(' ')
 
+  const handleClick = () => {
+    const resolvedConfirmConfig =
+      typeof confirmConfig === 'function'
+        ? confirmConfig({
+            selected,
+            nextSelected: !selected,
+            title,
+          })
+        : confirmConfig
+
+    if (resolvedConfirmConfig) {
+      requestConfirm(resolvedConfirmConfig, onClick)
+      return
+    }
+
+    onClick()
+  }
+
   return (
-    <Root
-      className={cardClassName}
-      {...(isClickable
-        ? {
-            type: 'button',
-            onClick,
-            'aria-pressed': selected,
-          }
-        : {})}
-    >
-      <span className="feature-info-card__icon-wrap">{renderIcon(icon, iconAlt, 'feature-info-card__icon')}</span>
-      <span className="feature-info-card__content">
-        <span className="feature-info-card__title">{title}</span>
-        {description ? <span className="feature-info-card__description">{description}</span> : null}
-      </span>
-      {selected ? (
-        <img
-          src={selectedBadgeIcon}
-          alt=""
-          aria-hidden="true"
-          className="feature-info-card__selected-badge"
-        />
-      ) : null}
-    </Root>
+    <>
+      <Root
+        className={cardClassName}
+        {...(isClickable
+          ? {
+              type: 'button',
+              onClick: handleClick,
+              'aria-pressed': selected,
+            }
+          : {})}
+      >
+        <span className="feature-info-card__icon-wrap">{renderIcon(icon, iconAlt, 'feature-info-card__icon')}</span>
+        <span className="feature-info-card__content">
+          <span className="feature-info-card__title">{title}</span>
+          {description ? <span className="feature-info-card__description">{description}</span> : null}
+        </span>
+        {selected ? (
+          <img
+            src={selectedBadgeIcon}
+            alt=""
+            aria-hidden="true"
+            className="feature-info-card__selected-badge"
+          />
+        ) : null}
+      </Root>
+      {confirmModal}
+    </>
   )
 }
 

@@ -1,3 +1,4 @@
+import { useActionConfirm } from '../hooks/useActionConfirm'
 import './ToggleSwitch.css'
 
 function joinClassNames(...names) {
@@ -11,23 +12,46 @@ function ToggleSwitch({
   className = '',
   forceOnStyle = false,
   disabled = false,
+  confirmConfig,
 }) {
+  const { requestConfirm, confirmModal } = useActionConfirm()
+
+  const handleClick = () => {
+    const resolvedConfirmConfig =
+      typeof confirmConfig === 'function'
+        ? confirmConfig({
+            checked,
+            nextChecked: !checked,
+          })
+        : confirmConfig
+
+    if (resolvedConfirmConfig) {
+      requestConfirm(resolvedConfirmConfig, onToggle)
+      return
+    }
+
+    onToggle?.()
+  }
+
   return (
-    <button
-      type="button"
-      className={joinClassNames(
-        'toggle-switch',
-        checked ? 'is-on' : '',
-        forceOnStyle ? 'is-blue' : '',
-        className,
-      )}
-      aria-label={ariaLabel}
-      aria-pressed={checked}
-      onClick={onToggle}
-      disabled={disabled}
-    >
-      <span className="toggle-switch__thumb" />
-    </button>
+    <>
+      <button
+        type="button"
+        className={joinClassNames(
+          'toggle-switch',
+          checked ? 'is-on' : '',
+          forceOnStyle ? 'is-blue' : '',
+          className,
+        )}
+        aria-label={ariaLabel}
+        aria-pressed={checked}
+        onClick={handleClick}
+        disabled={disabled}
+      >
+        <span className="toggle-switch__thumb" />
+      </button>
+      {confirmModal}
+    </>
   )
 }
 

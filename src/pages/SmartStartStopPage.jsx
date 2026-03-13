@@ -1,5 +1,6 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import LabeledSelectRow from '../components/LabeledSelectRow'
+import { useActionConfirm } from '../hooks/useActionConfirm'
 import './SmartStartStopPage.css'
 
 const SLIDER_MIN = 0
@@ -18,14 +19,17 @@ function valueFromTrackClick(event, min, max) {
 }
 
 function SmartStartStopPage() {
+  const { requestConfirm, confirmModal } = useActionConfirm()
   const [tempDiff, setTempDiff] = useState('10')
   const [loadCycle, setLoadCycle] = useState('10')
   const [unloadCycle, setUnloadCycle] = useState('10')
   const [coolingDiff, setCoolingDiff] = useState('10')
   const [minFreq, setMinFreq] = useState(5)
   const [maxFreq, setMaxFreq] = useState(14)
+  const freqRangeStartRef = useRef({ minFreq: 5, maxFreq: 14 })
+  const isFreqRangeDraggingRef = useRef(false)
 
-  const rangeText = useMemo(() => `${minFreq}  —  ${maxFreq}`, [minFreq, maxFreq])
+  const rangeText = useMemo(() => `${minFreq}  -  ${maxFreq}`, [minFreq, maxFreq])
   const sliderTrackStyle = useMemo(
     () => ({
       '--min-percent': ((minFreq - SLIDER_MIN) / (SLIDER_MAX - SLIDER_MIN)) * 100,
@@ -33,21 +37,64 @@ function SmartStartStopPage() {
     }),
     [maxFreq, minFreq],
   )
+
+  const requestFreqRangeConfirm = (nextMinFreq, nextMaxFreq, previousRange) => {
+    requestConfirm(
+      { message: `确认将频率区间设定为 ${nextMinFreq} - ${nextMaxFreq} Hz 吗？` },
+      () => {},
+      () => {
+        setMinFreq(previousRange.minFreq)
+        setMaxFreq(previousRange.maxFreq)
+      },
+    )
+  }
+
   const handleSliderWrapPointerDown = (event) => {
     if (event.target.closest('.smart-start-stop-page__slider')) {
       return
     }
 
+    const previousRange = { minFreq, maxFreq }
     const nextValue = valueFromTrackClick(event, SLIDER_MIN, SLIDER_MAX)
+    let nextMinFreq = minFreq
+    let nextMaxFreq = maxFreq
     const minDistance = Math.abs(nextValue - minFreq)
     const maxDistance = Math.abs(nextValue - maxFreq)
 
     if (minDistance <= maxDistance) {
-      setMinFreq(Math.min(nextValue, maxFreq - 1))
+      nextMinFreq = Math.min(nextValue, maxFreq - 1)
+    } else {
+      nextMaxFreq = Math.max(nextValue, minFreq + 1)
+    }
+
+    setMinFreq(nextMinFreq)
+    setMaxFreq(nextMaxFreq)
+
+    if (previousRange.minFreq === nextMinFreq && previousRange.maxFreq === nextMaxFreq) {
       return
     }
 
-    setMaxFreq(Math.max(nextValue, minFreq + 1))
+    requestFreqRangeConfirm(nextMinFreq, nextMaxFreq, previousRange)
+  }
+
+  const handleFreqSliderPointerDown = () => {
+    isFreqRangeDraggingRef.current = true
+    freqRangeStartRef.current = { minFreq, maxFreq }
+  }
+
+  const handleFreqSliderPointerEnd = () => {
+    if (!isFreqRangeDraggingRef.current) {
+      return
+    }
+
+    isFreqRangeDraggingRef.current = false
+    const previousRange = freqRangeStartRef.current
+
+    if (previousRange.minFreq === minFreq && previousRange.maxFreq === maxFreq) {
+      return
+    }
+
+    requestFreqRangeConfirm(minFreq, maxFreq, previousRange)
   }
 
   return (
@@ -62,6 +109,7 @@ function SmartStartStopPage() {
             suffix="℃"
             onChange={setTempDiff}
             useModeCardControl
+            confirmConfig={({ nextValue }) => ({ message: `确认将加减载温差设置为 ${nextValue} ℃吗？` })}
           />
 
           <LabeledSelectRow
@@ -71,22 +119,24 @@ function SmartStartStopPage() {
             suffix="分钟"
             onChange={setLoadCycle}
             useModeCardControl
+            confirmConfig={({ nextValue }) => ({ message: `确认将加载周期设置为 ${nextValue} 分钟吗？` })}
           />
 
           <LabeledSelectRow
-            label="减载周期（分钟）"
+            label="卸载周期（分钟）"
             description="用于评估和执行热泵停止操作时间间隔"
             value={unloadCycle}
             suffix="分钟"
             onChange={setUnloadCycle}
             useModeCardControl
+            confirmConfig={({ nextValue }) => ({ message: `确认将卸载周期设置为 ${nextValue} 分钟吗？` })}
           />
 
           <div className="smart-start-stop-page__freq-row">
             <div className="smart-start-stop-page__freq-header">
               <div>
                 <div className="smart-start-stop-page__freq-title">频率区间设定（Hz）</div>
-                <p className="smart-start-stop-page__freq-desc">变频机组运行的最低频率-最高频率</p>
+                <p className="smart-start-stop-page__freq-desc">变频机组运行的最低频率 / 最高频率</p>
               </div>
               <div className="smart-start-stop-page__freq-range">{rangeText}</div>
             </div>
@@ -104,6 +154,9 @@ function SmartStartStopPage() {
                 max={SLIDER_MAX}
                 value={minFreq}
                 onChange={(event) => setMinFreq(Math.min(Number(event.target.value), maxFreq - 1))}
+                onPointerDown={handleFreqSliderPointerDown}
+                onPointerUp={handleFreqSliderPointerEnd}
+                onPointerCancel={handleFreqSliderPointerEnd}
                 className="smart-start-stop-page__slider smart-start-stop-page__slider--min"
                 aria-label="最小频率"
               />
@@ -113,6 +166,9 @@ function SmartStartStopPage() {
                 max={SLIDER_MAX}
                 value={maxFreq}
                 onChange={(event) => setMaxFreq(Math.max(Number(event.target.value), minFreq + 1))}
+                onPointerDown={handleFreqSliderPointerDown}
+                onPointerUp={handleFreqSliderPointerEnd}
+                onPointerCancel={handleFreqSliderPointerEnd}
                 className="smart-start-stop-page__slider smart-start-stop-page__slider--max"
                 aria-label="最大频率"
               />
@@ -126,9 +182,11 @@ function SmartStartStopPage() {
             suffix="℃"
             onChange={setCoolingDiff}
             useModeCardControl
+            confirmConfig={({ nextValue }) => ({ message: `确认将制冷温差设置为 ${nextValue} ℃吗？` })}
           />
         </div>
       </section>
+      {confirmModal}
     </main>
   )
 }

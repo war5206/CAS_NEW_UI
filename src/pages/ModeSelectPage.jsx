@@ -23,6 +23,7 @@ import heatTracingIcon from '../assets/heat-tracing.svg'
 import constantPressurePumpIcon from '../assets/constant-pressure-pump.svg'
 import pressureReliefValveIcon from '../assets/pressure-relief-valve.svg'
 import drainValveIcon from '../assets/drain-value.svg'
+import { useActionConfirm } from '../hooks/useActionConfirm'
 import { getStoredClimateMode, setStoredClimateMode } from '../utils/climateModeState'
 import { getStoredTemperatureMode, setStoredTemperatureMode } from '../utils/temperatureModeState'
 import './ModeSelectPage.css'
@@ -82,7 +83,7 @@ const MODE_SETTING_CARDS = [
   },
   {
     id: 'peak',
-    title: '峰谷调节',
+    title: '热电协同',
     description: '开启时，根据环境温度不同自动调节回水目标温度，关闭时，固定温度运行',
     statusIcon: peakStatusIcon,
     routePath: '/settings/mode-setting/peak-valley',
@@ -184,6 +185,7 @@ function ModeSettingCard({
   statusIconActive,
   onArrowClick,
   hasTargetPage,
+  toggleConfirmConfig,
 }) {
   const isClimateCard = id === 'climate'
   const isConstantMode = isClimateCard && !isEnabled
@@ -233,6 +235,7 @@ function ModeSettingCard({
           forceOnStyle={isConstantMode}
           ariaLabel={`${title}${isEnabled ? '关闭' : '开启'}`}
           className="mode-select-page__switch"
+          confirmConfig={toggleConfirmConfig}
         />
       </div>
     </article>
@@ -240,6 +243,7 @@ function ModeSettingCard({
 }
 
 function ModeSelectPage() {
+  const { requestConfirm, confirmModal } = useActionConfirm()
   const navigate = useNavigate()
   const [featureMode, setFeatureMode] = useState('smart')
   const [temperatureMode, setTemperatureMode] = useState(() => getStoredTemperatureMode())
@@ -310,6 +314,7 @@ function ModeSelectPage() {
             selectedBadgePosition={index === 0 ? 'start' : 'end'}
             onClick={() => setFeatureMode(item.id)}
             className="mode-select-page__feature-card"
+            confirmConfig={featureMode === item.id ? null : { message: `确认切换为${item.title}吗？` }}
           />
         ))}
       </section>
@@ -326,6 +331,7 @@ function ModeSelectPage() {
                 label={item.label}
                 selected={selected}
                 onClick={() => setTemperatureMode(item.id)}
+                confirmConfig={selected ? null : { message: `确认切换为${item.label}模式吗？` }}
               />
             )
           })}
@@ -349,6 +355,9 @@ function ModeSelectPage() {
                 statusIconActive={item.statusIconActive}
                 hasTargetPage={item.hasTargetPage}
                 onArrowClick={item.routePath ? () => navigate(item.routePath) : undefined}
+                toggleConfirmConfig={({ nextChecked }) => ({
+                  message: `确认${nextChecked ? '开启' : '关闭'}${item.title}吗？`,
+                })}
               />
             ))}
           </div>
@@ -365,9 +374,13 @@ function ModeSelectPage() {
             onChange={setManualDeviceType}
             triggerAriaLabel="选择设备类型"
             listAriaLabel="设备类型列表"
+            confirmConfig={({ nextValue }) => {
+              const nextOption = MANUAL_TYPE_OPTIONS.find((item) => item.value === nextValue)
+              return nextOption ? { message: `确认切换控制设备为${nextOption.label}吗？` } : null
+            }}
           />
 
-          <p className="mode-select-page__manual-tip">手动开关，单机触碰控制设备开关，蓝色代表开启，灰色代表关闭</p>
+          <p className="mode-select-page__manual-tip">手动开关，单机触摸控制设备开关，蓝色代表开启，灰色代表关闭</p>
 
           <div className="mode-select-page__manual-device-grid" aria-label="手动设备列表">
             {manualDeviceList.map((device) => {
@@ -378,7 +391,12 @@ function ModeSelectPage() {
                   type="button"
                   className={`mode-select-page__manual-device${isActive ? ' is-active' : ''}`}
                   aria-pressed={isActive}
-                  onClick={() => toggleManualDeviceStatus(device.id)}
+                  onClick={() =>
+                    requestConfirm(
+                      { message: `确认${isActive ? '关闭' : '开启'}${device.label}吗？` },
+                      () => toggleManualDeviceStatus(device.id),
+                    )
+                  }
                 >
                   <img src={manualDeviceIcon} alt="" aria-hidden="true" className="mode-select-page__manual-device-icon" />
                   <span className="mode-select-page__manual-device-label">{device.label}</span>
@@ -388,6 +406,7 @@ function ModeSelectPage() {
           </div>
         </section>
       )}
+      {confirmModal}
     </main>
   )
 }

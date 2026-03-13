@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { useActionConfirm } from '../hooks/useActionConfirm'
 import './SelectDropdown.css'
 
 function joinClassNames(...names) {
@@ -27,7 +28,9 @@ function SelectDropdown({
   showSelectedCheck = false,
   selectedCheckIcon = '',
   disabled = false,
+  confirmConfig,
 }) {
+  const { requestConfirm, confirmModal } = useActionConfirm()
   const [isOpen, setIsOpen] = useState(false)
   const containerRef = useRef(null)
   const menuRef = useRef(null)
@@ -121,61 +124,81 @@ function SelectDropdown({
   }
 
   return (
-    <div className={joinClassNames('select-dropdown', className)} ref={containerRef}>
-      <button
-        type="button"
-        className={joinClassNames('select-dropdown__trigger', triggerClassName, isOpen ? 'is-open' : '')}
-        aria-label={triggerAriaLabel}
-        aria-expanded={isOpen}
-        aria-haspopup="listbox"
-        onClick={() => setIsOpen((prev) => !prev)}
-        disabled={disabled}
-      >
-        <span>{selectedOption?.label ?? ''}</span>
-      </button>
+    <>
+      <div className={joinClassNames('select-dropdown', className)} ref={containerRef}>
+        <button
+          type="button"
+          className={joinClassNames('select-dropdown__trigger', triggerClassName, isOpen ? 'is-open' : '')}
+          aria-label={triggerAriaLabel}
+          aria-expanded={isOpen}
+          aria-haspopup="listbox"
+          onClick={() => setIsOpen((prev) => !prev)}
+          disabled={disabled}
+        >
+          <span>{selectedOption?.label ?? ''}</span>
+        </button>
 
-      <div
-        ref={menuRef}
-        className={joinClassNames('select-dropdown__menu', dropdownClassName, isOpen ? 'is-open' : '')}
-        role="listbox"
-        aria-label={listAriaLabel}
-        aria-hidden={!isOpen}
-        onWheelCapture={(event) => event.stopPropagation()}
-        onPointerDown={handleMenuPointerDown}
-        onPointerMove={handleMenuPointerMove}
-        onPointerUp={clearMenuDraggingState}
-        onPointerCancel={clearMenuDraggingState}
-      >
-        {options.map((item) => {
-          const isSelected = item.value === selectedOption?.value
-          return (
-            <button
-              key={item.value}
-              type="button"
-              role="option"
-              aria-selected={isSelected}
-              className={joinClassNames('select-dropdown__option', optionClassName, isSelected ? selectedOptionClassName : '')}
-              onClick={(event) => {
-                if (blockNextOptionClickRef.current) {
-                  event.preventDefault()
-                  return
-                }
+        <div
+          ref={menuRef}
+          className={joinClassNames('select-dropdown__menu', dropdownClassName, isOpen ? 'is-open' : '')}
+          role="listbox"
+          aria-label={listAriaLabel}
+          aria-hidden={!isOpen}
+          onWheelCapture={(event) => event.stopPropagation()}
+          onPointerDown={handleMenuPointerDown}
+          onPointerMove={handleMenuPointerMove}
+          onPointerUp={clearMenuDraggingState}
+          onPointerCancel={clearMenuDraggingState}
+        >
+          {options.map((item) => {
+            const isSelected = item.value === selectedOption?.value
+            return (
+              <button
+                key={item.value}
+                type="button"
+                role="option"
+                aria-selected={isSelected}
+                className={joinClassNames('select-dropdown__option', optionClassName, isSelected ? selectedOptionClassName : '')}
+                onClick={(event) => {
+                  if (blockNextOptionClickRef.current) {
+                    event.preventDefault()
+                    return
+                  }
 
-                onChange?.(item.value)
-                setIsOpen(false)
-              }}
-            >
-              <span>{item.label}</span>
-              {isSelected && showSelectedCheck && selectedCheckIcon ? (
-                <span className="select-dropdown__option-check" aria-hidden="true">
-                  <img src={selectedCheckIcon} alt="" />
-                </span>
-              ) : null}
-            </button>
-          )
-        })}
+                  const commitChange = () => {
+                    onChange?.(item.value)
+                    setIsOpen(false)
+                  }
+                  const resolvedConfirmConfig =
+                    typeof confirmConfig === 'function'
+                      ? confirmConfig({
+                          currentValue: value,
+                          nextValue: item.value,
+                          option: item,
+                        })
+                      : confirmConfig
+
+                  if (resolvedConfirmConfig) {
+                    requestConfirm(resolvedConfirmConfig, commitChange)
+                    return
+                  }
+
+                  commitChange()
+                }}
+              >
+                <span>{item.label}</span>
+                {isSelected && showSelectedCheck && selectedCheckIcon ? (
+                  <span className="select-dropdown__option-check" aria-hidden="true">
+                    <img src={selectedCheckIcon} alt="" />
+                  </span>
+                ) : null}
+              </button>
+            )
+          })}
+        </div>
       </div>
-    </div>
+      {confirmModal}
+    </>
   )
 }
 

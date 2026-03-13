@@ -413,7 +413,7 @@
 .alerts-detail-modal {
   width: min(880px, calc(100vw - 64px));
   border-radius: 24px;
-  background: linear-gradient(180deg, #182131 0%, #0f1725 100%);
+  background: #22262D;
   border: 1px solid rgba(94, 118, 154, 0.65);
   box-shadow: 0 24px 80px rgba(0, 0, 0, 0.35);
   color: #eef5ff;
@@ -450,7 +450,7 @@
 .alerts-detail-modal__grid div {
   padding: 18px 20px;
   border-radius: 16px;
-  background: rgba(34, 45, 63, 0.72);
+  background: #353b45;
   min-height: 92px;
   box-sizing: border-box;
 }
@@ -515,6 +515,10 @@
   padding: 0 24px;
   text-align: left;
   font-size: 24px;
+}
+
+.alerts-analysis__date-btn--single {
+  min-width: 336px;
 }
 
 .alerts-analysis__range-separator {

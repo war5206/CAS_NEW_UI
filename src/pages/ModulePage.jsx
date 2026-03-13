@@ -1,25 +1,31 @@
-import HeatPumpLoopPumpPage from './HeatPumpLoopPumpPage'
-import TerminalLoopPumpPage from './TerminalLoopPumpPage'
-import HeatPumpPage from './HeatPumpPage'
-import HeatTracePage from './HeatTracePage'
-import ConstantPressurePumpPage from './ConstantPressurePumpPage'
-import DrainValvePage from './DrainValvePage'
-import ReliefValvePage from './ReliefValvePage'
-import ModeSelectPage from './ModeSelectPage'
-import ClimateCompensationPage from './ClimateCompensationPage'
-import CouplingEnergyPage from './CouplingEnergyPage'
-import BasicSettingPage from './BasicSettingPage'
-import SystemParamsPage from './SystemParamsPage'
-import SmartStartStopPage from './SmartStartStopPage'
-import PeakValleyPage from './PeakValleyPage'
-import SmartTimerPage from './SmartTimerPage'
+import PageTransition from '../components/PageTransition'
 import AlertsModulePage from './AlertsModulePage'
-import DataOverviewPage from './DataOverviewPage'
-import PowerStatisticsPage from './PowerStatisticsPage'
-import WaterStatisticsPage from './WaterStatisticsPage'
-import HeatStatisticsPage from './HeatStatisticsPage'
+import ArchiveManagementPage from './ArchiveManagementPage'
+import BasicSettingPage from './BasicSettingPage'
+import ClimateCompensationPage from './ClimateCompensationPage'
 import ColdStatisticsPage from './ColdStatisticsPage'
+import ConstantPressurePumpPage from './ConstantPressurePumpPage'
 import CostAnalysisPage from './CostAnalysisPage'
+import CouplingEnergyPage from './CouplingEnergyPage'
+import DataOverviewPage from './DataOverviewPage'
+import DrainValvePage from './DrainValvePage'
+import HeatPumpLoopPumpPage from './HeatPumpLoopPumpPage'
+import HeatPumpPage from './HeatPumpPage'
+import HeatStatisticsPage from './HeatStatisticsPage'
+import HeatTracePage from './HeatTracePage'
+import ModeSelectPage from './ModeSelectPage'
+import MonitorEmptyPage from './MonitorEmptyPage'
+import OperationsDeviceManagementPage from './OperationsDeviceManagementPage'
+import OperationsSystemManagementPage from './OperationsSystemManagementPage'
+import PeakValleyPage from './PeakValleyPage'
+import PowerStatisticsPage from './PowerStatisticsPage'
+import ReliefValvePage from './ReliefValvePage'
+import SmartStartStopPage from './SmartStartStopPage'
+import SmartTimerPage from './SmartTimerPage'
+import SystemManualPage from './SystemManualPage'
+import SystemParamsPage from './SystemParamsPage'
+import TerminalLoopPumpPage from './TerminalLoopPumpPage'
+import WaterStatisticsPage from './WaterStatisticsPage'
 
 function ModulePage({
   routeInfo,
@@ -30,48 +36,50 @@ function ModulePage({
   onUnitLayoutCommitted,
 }) {
   const { module, section, tab } = routeInfo
+  let content = null
+
   const isModeSelectSection = module.id === 'settings' && section?.id === 'mode-select'
   const isDeviceParamsSection = module.id === 'settings' && section?.id === 'device-params'
 
   if (isModeSelectSection) {
-    return <ModeSelectPage />
+    content = <ModeSelectPage />
   }
 
-  if (isDeviceParamsSection) {
+  if (!content && isDeviceParamsSection) {
     if (tab?.id === 'hp-loop-pump') {
-      return <HeatPumpLoopPumpPage />
+      content = <HeatPumpLoopPumpPage />
     }
 
     if (tab?.id === 'terminal-loop-pump') {
-      return <TerminalLoopPumpPage />
+      content = <TerminalLoopPumpPage />
     }
 
     if (tab?.id === 'heat-pump') {
-      return <HeatPumpPage />
+      content = <HeatPumpPage />
     }
 
     if (tab?.id === 'heat-trace') {
-      return <HeatTracePage />
+      content = <HeatTracePage />
     }
 
     if (tab?.id === 'constant-pressure-pump') {
-      return <ConstantPressurePumpPage />
+      content = <ConstantPressurePumpPage />
     }
 
     if (tab?.id === 'drain-valve') {
-      return <DrainValvePage />
+      content = <DrainValvePage />
     }
 
     if (tab?.id === 'relief-valve') {
-      return <ReliefValvePage />
+      content = <ReliefValvePage />
     }
   }
 
   const isBaseSettingSystemParamsPage =
     module.id === 'settings' && section?.id === 'base-setting' && tab?.id === 'system-params'
 
-  if (isBaseSettingSystemParamsPage) {
-    return (
+  if (!content && isBaseSettingSystemParamsPage) {
+    content = (
       <SystemParamsPage
         onUnsavedGuardChange={onUnsavedGuardChange}
         onSecondaryNavVisibilityChange={onSecondaryNavVisibilityChange}
@@ -82,97 +90,90 @@ function ModulePage({
     )
   }
 
-  const isModeSettingClimatePage =
-    module.id === 'settings' && section?.id === 'mode-setting' && tab?.id === 'climate'
-
-  if (isModeSettingClimatePage) {
-    return <ClimateCompensationPage />
+  if (!content && module.id === 'settings' && section?.id === 'mode-setting' && tab?.id === 'climate') {
+    content = <ClimateCompensationPage />
   }
 
-  const isModeSettingStartStopPage =
-    module.id === 'settings' && section?.id === 'mode-setting' && tab?.id === 'start-stop'
-
-  if (isModeSettingStartStopPage) {
-    return <SmartStartStopPage />
+  if (!content && module.id === 'settings' && section?.id === 'mode-setting' && tab?.id === 'start-stop') {
+    content = <SmartStartStopPage />
   }
 
-  const isModeSettingPeakValleyPage =
-    module.id === 'settings' && section?.id === 'mode-setting' && tab?.id === 'peak'
-
-  if (isModeSettingPeakValleyPage) {
-    return <PeakValleyPage />
-  }
-  const isModeSettingTimerPage =
-    module.id === 'settings' && section?.id === 'mode-setting' && tab?.id === 'timer'
-
-  if (isModeSettingTimerPage) {
-    return <SmartTimerPage />
+  if (!content && module.id === 'settings' && section?.id === 'mode-setting' && tab?.id === 'peak') {
+    content = <PeakValleyPage />
   }
 
-
-
-  const isAnalysisDataOverviewPage = module.id === 'analysis' && section?.id === 'data-overview'
-
-  if (isAnalysisDataOverviewPage) {
-    return <DataOverviewPage />
+  if (!content && module.id === 'settings' && section?.id === 'mode-setting' && tab?.id === 'timer') {
+    content = <SmartTimerPage />
   }
 
-  const isAnalysisPowerStatisticsPage = module.id === 'analysis' && section?.id === 'power'
-
-  if (isAnalysisPowerStatisticsPage) {
-    return <PowerStatisticsPage />
+  if (!content && module.id === 'settings' && section?.id === 'mode-setting' && tab?.id === 'coupling') {
+    content = <CouplingEnergyPage />
   }
 
-  const isAnalysisWaterStatisticsPage = module.id === 'analysis' && section?.id === 'water'
-
-  if (isAnalysisWaterStatisticsPage) {
-    return <WaterStatisticsPage />
+  if (!content && module.id === 'analysis' && section?.id === 'data-overview') {
+    content = <DataOverviewPage />
   }
 
-  const isAnalysisHeatStatisticsPage = module.id === 'analysis' && section?.id === 'heat'
-
-  if (isAnalysisHeatStatisticsPage) {
-    return <HeatStatisticsPage />
+  if (!content && module.id === 'analysis' && section?.id === 'power') {
+    content = <PowerStatisticsPage />
   }
 
-  const isAnalysisColdStatisticsPage = module.id === 'analysis' && section?.id === 'cold'
-
-  if (isAnalysisColdStatisticsPage) {
-    return <ColdStatisticsPage />
+  if (!content && module.id === 'analysis' && section?.id === 'water') {
+    content = <WaterStatisticsPage />
   }
 
-  const isAnalysisCostAnalysisPage = module.id === 'analysis' && section?.id === 'cost'
-
-  if (isAnalysisCostAnalysisPage) {
-    return <CostAnalysisPage />
+  if (!content && module.id === 'analysis' && section?.id === 'heat') {
+    content = <HeatStatisticsPage />
   }
 
-  const isAlertsPage = module.id === 'alerts' && section
-
-  if (isAlertsPage) {
-    return <AlertsModulePage sectionId={section.id} onDetailBreadcrumbChange={onDetailBreadcrumbChange} />
-  }
-  const isModeSettingCouplingPage =
-    module.id === 'settings' && section?.id === 'mode-setting' && tab?.id === 'coupling'
-
-  if (isModeSettingCouplingPage) {
-    return <CouplingEnergyPage />
+  if (!content && module.id === 'analysis' && section?.id === 'cold') {
+    content = <ColdStatisticsPage />
   }
 
-  const isBasicSettingSection = module.id === 'settings' && section?.id === 'base-setting'
-
-  if (isBasicSettingSection) {
-    return <BasicSettingPage tabId={tab?.id} />
+  if (!content && module.id === 'analysis' && section?.id === 'cost') {
+    content = <CostAnalysisPage />
   }
 
-  return (
-    <div className="placeholder-card module-placeholder">
-      <div className="placeholder-title">{module.label}模块</div>
-      <div className="placeholder-meta">当前页面：{section?.label ?? '一级模块'}</div>
-      {tab ? <div className="placeholder-meta">当前 Tab：{tab.label}</div> : null}
-      <div className="placeholder-note">内容区域待填充</div>
-    </div>
-  )
+  if (!content && module.id === 'alerts' && section) {
+    content = <AlertsModulePage sectionId={section.id} onDetailBreadcrumbChange={onDetailBreadcrumbChange} />
+  }
+
+  if (!content && module.id === 'monitor') {
+    content = <MonitorEmptyPage />
+  }
+
+  if (!content && module.id === 'operations' && section?.id === 'system-management' && tab) {
+    content = <OperationsSystemManagementPage tabId={tab.id} />
+  }
+
+  if (!content && module.id === 'operations' && section?.id === 'device-management' && tab) {
+    content = <OperationsDeviceManagementPage tabId={tab.id} />
+  }
+
+  if (!content && module.id === 'operations' && section?.id === 'archive') {
+    content = <ArchiveManagementPage />
+  }
+
+  if (!content && module.id === 'operations' && section?.id === 'manual') {
+    content = <SystemManualPage />
+  }
+
+  if (!content && module.id === 'settings' && section?.id === 'base-setting') {
+    content = <BasicSettingPage tabId={tab?.id} />
+  }
+
+  if (!content) {
+    content = (
+      <div className="placeholder-card module-placeholder">
+        <div className="placeholder-title">{module.label}模块</div>
+        <div className="placeholder-meta">当前页面：{section?.label ?? '一级模块'}</div>
+        {tab ? <div className="placeholder-meta">当前 Tab：{tab.label}</div> : null}
+        <div className="placeholder-note">内容区域待补充</div>
+      </div>
+    )
+  }
+
+  return <PageTransition transitionKey={routeInfo.key}>{content}</PageTransition>
 }
 
 export default ModulePage

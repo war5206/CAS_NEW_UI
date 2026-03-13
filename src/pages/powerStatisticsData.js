@@ -1,3 +1,11 @@
+import {
+  enumerateMonthRange,
+  formatMonthAxisLabel,
+  getCurrentDateInfo,
+  getMaxAvailableDay,
+  getMonthDayCount,
+} from '../utils/analysisFilterUtils'
+
 const DEVICE_FACTORS = {
   'heat-pump': 1,
   'water-pump': 0.72,
@@ -65,55 +73,15 @@ function scaleNullableValue(value, factor) {
   return scaleNumber(value, factor)
 }
 
-function getMonthDays(monthValue) {
-  const [year, month] = (monthValue || '2025-03').split('-').map(Number)
-  return new Date(year, month, 0).getDate()
-}
-
-function buildMonthRange(startMonthValue, endMonthValue) {
-  const startValue = startMonthValue || endMonthValue || '2025-01'
-  const endValue = endMonthValue || startMonthValue || startValue
-  let [startYear, startMonth] = startValue.split('-').map(Number)
-  let [endYear, endMonth] = endValue.split('-').map(Number)
-
-  if (startYear > endYear || (startYear === endYear && startMonth > endMonth)) {
-    ;[startYear, endYear] = [endYear, startYear]
-    ;[startMonth, endMonth] = [endMonth, startMonth]
-  }
-
-  const months = []
-  let year = startYear
-  let month = startMonth
-
-  while (year < endYear || (year === endYear && month <= endMonth)) {
-    months.push({
-      value: `${year}-${String(month).padStart(2, '0')}`,
-      label: String(month).padStart(2, '0'),
-      monthIndex: month - 1,
-    })
-
-    month += 1
-    if (month > 12) {
-      month = 1
-      year += 1
-    }
-
-    if (months.length >= 24) {
-      break
-    }
-  }
-
-  return months.length > 0
-    ? months
-    : [{ value: startValue, label: String(startMonth).padStart(2, '0'), monthIndex: startMonth - 1 }]
-}
-
 function buildDaySeries(range, factor) {
   const monthValue = range.month || '2025-03'
-  const days = getMonthDays(monthValue)
-  const labels = Array.from({ length: days }, (_, index) => String(index + 1).padStart(2, '0'))
-  const tooltipLabels = labels.map((label) => `${monthValue}-${label}`)
-  const values = DAY_BASE_VALUES.slice(0, days).map((value) => scaleNumber(value, factor))
+  const days = getMonthDayCount(monthValue)
+  const maxAvailableDay = getMaxAvailableDay(monthValue, getCurrentDateInfo())
+  const labels = Array.from({ length: days }, (_, index) => `${index + 1}号`)
+  const tooltipLabels = Array.from({ length: days }, (_, index) => `${monthValue}-${String(index + 1).padStart(2, '0')}`)
+  const values = Array.from({ length: days }, (_, index) =>
+    index + 1 <= maxAvailableDay ? scaleNumber(DAY_BASE_VALUES[index % DAY_BASE_VALUES.length], factor) : null,
+  )
 
   return {
     labels,
@@ -135,10 +103,10 @@ function buildDaySeries(range, factor) {
 }
 
 function buildMonthSeries(range, factor) {
-  const monthRange = buildMonthRange(range.startMonth, range.endMonth)
+  const monthRange = enumerateMonthRange(range.startMonth, range.endMonth)
 
   return {
-    labels: monthRange.map((item) => item.label),
+    labels: monthRange.map((item) => formatMonthAxisLabel(item.value)),
     tooltipLabels: monthRange.map((item) => item.value),
     xAxisName: '月',
     yAxisMax: 1000,
@@ -151,14 +119,14 @@ function buildMonthSeries(range, factor) {
       {
         name: '采暖耗电',
         type: 'bar',
-        data: monthRange.map((item) => scaleNullableValue(MONTH_HEATING_VALUES[item.monthIndex], factor)),
+        data: monthRange.map((item) => scaleNullableValue(MONTH_HEATING_VALUES[item.month - 1], factor)),
         colorKey: 'heating',
         barWidth: 26,
       },
       {
         name: '制冷耗电',
         type: 'bar',
-        data: monthRange.map((item) => scaleNullableValue(MONTH_COOLING_VALUES[item.monthIndex], factor)),
+        data: monthRange.map((item) => scaleNullableValue(MONTH_COOLING_VALUES[item.month - 1], factor)),
         colorKey: 'cooling',
         barWidth: 26,
       },
@@ -284,7 +252,7 @@ export function buildPowerStatisticsViewModel({ period, range, compareMode, equi
       yAxisInterval: chart.yAxisInterval,
       compareBasisData:
         period === '月'
-          ? chart.series[0].data.map((value, index) => value ?? chart.series[1].data[index] ?? 0)
+          ? chart.series[0].data.map((value, index) => value ?? chart.series[1].data[index] ?? null)
           : chart.series[0].data,
       compareLegendNames: {
         mom: '上一周期用电量',

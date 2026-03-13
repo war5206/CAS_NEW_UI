@@ -27,7 +27,7 @@ const DETAIL_METRICS = [
   { key: 'ambientTemp', label: '环境温度(℃)', value: '-10' },
   { key: 'compressor1Current', label: '压缩机1电流(A)', value: '2' },
   { key: 'compressor2Current', label: '压缩机2电流(A)', value: '2' },
-  { key: 'totalRunHours', label: '累计运行时长(h)', value: '关' },
+  { key: 'totalRunHours', label: '累计运行时长(h)', value: '0' },
   { key: 'defrostState', label: '防冻状态', value: '开' },
   { key: 'modeState', label: '模式状态', value: '制热' },
   { key: 'frostState', label: '化霜状态', value: '关' },
@@ -68,9 +68,12 @@ function HeatPumpPage() {
         icon={groupControlIcon}
         iconAlt="热泵群控"
         title="热泵批量控制"
-        description="开启后，所有的热泵均以相同的参数下置"
+        description="开启后，所有的热泵均以相同的参数下发"
         selected={isGroupControlEnabled}
         onClick={() => setIsGroupControlEnabled((prev) => !prev)}
+        confirmConfig={({ nextSelected }) => ({
+          message: `确认${nextSelected ? '开启' : '关闭'}热泵批量控制吗？`,
+        })}
       />
 
       {!isGroupControlEnabled ? (
@@ -91,6 +94,7 @@ function HeatPumpPage() {
               onChange={setSelectedHeatPumpId}
               triggerAriaLabel="选择热泵"
               listAriaLabel="热泵列表"
+              confirmConfig={({ nextValue }) => ({ message: `确认切换为热泵${nextValue}吗？` })}
             />
           </div>
 
@@ -130,6 +134,7 @@ function HeatPumpPage() {
               showInput={false}
               onChange={(value) => updateParameter(row.id, value)}
               keypadTitle={row.label}
+              confirmConfig={({ nextValue }) => ({ message: `确认将${row.label}设置为 ${nextValue}${row.suffix} 吗？` })}
             />
           ))}
         </div>

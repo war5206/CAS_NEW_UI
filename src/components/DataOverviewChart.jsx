@@ -1,24 +1,36 @@
 import { useEffect, useMemo, useRef } from 'react'
 import * as echarts from 'echarts'
+import {
+  enumerateMonthRange,
+  formatMonthAxisLabel,
+  getCurrentDateInfo,
+  getMaxAvailableDay,
+  getMonthDayCount,
+  parseMonthValue,
+} from '../utils/analysisFilterUtils'
 
 function createOverviewDayDataset(range) {
   const monthValue = range.month || '2026-03'
-  const [year, month] = monthValue.split('-')
-  const monthNumber = Number(month)
-  const pointCount = 12
+  const { year, month } = parseMonthValue(monthValue)
+  const pointCount = getMonthDayCount(monthValue)
+  const maxAvailableDay = getMaxAvailableDay(monthValue, getCurrentDateInfo())
 
-  const labels = Array.from({ length: pointCount }, (_, index) =>
-    `${String(monthNumber).padStart(2, '0')}-${String(index + 1).padStart(2, '0')}`
-  )
+  const labels = Array.from({ length: pointCount }, (_, index) => `${index + 1}号`)
 
   const currentData = labels.map((_, index) =>
-    Number((1.2 + ((monthNumber + index * 0.37) % 11) * 0.11 + index * 0.03).toFixed(2))
+    index + 1 <= maxAvailableDay
+      ? Number((1.2 + ((month + index * 0.37) % 11) * 0.11 + index * 0.03).toFixed(2))
+      : null,
   )
-  const prevData = currentData.map((value, index) => Number((value - 0.18 + (index % 3) * 0.05).toFixed(2)))
-  const yoyData = currentData.map((value, index) => Number((value - 0.32 + (index % 4) * 0.04).toFixed(2)))
+  const prevData = currentData.map((value, index) =>
+    value == null ? null : Number((value - 0.18 + (index % 3) * 0.05).toFixed(2)),
+  )
+  const yoyData = currentData.map((value, index) =>
+    value == null ? null : Number((value - 0.32 + (index % 4) * 0.04).toFixed(2)),
+  )
 
   return {
-    title: `${year}年${monthNumber}月日趋势`,
+    title: `${year}.${String(month).padStart(2, '0')}`,
     labels,
     currentData,
     prevData,
@@ -29,26 +41,9 @@ function createOverviewDayDataset(range) {
 function createOverviewMonthDataset(range) {
   const start = range.startMonth || '2025-11'
   const end = range.endMonth || start
-  const [startYear, startMonth] = start.split('-').map(Number)
-  const [endYear, endMonth] = end.split('-').map(Number)
-  const labels = []
-
-  let year = startYear
-  let month = startMonth
-
-  while (year < endYear || (year === endYear && month <= endMonth)) {
-    labels.push(`${year}.${String(month).padStart(2, '0')}`)
-    month += 1
-    if (month > 12) {
-      month = 1
-      year += 1
-    }
-    if (labels.length >= 12) {
-      break
-    }
-  }
-
-  const safeLabels = labels.length > 0 ? labels : [start.replace('-', '.')]
+  const monthRange = enumerateMonthRange(start, end)
+  const safeLabels = monthRange.length > 0 ? monthRange.map((item) => formatMonthAxisLabel(item.value)) : [formatMonthAxisLabel(start)]
+  const { month: startMonth } = parseMonthValue(start)
   const currentData = safeLabels.map((_, index) =>
     Number((1.6 + index * 0.14 + ((startMonth + index) % 4) * 0.09).toFixed(2))
   )
@@ -168,13 +163,21 @@ function buildSharedTooltipContent({ axisLabel, params, yoyPercentage, chartMode
 
 function buildComparisonSeriesData(sourceData = []) {
   const normalized = sourceData.map((value, index) => {
-    const numeric = Number(value ?? 0)
+    if (value == null) {
+      return null
+    }
+
+    const numeric = Number(value)
     return Number((numeric * (0.82 + (index % 4) * 0.03)).toFixed(2))
   })
 
   return {
-    prevData: normalized.map((value, index) => Number((value * (0.92 + (index % 3) * 0.015)).toFixed(2))),
-    yoyData: normalized.map((value, index) => Number((value * (0.78 + (index % 5) * 0.018)).toFixed(2))),
+    prevData: normalized.map((value, index) =>
+      value == null ? null : Number((value * (0.92 + (index % 3) * 0.015)).toFixed(2)),
+    ),
+    yoyData: normalized.map((value, index) =>
+      value == null ? null : Number((value * (0.78 + (index % 5) * 0.018)).toFixed(2)),
+    ),
   }
 }
 
@@ -192,13 +195,13 @@ function buildPowerStatisticsOption(chartModel, compareMode) {
   }))
 
   const compareBasisData =
-    chartModel.compareBasisData?.map((value) => (value == null ? 0 : Number(value))) ??
-    chartModel.series[0]?.data.map((value) => (value == null ? 0 : Number(value))) ??
+    chartModel.compareBasisData?.map((value) => (value == null ? null : Number(value))) ??
+    chartModel.series[0]?.data.map((value) => (value == null ? null : Number(value))) ??
     []
 
   const { prevData, yoyData } = buildComparisonSeriesData(compareBasisData)
   const yoyPercentages = compareBasisData.map((value, index) =>
-    Number((((value - yoyData[index]) / (yoyData[index] || 1)) * 100).toFixed(1))
+    value == null || yoyData[index] == null ? null : Number((((value - yoyData[index]) / (yoyData[index] || 1)) * 100).toFixed(1))
   )
   const seriesColorMap = Object.fromEntries(chartModel.legend.map((item) => [item.name, item.color]))
 
@@ -220,7 +223,7 @@ function buildPowerStatisticsOption(chartModel, compareMode) {
     series.push({
       name: chartModel.compareLegendNames?.mom ?? '上一周期',
       type: 'line',
-      data: prevData,
+      data: prevData.map((value) => (value == null ? '-' : value)),
       smooth: false,
       symbol: 'circle',
       symbolSize: 8,
@@ -239,7 +242,7 @@ function buildPowerStatisticsOption(chartModel, compareMode) {
     series.push({
       name: chartModel.compareLegendNames?.yoy ?? '去年同期',
       type: 'bar',
-      data: yoyData,
+      data: yoyData.map((value) => (value == null ? '-' : value)),
       barWidth: 16,
       itemStyle: {
         color: createGradient([
@@ -340,7 +343,9 @@ function buildPowerStatisticsOption(chartModel, compareMode) {
 function buildOverviewOption(period, compareMode, range) {
   const dataset = buildOverviewDataset(period, range)
   const yoyPercentages = dataset.currentData.map((value, index) =>
-    Number((((value - dataset.yoyData[index]) / (dataset.yoyData[index] || 1)) * 100).toFixed(1))
+    value == null || dataset.yoyData[index] == null
+      ? null
+      : Number((((value - dataset.yoyData[index]) / (dataset.yoyData[index] || 1)) * 100).toFixed(1))
   )
 
   const barGradient = createGradient([
@@ -364,7 +369,7 @@ function buildOverviewOption(period, compareMode, range) {
     {
       name: compareMode === 'yoy' ? '当前周期 COP' : 'COP',
       type: 'bar',
-      data: dataset.currentData,
+      data: dataset.currentData.map((value) => (value == null ? '-' : value)),
       barWidth: compareMode === 'yoy' ? 16 : 22,
       itemStyle: {
         color: barGradient,
@@ -379,7 +384,7 @@ function buildOverviewOption(period, compareMode, range) {
     series.push({
       name: '上一周期 COP',
       type: 'line',
-      data: dataset.prevData,
+      data: dataset.prevData.map((value) => (value == null ? '-' : value)),
       smooth: false,
       symbol: 'circle',
       symbolSize: 8,
@@ -393,7 +398,7 @@ function buildOverviewOption(period, compareMode, range) {
     series.push({
       name: '去年同期 COP',
       type: 'bar',
-      data: dataset.yoyData,
+      data: dataset.yoyData.map((value) => (value == null ? '-' : value)),
       barWidth: 16,
       itemStyle: {
         color: barGradientYellow,

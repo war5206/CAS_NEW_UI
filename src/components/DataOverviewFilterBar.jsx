@@ -26,7 +26,7 @@ function DataOverviewFilterBar({
           type="month"
           value={range.month}
           onChange={(value) => onRangeChange({ month: value })}
-          title="月份选择"
+          title="年月选择"
           placeholder="请选择年月"
           icon={dateIcon}
           className="data-overview-filter-bar__date"
