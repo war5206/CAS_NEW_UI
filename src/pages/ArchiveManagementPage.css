@@ -71,10 +71,9 @@
 }
 
 .archive-page__panel {
-  min-height: calc(100% - 90px);
   border-radius: 22px;
   border: 1px solid rgba(110, 133, 171, 0.18);
-  background: linear-gradient(180deg, rgba(31, 39, 53, 0.95) 0%, rgba(27, 34, 46, 0.98) 100%);
+  background: #22262D;
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.03);
   padding: 26px 32px;
   box-sizing: border-box;
@@ -181,12 +180,12 @@
 .archive-page__modal-backdrop {
   position: fixed;
   inset: 0;
-  z-index: 150;
+  z-index: 240;
   display: flex;
   align-items: center;
   justify-content: center;
   padding: 24px;
-  background: rgba(0, 0, 0, 0.6);
+  background: rgba(6, 10, 18, 0.74);
 }
 
 .archive-page__modal {
@@ -231,8 +230,8 @@
 }
 
 .archive-page__modal-close img {
-  width: 14px;
-  height: 14px;
+  width: 20px;
+  height: 20px;
 }
 
 .archive-page__picker {

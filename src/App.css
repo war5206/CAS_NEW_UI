@@ -426,6 +426,8 @@
 .content.has-secondary.is-module-layout:has(.alerts-detail-modal-backdrop) .stage-content,
 .app:has(.ops-trend-modal__backdrop) .content.has-secondary.is-module-layout .stage-content,
 .content.has-secondary.is-module-layout:has(.ops-trend-modal__backdrop) .stage-content,
+.app:has(.archive-page__modal-backdrop) .content.has-secondary.is-module-layout .stage-content,
+.content.has-secondary.is-module-layout:has(.archive-page__modal-backdrop) .stage-content,
 .content.has-secondary.is-module-layout:has(.alert-preview-modal__backdrop) .stage-content {
   box-shadow: -24px 0 0 rgba(6, 10, 18, 0.74);
 }
