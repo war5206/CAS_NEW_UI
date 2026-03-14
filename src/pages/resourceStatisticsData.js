@@ -12,12 +12,6 @@ import {
   parseTimeToMinutes,
 } from '../utils/energyPriceState'
 
-const COMPARE_FACTORS = {
-  none: 1,
-  mom: 0.94,
-  yoy: 1.07,
-}
-
 const COST_DEVICE_FACTORS = {
   'total-cost': 1,
   'heat-pump': 1,
@@ -33,22 +27,32 @@ const DAY_BASE_VALUES = [
 const YEAR_BASE_VALUES = [12280, 13860, 14940, 15620, 14880, 16240]
 
 const DEFAULT_COMPARE_COLORS = {
-  momLine: '#FACC25',
-  yoyBar: '#FACC25',
+  momLine: '#39C6E9',
+  yoyBar: '#7C8CFF',
   yoyGradientStops: [
-    { offset: 0, color: '#FACC25' },
-    { offset: 0.75, color: '#FACC25' },
-    { offset: 1, color: 'rgba(250, 204, 37, 0)' },
+    { offset: 0, color: '#7C8CFF' },
+    { offset: 0.72, color: '#7C8CFF' },
+    { offset: 1, color: 'rgba(124, 140, 255, 0)' },
   ],
 }
 
 const DAY_COMPARE_COLORS = {
-  momLine: '#4CC9F0',
-  yoyBar: '#5B8FF9',
+  momLine: '#39C6E9',
+  yoyBar: '#7C8CFF',
   yoyGradientStops: [
-    { offset: 0, color: '#5B8FF9' },
-    { offset: 0.75, color: '#5B8FF9' },
-    { offset: 1, color: 'rgba(91, 143, 249, 0)' },
+    { offset: 0, color: '#7C8CFF' },
+    { offset: 0.72, color: '#7C8CFF' },
+    { offset: 1, color: 'rgba(124, 140, 255, 0)' },
+  ],
+}
+
+const COOL_TONE_COMPARE_COLORS = {
+  momLine: '#35D39A',
+  yoyBar: '#FFB44D',
+  yoyGradientStops: [
+    { offset: 0, color: '#FFB44D' },
+    { offset: 0.72, color: '#FFB44D' },
+    { offset: 1, color: 'rgba(255, 180, 77, 0)' },
   ],
 }
 
@@ -57,6 +61,7 @@ const PAGE_CONFIGS = {
     title: '用水量',
     titleOptions: [],
     accentColor: '#1FA8FF',
+    compareColors: COOL_TONE_COMPARE_COLORS,
     legendName: '用水量',
     unit: 't',
     valueSuffix: ' t',
@@ -113,6 +118,7 @@ const PAGE_CONFIGS = {
     title: '制冷量',
     titleOptions: [],
     accentColor: '#1E73FF',
+    compareColors: COOL_TONE_COMPARE_COLORS,
     legendName: '制冷量',
     unit: 'kWh',
     valueSuffix: ' kWh',
@@ -480,12 +486,10 @@ export function getResourceStatisticsPageConfig(pageType) {
   return PAGE_CONFIGS[pageType]
 }
 
-export function buildResourceStatisticsViewModel({ pageType, period, range, compareMode, titleValue, energyPriceState }) {
+export function buildResourceStatisticsViewModel({ pageType, period, range, titleValue, energyPriceState }) {
   const config = PAGE_CONFIGS[pageType]
-  const factor = COMPARE_FACTORS[compareMode] ?? 1
-
   if (pageType !== 'cost') {
-    const chart = buildGenericChart(config, period, range, factor)
+    const chart = buildGenericChart(config, period, range, 1)
 
     return {
       pageConfig: config,
@@ -506,7 +510,7 @@ export function buildResourceStatisticsViewModel({ pageType, period, range, comp
           mom: `上一周期${config.legendName}`,
           yoy: `去年同期${config.legendName}`,
         },
-        compareColors: DEFAULT_COMPARE_COLORS,
+        compareColors: config.compareColors ?? DEFAULT_COMPARE_COLORS,
         legend: [{ name: config.legendName, color: config.accentColor }],
         series: [
           {
@@ -525,15 +529,14 @@ export function buildResourceStatisticsViewModel({ pageType, period, range, comp
 
   const resolvedEnergyPriceState = energyPriceState ?? getStoredEnergyPriceState()
   const deviceFactor = COST_DEVICE_FACTORS[titleValue || 'total-cost'] ?? 1
-  const combinedFactor = factor * deviceFactor
 
   let chart
   if (period === '日') {
-    chart = buildCostDayChart(range, combinedFactor, resolvedEnergyPriceState)
+    chart = buildCostDayChart(range, deviceFactor, resolvedEnergyPriceState)
   } else if (period === '月') {
-    chart = buildCostMonthChart(range, combinedFactor, resolvedEnergyPriceState)
+    chart = buildCostMonthChart(range, deviceFactor, resolvedEnergyPriceState)
   } else {
-    chart = buildCostYearChart(range, combinedFactor, resolvedEnergyPriceState)
+    chart = buildCostYearChart(range, deviceFactor, resolvedEnergyPriceState)
   }
 
   return {

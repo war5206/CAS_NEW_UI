@@ -508,6 +508,7 @@
   appearance: none;
   background: transparent;
   cursor: pointer;
+  touch-action: none;
 }
 
 .climate-page__level-slider-input:disabled {

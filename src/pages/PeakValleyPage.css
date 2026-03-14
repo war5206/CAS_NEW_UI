@@ -137,11 +137,13 @@
   position: absolute;
   top: 50%;
   left: 50%;
-  width: 1px;
+  width: 2px;
   height: 60px;
   transform: translate(-50%, -50%);
   pointer-events: none;
-  z-index: 3;
+  border-radius: 999px;
+  background: white;
+  z-index: 5;
 }
 
 .peak-valley-page__strength-slider {
@@ -155,6 +157,7 @@
   -webkit-appearance: none;
   appearance: none;
   z-index: 3;
+  touch-action: none;
 }
 
 .peak-valley-page__strength-slider--right {

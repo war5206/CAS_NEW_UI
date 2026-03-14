@@ -1,9 +1,8 @@
-import { useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import FeatureInfoCard from '../components/FeatureInfoCard'
 import LabeledSelectRow from '../components/LabeledSelectRow'
 import { useActionConfirm } from '../hooks/useActionConfirm'
 import peakValleyIcon from '../assets/peak-valley-white.svg'
-import peakValleyLineIcon from '../assets/peak-valley-line.svg'
 import './PeakValleyPage.css'
 
 const HOUR_LABELS = ['5h', '4h', '3h', '2h', '1h', '0', '1h', '2h', '3h', '4h', '5h']
@@ -37,6 +36,7 @@ function PeakValleyPage() {
   const [chargeMinutes, setChargeMinutes] = useState(95)
   const [releaseMinutes, setReleaseMinutes] = useState(95)
   const strengthRangeStartRef = useRef({ chargeMinutes: 95, releaseMinutes: 95 })
+  const strengthRangeValueRef = useRef({ chargeMinutes: 95, releaseMinutes: 95 })
   const isStrengthDraggingRef = useRef(false)
 
   const chargeText = useMemo(() => minutesToText(chargeMinutes), [chargeMinutes])
@@ -61,6 +61,10 @@ function PeakValleyPage() {
       },
     )
   }
+
+  useEffect(() => {
+    strengthRangeValueRef.current = { chargeMinutes, releaseMinutes }
+  }, [chargeMinutes, releaseMinutes])
 
   const handleChargeSliderChange = (event) => {
     const rawValue = Number(event.target.value)
@@ -108,31 +112,50 @@ function PeakValleyPage() {
       return
     }
 
-    requestStrengthConfirm(nextChargeMinutes, nextReleaseMinutes, previousRange)
-  }
-
-  const handleStrengthSliderPointerDown = () => {
     isStrengthDraggingRef.current = true
-    strengthRangeStartRef.current = { chargeMinutes, releaseMinutes }
+    strengthRangeStartRef.current = previousRange
   }
 
-  const handleStrengthSliderPointerEnd = () => {
+  const handleStrengthSliderPointerDown = (event) => {
+    event.stopPropagation()
+    isStrengthDraggingRef.current = true
+    strengthRangeStartRef.current = strengthRangeValueRef.current
+  }
+
+  const handleStrengthSliderPointerEnd = (event) => {
+    event?.stopPropagation?.()
+
     if (!isStrengthDraggingRef.current) {
       return
     }
 
     isStrengthDraggingRef.current = false
     const previousRange = strengthRangeStartRef.current
+    const nextRange = strengthRangeValueRef.current
 
     if (
-      previousRange.chargeMinutes === chargeMinutes &&
-      previousRange.releaseMinutes === releaseMinutes
+      previousRange.chargeMinutes === nextRange.chargeMinutes &&
+      previousRange.releaseMinutes === nextRange.releaseMinutes
     ) {
       return
     }
 
-    requestStrengthConfirm(chargeMinutes, releaseMinutes, previousRange)
+    requestStrengthConfirm(nextRange.chargeMinutes, nextRange.releaseMinutes, previousRange)
   }
+
+  useEffect(() => {
+    const handlePointerRelease = () => {
+      handleStrengthSliderPointerEnd()
+    }
+
+    window.addEventListener('pointerup', handlePointerRelease)
+    window.addEventListener('pointercancel', handlePointerRelease)
+
+    return () => {
+      window.removeEventListener('pointerup', handlePointerRelease)
+      window.removeEventListener('pointercancel', handlePointerRelease)
+    }
+  }, [requestConfirm, chargeMinutes, releaseMinutes])
 
   return (
     <main className="peak-valley-page">
@@ -185,7 +208,7 @@ function PeakValleyPage() {
               <div className="peak-valley-page__strength-track" />
               <div className="peak-valley-page__strength-fill peak-valley-page__strength-fill--charge" />
               <div className="peak-valley-page__strength-fill peak-valley-page__strength-fill--release" />
-              <img className="peak-valley-page__strength-divider" src={peakValleyLineIcon} alt="" aria-hidden="true" />
+              <div className="peak-valley-page__strength-divider" aria-hidden="true" />
               <input
                 className="peak-valley-page__strength-slider peak-valley-page__strength-slider--left"
                 type="range"

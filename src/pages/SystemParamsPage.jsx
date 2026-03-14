@@ -73,7 +73,7 @@ const ENERGY_PRICE_TABS = [
   { value: 'gas', label: '气' },
 ]
 
-const COUPLING_ENERGY_TYPES = ['电锅炉', '燃气锅炉', '水源热泵', '风冷热泵', '无耦合能源']
+const COUPLING_ENERGY_TYPES = ['电锅炉', '燃气锅炉', '水源热泵', '风冷模块', '无耦合能源']
 
 const REGION_OPTIONS = [
   {

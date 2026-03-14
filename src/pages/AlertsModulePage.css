@@ -367,8 +367,8 @@
 
 .alerts-table--fault-tree th,
 .alerts-table--fault-tree td {
-  border-right: 1px solid rgba(140, 163, 196, 0.58);
-  border-bottom: 1px solid rgba(140, 163, 196, 0.42);
+  border-right: 1px solid rgba(140, 163, 196, 0.5);
+  border-bottom: 1px solid rgba(140, 163, 196, 0.5);
 }
 
 .alerts-actions {

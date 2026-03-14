@@ -65,9 +65,9 @@
 }
 
 .avatar {
-  width: 80px;
-  height: 80px;
-  margin-top: 42.5px;
+  width: 70px;
+  height: 70px;
+  margin-top: 52px;
   border-radius: 50%;
   overflow: hidden;
   border: 2px solid rgba(75, 94, 126, 0.36);
@@ -683,7 +683,7 @@
   grid-template-rows: minmax(0, 1fr);
   min-height: 0;
   min-width: 0;
-  padding: 24px;
+  padding: 24px 24px 24px 45px;
 }
 
 .home-system-title {
@@ -726,6 +726,21 @@
 .home-system-overlay {
   position: absolute;
   inset: 0;
+  --home-system-font-base: clamp(12px, 0.95vw, 19px);
+  --home-system-gap-tight: clamp(5.4px, 0.428vw, 8.55px);
+  --home-system-gap-wide: clamp(7.2px, 0.57vw, 11.4px);
+  --home-system-row-margin-top: clamp(4.56px, 0.361vw, 7.22px);
+  --home-system-font-title: clamp(13.92px, 1.102vw, 22.04px);
+  --home-system-font-small: clamp(9.84px, 0.779vw, 15.58px);
+  --home-system-font-extra: clamp(10.8px, 0.855vw, 17.1px);
+  --home-system-tip-margin-top: clamp(4.72px, 0.374vw, 7.48px);
+  --home-system-unit-margin-left: clamp(4.13px, 0.327vw, 6.54px);
+  --home-system-badge-font: clamp(13.44px, 1.064vw, 21.28px);
+  --home-system-badge-min-width: clamp(24.86px, 1.968vw, 39.37px);
+  --home-system-badge-height: clamp(19.08px, 1.511vw, 30.22px);
+  --home-system-badge-padding-x: clamp(3.76px, 0.298vw, 5.96px);
+  --home-system-badge-radius: clamp(5.11px, 0.404vw, 8.09px);
+  --home-system-letter-spacing: clamp(1.44px, 0.114vw, 2.28px);
   width: 100%;
   height: 100%;
   opacity: 0;
@@ -733,7 +748,7 @@
   transition: opacity 160ms ease;
   pointer-events: none;
   color: #f5f8ff;
-  font-size: clamp(12px, 0.95vw, 19px);
+  font-size: var(--home-system-font-base);
   line-height: 1.25;
 }
 
@@ -764,7 +779,7 @@
 }
 
 .home-system-hitbox--heat-pump-icon {
-  left: 0.4%;
+  left: -0.1%;
   top: 12%;
   width: 15.5%;
   height: 19.5%;
@@ -772,7 +787,7 @@
 }
 
 .home-system-hitbox--terminal-building-icon {
-  left: 86%;
+  left: 86.8%;
   top: 46.2%;
   width: 12.5%;
   height: 22.5%;
@@ -783,28 +798,28 @@
 .home-system-row {
   display: flex;
   align-items: baseline;
-  gap: 0.45em;
+  gap: var(--home-system-gap-tight);
 }
 
 .home-system-row {
-  margin-top: 0.38em;
+  margin-top: var(--home-system-row-margin-top);
 }
 
 .home-system-caption {
   color: #f5f8ff;
-  font-size: 1em;
+  font-size: var(--home-system-font-base);
 }
 
 .home-system-caption--title {
-  font-size: 1.16em;
+  font-size: var(--home-system-font-title);
   font-weight: 700;
 }
 
 .home-system-node--heat-pump-click-tip {
   top: 25%;
-  left: 4.5%;
-  margin-top: 0.48em;
-  font-size: 0.82em;
+  left: 4.7%;
+  margin-top: var(--home-system-tip-margin-top);
+  font-size: 14px;
   color: #0e0e14;
 }
 
@@ -816,19 +831,19 @@
 .home-system-value {
   color: #00cbff;
   font-family: 'Alibaba PuHuiTi 2.0', sans-serif;
-  font-size: 1.16em;
+  font-size: var(--home-system-font-title);
   font-weight: 600;
 }
 
 .home-system-unit {
   color: #f5f8ff;
-  font-size: 0.82em;
-  margin-left: 0.42em;
+  font-size: var(--home-system-font-small);
+  margin-left: var(--home-system-unit-margin-left);
 }
 
 .home-system-extra {
   color: #f5f8ff;
-  font-size: 0.9em;
+  font-size: var(--home-system-font-extra);
 }
 
 .home-system-value.is-defrost {
@@ -848,13 +863,13 @@
 }
 
 .home-system-value-badge {
-  min-width: 1.85em;
-  height: 1.42em;
-  padding: 0 0.28em;
-  border-radius: 0.38em;
+  min-width: var(--home-system-badge-min-width);
+  height: var(--home-system-badge-height);
+  padding: 0 var(--home-system-badge-padding-x);
+  border-radius: var(--home-system-badge-radius);
   font-family: 'Alibaba PuHuiTi 2.0', sans-serif;
-  font-size: 1.12em;
-  line-height: 1.42em;
+  font-size: var(--home-system-badge-font);
+  line-height: var(--home-system-badge-height);
   text-align: center;
 }
 
@@ -931,7 +946,7 @@
   top: 54%;
   writing-mode: vertical-rl;
   text-orientation: mixed;
-  letter-spacing: 0.12em;
+  letter-spacing: var(--home-system-letter-spacing);
 }
 
 .home-system-node--drain-valve {
@@ -958,7 +973,7 @@
   left: 66%;
   top: 79.5%;
   display: inline-flex;
-  gap: 0.6em;
+  gap: var(--home-system-gap-wide);
 }
 
 .home-system-node--soft-water {
@@ -976,7 +991,7 @@
 }
 
 .home-system-node--terminal-building-tip {
-  left: 89%;
+  left: 89.7%;
   top: 59.8%;
   font-size: 14px;
   color: #0e0e14;
@@ -1540,34 +1555,69 @@
 .home-building-toolbar {
   display: flex;
   align-items: center;
+  position: relative;
+  z-index: 4;
+}
+
+.home-building-floor-select {
+  width: 260px !important;
+  flex: 0 0 auto;
+  --select-trigger-radius: 16px;
+  --select-trigger-height: 60px;
+  --select-trigger-font-size: 20px;
+  --select-trigger-padding-y: 0;
+  --select-trigger-padding-x: 32px;
+  --select-arrow-right: 30px;
+  --select-arrow-size: 10px;
+  --select-arrow-stroke: 2px;
+  --select-menu-radius: 18px;
+  --select-menu-padding: 8px;
+  --select-menu-max-height: 360px;
+  --select-menu-z-index: 48;
+  --select-option-height: 52px;
+  --select-option-radius: 12px;
+  --select-option-font-size: 20px;
+  --select-option-padding-x: 18px;
 }
 
 .home-building-floor-button {
-  min-width: 128px;
-  height: 60px;
   border: none;
-  border-radius: 16px;
-  padding: 16px 32px;
   background: #22262D;
   color: #FFF;
-  font-size: 20px;
   font-weight: 500;
   line-height: 1;
   font-family: 'Alibaba PuHuiTi 2.0', sans-serif;
   display: inline-flex;
   align-items: center;
-  justify-content: center;
-  gap: 14px;
+  justify-content: flex-start;
   cursor: pointer;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.04);
 }
 
 .home-building-floor-button::after {
-  content: '';
-  width: 10px;
-  height: 10px;
-  border-right: 2px solid rgba(214, 225, 240, 0.84);
-  border-bottom: 2px solid rgba(214, 225, 240, 0.84);
-  transform: rotate(-45deg);
+  border-right-color: rgba(214, 225, 240, 0.84);
+  border-bottom-color: rgba(214, 225, 240, 0.84);
+}
+
+.home-building-floor-button.is-open {
+  background: #2A3039;
+}
+
+.home-building-floor-menu {
+  top: calc(100% + 10px);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  background: #22262D;
+  box-shadow: 0 18px 30px rgba(0, 0, 0, 0.28);
+}
+
+.home-building-floor-option {
+  color: rgba(243, 249, 255, 0.88);
+  font-family: 'Alibaba PuHuiTi 2.0', sans-serif;
+}
+
+.home-building-floor-option.is-selected {
+  color: #FFF;
+  background: rgba(255, 255, 255, 0.08);
 }
 
 .home-building-master-row {
@@ -1588,7 +1638,7 @@
   font-size: 24px;
   font-weight: 700;
   line-height: 1;
-  letter-spacing: 0.02em;
+  letter-spacing: 0.48px;
 }
 
 .home-building-room-grid {
@@ -2410,11 +2460,23 @@
   }
 
   .home-building-floor-button {
-    min-width: 98px;
-    height: 46px;
-    padding: 0 16px;
-    font-size: 28px;
-    border-radius: 12px;
+    box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.05);
+  }
+
+  .home-building-floor-select {
+    width: 300px;
+    --select-trigger-radius: 12px;
+    --select-trigger-height: 46px;
+    --select-trigger-font-size: 28px;
+    --select-trigger-padding-x: 16px;
+    --select-arrow-right: 16px;
+    --select-arrow-size: 8px;
+    --select-menu-radius: 14px;
+    --select-menu-padding: 6px;
+    --select-option-height: 44px;
+    --select-option-radius: 10px;
+    --select-option-font-size: 24px;
+    --select-option-padding-x: 14px;
   }
 
   .home-building-master-row {

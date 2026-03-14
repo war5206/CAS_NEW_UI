@@ -69,16 +69,19 @@
 
 .time-picker-modal__columns {
   position: relative;
-  width: 90%;
+  width: 100%;
+  max-width: 560px;
   gap: 12px;
   display: grid;
 }
 
 .time-picker-modal__columns[data-columns='2'] {
-  gap: 0px;
+  gap: 12px;
 }
 
 .time-picker-modal__column {
+  width: 100%;
+  min-width: 0;
   height: calc(var(--picker-row-height) * 7);
   padding-block: calc(var(--picker-row-height) * 3);
   overflow-y: auto;
@@ -87,7 +90,6 @@
   touch-action: pan-y;
   scrollbar-width: none;
   cursor: grab;
-  margin: 0 auto;
 }
 
 .time-picker-modal__column::-webkit-scrollbar {
@@ -99,7 +101,8 @@
 }
 
 .time-picker-modal__option {
-  width: min(100%, 200px);
+  width: 100%;
+  max-width: none;
   height: var(--picker-row-height);
   border: none;
   background: transparent;
@@ -173,6 +176,10 @@
     left: 18px;
     right: 18px;
     border-radius: 14px;
+  }
+
+  .time-picker-modal__columns {
+    max-width: none;
   }
 
   .time-picker-modal__option {

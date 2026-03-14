@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import LabeledSelectRow from '../components/LabeledSelectRow'
 import { useActionConfirm } from '../hooks/useActionConfirm'
 import './SmartStartStopPage.css'
@@ -27,6 +27,7 @@ function SmartStartStopPage() {
   const [minFreq, setMinFreq] = useState(5)
   const [maxFreq, setMaxFreq] = useState(14)
   const freqRangeStartRef = useRef({ minFreq: 5, maxFreq: 14 })
+  const freqRangeValueRef = useRef({ minFreq: 5, maxFreq: 14 })
   const isFreqRangeDraggingRef = useRef(false)
 
   const rangeText = useMemo(() => `${minFreq}  -  ${maxFreq}`, [minFreq, maxFreq])
@@ -48,6 +49,10 @@ function SmartStartStopPage() {
       },
     )
   }
+
+  useEffect(() => {
+    freqRangeValueRef.current = { minFreq, maxFreq }
+  }, [maxFreq, minFreq])
 
   const handleSliderWrapPointerDown = (event) => {
     if (event.target.closest('.smart-start-stop-page__slider')) {
@@ -74,28 +79,47 @@ function SmartStartStopPage() {
       return
     }
 
-    requestFreqRangeConfirm(nextMinFreq, nextMaxFreq, previousRange)
-  }
-
-  const handleFreqSliderPointerDown = () => {
     isFreqRangeDraggingRef.current = true
-    freqRangeStartRef.current = { minFreq, maxFreq }
+    freqRangeStartRef.current = previousRange
   }
 
-  const handleFreqSliderPointerEnd = () => {
+  const handleFreqSliderPointerDown = (event) => {
+    event.stopPropagation()
+    isFreqRangeDraggingRef.current = true
+    freqRangeStartRef.current = freqRangeValueRef.current
+  }
+
+  const handleFreqSliderPointerEnd = (event) => {
+    event?.stopPropagation?.()
+
     if (!isFreqRangeDraggingRef.current) {
       return
     }
 
     isFreqRangeDraggingRef.current = false
     const previousRange = freqRangeStartRef.current
+    const nextRange = freqRangeValueRef.current
 
-    if (previousRange.minFreq === minFreq && previousRange.maxFreq === maxFreq) {
+    if (previousRange.minFreq === nextRange.minFreq && previousRange.maxFreq === nextRange.maxFreq) {
       return
     }
 
-    requestFreqRangeConfirm(minFreq, maxFreq, previousRange)
+    requestFreqRangeConfirm(nextRange.minFreq, nextRange.maxFreq, previousRange)
   }
+
+  useEffect(() => {
+    const handlePointerRelease = () => {
+      handleFreqSliderPointerEnd()
+    }
+
+    window.addEventListener('pointerup', handlePointerRelease)
+    window.addEventListener('pointercancel', handlePointerRelease)
+
+    return () => {
+      window.removeEventListener('pointerup', handlePointerRelease)
+      window.removeEventListener('pointercancel', handlePointerRelease)
+    }
+  }, [requestConfirm, minFreq, maxFreq])
 
   return (
     <main className="smart-start-stop-page">
@@ -136,7 +160,7 @@ function SmartStartStopPage() {
             <div className="smart-start-stop-page__freq-header">
               <div>
                 <div className="smart-start-stop-page__freq-title">频率区间设定（Hz）</div>
-                <p className="smart-start-stop-page__freq-desc">变频机组运行的最低频率 / 最高频率</p>
+                <p className="smart-start-stop-page__freq-desc">变频机组运行的最低频率 — 最高频率</p>
               </div>
               <div className="smart-start-stop-page__freq-range">{rangeText}</div>
             </div>

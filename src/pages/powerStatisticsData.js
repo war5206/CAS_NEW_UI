@@ -19,12 +19,6 @@ const DEVICE_FACTORS = {
   'coupling-energy': 0.48,
 }
 
-const COMPARE_FACTORS = {
-  none: 1,
-  mom: 0.93,
-  yoy: 1.08,
-}
-
 const DAY_BASE_VALUES = [
   580, 920, 390, 770, 560, 290, 380, 570, 350, 440, 380, 520, 520, 380, 500, 380,
   480, 380, 580, 590, 580, 480, 400, 520, 350, 250, 400, 480, 150, 180, 340,
@@ -49,22 +43,22 @@ const TOTAL_BAR_GRADIENT = [
 ]
 
 const DAY_COMPARE_COLORS = {
-  momLine: '#4CC9F0',
-  yoyBar: '#5B8FF9',
+  momLine: '#39C6E9',
+  yoyBar: '#7C8CFF',
   yoyGradientStops: [
-    { offset: 0, color: '#5B8FF9' },
-    { offset: 0.75, color: '#5B8FF9' },
-    { offset: 1, color: 'rgba(91, 143, 249, 0)' },
+    { offset: 0, color: '#7C8CFF' },
+    { offset: 0.72, color: '#7C8CFF' },
+    { offset: 1, color: 'rgba(124, 140, 255, 0)' },
   ],
 }
 
 const DEFAULT_COMPARE_COLORS = {
-  momLine: '#FACC25',
-  yoyBar: '#FACC25',
+  momLine: '#39C6E9',
+  yoyBar: '#7C8CFF',
   yoyGradientStops: [
-    { offset: 0, color: '#FACC25' },
-    { offset: 0.75, color: '#FACC25' },
-    { offset: 1, color: 'rgba(250, 204, 37, 0)' },
+    { offset: 0, color: '#7C8CFF' },
+    { offset: 0.72, color: '#7C8CFF' },
+    { offset: 1, color: 'rgba(124, 140, 255, 0)' },
   ],
 }
 
@@ -327,19 +321,17 @@ export function getPowerTypeOptions() {
   ]
 }
 
-export function buildPowerStatisticsViewModel({ period, range, compareMode, equipmentType, energyPriceState }) {
+export function buildPowerStatisticsViewModel({ period, range, equipmentType, energyPriceState }) {
   const deviceFactor = DEVICE_FACTORS[equipmentType] ?? 1
-  const compareFactor = COMPARE_FACTORS[compareMode] ?? 1
-  const factor = deviceFactor * compareFactor
   const resolvedEnergyPriceState = energyPriceState ?? getStoredEnergyPriceState()
 
   let chart
   if (period === '日') {
-    chart = buildDaySeries(range, factor, resolvedEnergyPriceState)
+    chart = buildDaySeries(range, deviceFactor, resolvedEnergyPriceState)
   } else if (period === '月') {
-    chart = buildMonthSeries(range, factor)
+    chart = buildMonthSeries(range, deviceFactor)
   } else {
-    chart = buildYearSeries(range, factor)
+    chart = buildYearSeries(range, deviceFactor)
   }
 
   return {

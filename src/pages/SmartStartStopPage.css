@@ -105,6 +105,7 @@
   -webkit-appearance: none;
   appearance: none;
   z-index: 3;
+  touch-action: none;
 }
 
 .smart-start-stop-page__slider--max {

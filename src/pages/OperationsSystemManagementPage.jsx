@@ -88,7 +88,7 @@ const REGION_OPTIONS = [
   },
 ]
 
-const COUPLING_ENERGY_TYPES = ['无耦合能源', '电锅炉', '燃气锅炉', '水源热泵', '风冷热泵']
+const COUPLING_ENERGY_TYPES = ['无耦合能源', '电锅炉', '燃气锅炉', '水源热泵', '风冷模块']
 const WATER_PUMP_MODE_STATES = ['定频', '变频']
 const SYSTEM_RUNNING_MODE_STATES = ['手动模式', '智能模式']
 const HEAT_PUMP_MODE_STATES = ['制冷模式', '制热模式']

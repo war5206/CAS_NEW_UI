@@ -10,13 +10,11 @@ export const DEFAULT_ENERGY_PRICE_STATE = {
     {
       id: 1,
       startDate: '01-01',
-      endDate: '06-30',
+      endDate: '12-31',
       segments: [
-        { start: '00:00', end: '06:00', price: '0.38', color: '#2387f0' },
-        { start: '06:00', end: '12:00', price: '0.60', color: '#efc443' },
-        { start: '12:00', end: '16:00', price: '0.75', color: '#ff7a45' },
-        { start: '16:00', end: '20:00', price: '0.52', color: '#2dd283' },
-        { start: '20:00', end: '24:00', price: '0.75', color: '#ff7a45' },
+        { start: '00:00', end: '08:00', price: '0.28', color: '#2387f0' },
+        { start: '08:00', end: '22:00', price: '0.52', color: '#efc443' },
+        { start: '22:00', end: '24:00', price: '0.28', color: '#ff7a45' },
       ],
     },
   ],

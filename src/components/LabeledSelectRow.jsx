@@ -36,6 +36,11 @@ function formatTwoDigits(value) {
   return String(value).padStart(2, '0')
 }
 
+function formatTimeText(value) {
+  const [hour = 0, minute = 0] = Array.isArray(value) ? value : parseTimeValue(value)
+  return `${formatTwoDigits(hour)}:${formatTwoDigits(minute)}`
+}
+
 function LabeledSelectRow({
   label,
   description,
@@ -128,10 +133,18 @@ function LabeledSelectRow({
           ]}
           value={parseTimeValue(currentValue)}
           onClose={closeKeyboard}
-          confirmConfig={confirmConfig}
+          confirmConfig={
+            typeof confirmConfig === 'function'
+              ? ({ currentValue: nextCurrentValue, nextValue, ...rest }) =>
+                  confirmConfig({
+                    currentValue: formatTimeText(nextCurrentValue),
+                    nextValue: formatTimeText(nextValue),
+                    ...rest,
+                  })
+              : confirmConfig
+          }
           onConfirm={(nextValue) => {
-            const [hour = 0, minute = 0] = Array.isArray(nextValue) ? nextValue : []
-            handleConfirm(`${formatTwoDigits(hour)}:${formatTwoDigits(minute)}`)
+            handleConfirm(formatTimeText(nextValue))
           }}
         />
       ) : (

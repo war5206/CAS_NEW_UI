@@ -127,6 +127,7 @@ function ClimateCompensationPage() {
   const [draftActiveAdvancedCurveId, setDraftActiveAdvancedCurveId] = useState(null)
   const [constantReturnTemp, setConstantReturnTemp] = useState('10')
   const levelSliderStartRef = useRef(8)
+  const levelValueRef = useRef(8)
   const isLevelSliderDraggingRef = useRef(false)
   const curveValuesRef = useRef([])
   const curveDragStateRef = useRef({ active: false, index: -1, startValue: null })
@@ -447,6 +448,10 @@ function ClimateCompensationPage() {
     curveValuesRef.current = curveValues
   }, [curveValues])
 
+  useEffect(() => {
+    levelValueRef.current = levelValue
+  }, [levelValue])
+
   const handleLevelSliderPointerDown = () => {
     isLevelSliderDraggingRef.current = true
     levelSliderStartRef.current = levelValue
@@ -459,7 +464,7 @@ function ClimateCompensationPage() {
 
     isLevelSliderDraggingRef.current = false
     const previousValue = levelSliderStartRef.current
-    const nextValue = levelValue
+    const nextValue = levelValueRef.current
 
     if (previousValue === nextValue) {
       return
@@ -471,6 +476,20 @@ function ClimateCompensationPage() {
       () => setLevelValue(previousValue),
     )
   }
+
+  useEffect(() => {
+    const handlePointerRelease = () => {
+      handleLevelSliderPointerEnd()
+    }
+
+    window.addEventListener('pointerup', handlePointerRelease)
+    window.addEventListener('pointercancel', handlePointerRelease)
+
+    return () => {
+      window.removeEventListener('pointerup', handlePointerRelease)
+      window.removeEventListener('pointercancel', handlePointerRelease)
+    }
+  }, [requestConfirm, levelValue])
 
   useEffect(() => {
     if (selectedMode !== 'climate' || regulateType === 'custom' || !shouldInitChart || !chartRef.current) {

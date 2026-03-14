@@ -220,12 +220,12 @@ function buildPowerStatisticsOption(chartModel, compareMode) {
   )
   const seriesColorMap = Object.fromEntries(chartModel.legend.map((item) => [item.name, item.color]))
   const compareColors = chartModel.compareColors ?? {
-    momLine: '#FACC25',
-    yoyBar: '#FACC25',
+    momLine: '#39C6E9',
+    yoyBar: '#7C8CFF',
     yoyGradientStops: [
-      { offset: 0, color: '#FACC25' },
-      { offset: 0.75, color: '#FACC25' },
-      { offset: 1, color: 'rgba(250, 204, 37, 0)' },
+      { offset: 0, color: '#7C8CFF' },
+      { offset: 0.72, color: '#7C8CFF' },
+      { offset: 1, color: 'rgba(124, 140, 255, 0)' },
     ],
   }
 
@@ -250,8 +250,8 @@ function buildPowerStatisticsOption(chartModel, compareMode) {
       data: prevData.map((value) => (value == null ? '-' : value)),
       smooth: false,
       symbol: 'circle',
-      symbolSize: 8,
-      lineStyle: { color: compareColors.momLine, width: 2 },
+      symbolSize: 7,
+      lineStyle: { color: compareColors.momLine, width: 2.5 },
       itemStyle: { color: compareColors.momLine },
       z: 3,
     })
@@ -267,10 +267,11 @@ function buildPowerStatisticsOption(chartModel, compareMode) {
       name: chartModel.compareLegendNames?.yoy ?? '去年同期',
       type: 'bar',
       data: yoyData.map((value) => (value == null ? '-' : value)),
-      barWidth: 16,
+      barWidth: 14,
       itemStyle: {
         color: createGradient(compareColors.yoyGradientStops),
         borderRadius: [12, 12, 0, 0],
+        opacity: 0.82,
       },
       z: 2,
     })
@@ -359,7 +360,7 @@ function buildPowerStatisticsOption(chartModel, compareMode) {
             ? ''
             : `
               <div style="margin-top:12px;padding-top:12px;border-top:1px solid rgba(255,255,255,0.12);">
-                <div style="color:rgba(255,255,255,0.56);font-size:16px;">${chartModel.breakdownTitle ?? '????'}</div>
+                <div style="color:rgba(255,255,255,0.56);font-size:16px;">${chartModel.breakdownTitle ?? '电价区间'}</div>
                 ${breakdownRows.join('')}
               </div>
             `
