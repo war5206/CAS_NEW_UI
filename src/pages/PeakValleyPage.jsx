@@ -11,15 +11,14 @@ const STRENGTH_CENTER_VALUE = STRENGTH_MINUTES_LIMIT
 const STRENGTH_MAX_VALUE = STRENGTH_MINUTES_LIMIT * 2
 const STRENGTH_SLIDER_THUMB_WIDTH = 56
 
-function valueFromTrackClick(event, min, max) {
-  const rect = event.currentTarget.getBoundingClientRect()
-  const pointerX = event.clientX - rect.left
+function isThumbHit(clientX, rect, value, min, max) {
   const axisStart = STRENGTH_SLIDER_THUMB_WIDTH / 2
   const axisEnd = rect.width - STRENGTH_SLIDER_THUMB_WIDTH / 2
-  const clampedX = Math.min(Math.max(pointerX, axisStart), axisEnd)
-  const ratio = axisEnd === axisStart ? 0 : (clampedX - axisStart) / (axisEnd - axisStart)
-  const rawValue = min + ratio * (max - min)
-  return Math.round(rawValue)
+  const ratio = max === min ? 0 : (value - min) / (max - min)
+  const thumbCenter = axisStart + (axisEnd - axisStart) * ratio
+  const pointerX = clientX - rect.left
+
+  return Math.abs(pointerX - thumbCenter) <= STRENGTH_SLIDER_THUMB_WIDTH / 2
 }
 
 function minutesToText(minutes) {
@@ -35,6 +34,7 @@ function PeakValleyPage() {
   const [expenseRate, setExpenseRate] = useState('50')
   const [chargeMinutes, setChargeMinutes] = useState(95)
   const [releaseMinutes, setReleaseMinutes] = useState(95)
+  const strengthFinalizeTimeoutRef = useRef(null)
   const strengthRangeStartRef = useRef({ chargeMinutes: 95, releaseMinutes: 95 })
   const strengthRangeValueRef = useRef({ chargeMinutes: 95, releaseMinutes: 95 })
   const isStrengthDraggingRef = useRef(false)
@@ -66,69 +66,75 @@ function PeakValleyPage() {
     strengthRangeValueRef.current = { chargeMinutes, releaseMinutes }
   }, [chargeMinutes, releaseMinutes])
 
-  const handleChargeSliderChange = (event) => {
-    const rawValue = Number(event.target.value)
-    const nextValue = Math.min(Math.max(rawValue, 0), STRENGTH_CENTER_VALUE)
-    setChargeMinutes(STRENGTH_CENTER_VALUE - nextValue)
-  }
-
-  const handleReleaseSliderChange = (event) => {
-    const rawValue = Number(event.target.value)
-    const nextValue = Math.min(Math.max(rawValue, STRENGTH_CENTER_VALUE), STRENGTH_MAX_VALUE)
-    setReleaseMinutes(nextValue - STRENGTH_CENTER_VALUE)
-  }
-
-  const handleStrengthSliderWrapPointerDown = (event) => {
-    if (!isEnabled || event.target.closest('.peak-valley-page__strength-slider')) {
-      return
-    }
-
-    const previousRange = { chargeMinutes, releaseMinutes }
-    const nextValue = valueFromTrackClick(event, 0, STRENGTH_MAX_VALUE)
-    let nextChargeMinutes = chargeMinutes
-    let nextReleaseMinutes = releaseMinutes
-
-    if (nextValue < STRENGTH_CENTER_VALUE) {
-      nextChargeMinutes = STRENGTH_CENTER_VALUE - nextValue
-    } else if (nextValue > STRENGTH_CENTER_VALUE) {
-      nextReleaseMinutes = nextValue - STRENGTH_CENTER_VALUE
-    } else {
-      const centerToLeft = STRENGTH_CENTER_VALUE - leftSliderValue
-      const rightToCenter = rightSliderValue - STRENGTH_CENTER_VALUE
-      if (centerToLeft <= rightToCenter) {
-        nextChargeMinutes = 0
-      } else {
-        nextReleaseMinutes = 0
-      }
-    }
-
-    setChargeMinutes(nextChargeMinutes)
-    setReleaseMinutes(nextReleaseMinutes)
-
-    if (
-      previousRange.chargeMinutes === nextChargeMinutes &&
-      previousRange.releaseMinutes === nextReleaseMinutes
-    ) {
-      return
+  const beginStrengthInteraction = (previousRange = strengthRangeValueRef.current) => {
+    if (strengthFinalizeTimeoutRef.current) {
+      window.clearTimeout(strengthFinalizeTimeoutRef.current)
+      strengthFinalizeTimeoutRef.current = null
     }
 
     isStrengthDraggingRef.current = true
     strengthRangeStartRef.current = previousRange
   }
 
-  const handleStrengthSliderPointerDown = (event) => {
-    event.stopPropagation()
-    isStrengthDraggingRef.current = true
-    strengthRangeStartRef.current = strengthRangeValueRef.current
+  const previewStrengthRange = (nextRange) => {
+    strengthRangeValueRef.current = nextRange
+    setChargeMinutes(nextRange.chargeMinutes)
+    setReleaseMinutes(nextRange.releaseMinutes)
   }
 
-  const handleStrengthSliderPointerEnd = (event) => {
-    event?.stopPropagation?.()
+  const handleChargeSliderChange = (event) => {
+    if (!isStrengthDraggingRef.current) {
+      beginStrengthInteraction(strengthRangeValueRef.current)
+    }
 
+    const rawValue = Number(event.target.value)
+    const nextValue = Math.min(Math.max(rawValue, 0), STRENGTH_CENTER_VALUE)
+    previewStrengthRange({
+      chargeMinutes: STRENGTH_CENTER_VALUE - nextValue,
+      releaseMinutes: strengthRangeValueRef.current.releaseMinutes,
+    })
+  }
+
+  const handleReleaseSliderChange = (event) => {
+    if (!isStrengthDraggingRef.current) {
+      beginStrengthInteraction(strengthRangeValueRef.current)
+    }
+
+    const rawValue = Number(event.target.value)
+    const nextValue = Math.min(Math.max(rawValue, STRENGTH_CENTER_VALUE), STRENGTH_MAX_VALUE)
+    previewStrengthRange({
+      chargeMinutes: strengthRangeValueRef.current.chargeMinutes,
+      releaseMinutes: nextValue - STRENGTH_CENTER_VALUE,
+    })
+  }
+
+  const handleStrengthSliderPointerDown = (event, side) => {
+    event.stopPropagation()
+
+    if (!isEnabled) {
+      return
+    }
+
+    const currentRange = strengthRangeValueRef.current
+    const currentValue =
+      side === 'left'
+        ? STRENGTH_CENTER_VALUE - currentRange.chargeMinutes
+        : STRENGTH_CENTER_VALUE + currentRange.releaseMinutes
+
+    if (!isThumbHit(event.clientX, event.currentTarget.getBoundingClientRect(), currentValue, 0, STRENGTH_MAX_VALUE)) {
+      event.preventDefault()
+      return
+    }
+
+    beginStrengthInteraction(currentRange)
+  }
+
+  const finalizeStrengthInteraction = () => {
     if (!isStrengthDraggingRef.current) {
       return
     }
 
+    strengthFinalizeTimeoutRef.current = null
     isStrengthDraggingRef.current = false
     const previousRange = strengthRangeStartRef.current
     const nextRange = strengthRangeValueRef.current
@@ -143,6 +149,23 @@ function PeakValleyPage() {
     requestStrengthConfirm(nextRange.chargeMinutes, nextRange.releaseMinutes, previousRange)
   }
 
+  const handleStrengthSliderPointerEnd = (event) => {
+    event?.stopPropagation?.()
+
+    if (!isStrengthDraggingRef.current) {
+      return
+    }
+
+    if (strengthFinalizeTimeoutRef.current) {
+      window.clearTimeout(strengthFinalizeTimeoutRef.current)
+    }
+
+    // Touch taps on range inputs may dispatch change after pointerup.
+    strengthFinalizeTimeoutRef.current = window.setTimeout(() => {
+      finalizeStrengthInteraction()
+    }, 0)
+  }
+
   useEffect(() => {
     const handlePointerRelease = () => {
       handleStrengthSliderPointerEnd()
@@ -155,7 +178,15 @@ function PeakValleyPage() {
       window.removeEventListener('pointerup', handlePointerRelease)
       window.removeEventListener('pointercancel', handlePointerRelease)
     }
-  }, [requestConfirm, chargeMinutes, releaseMinutes])
+  }, [])
+
+  useEffect(() => {
+    return () => {
+      if (strengthFinalizeTimeoutRef.current) {
+        window.clearTimeout(strengthFinalizeTimeoutRef.current)
+      }
+    }
+  }, [])
 
   return (
     <main className="peak-valley-page">
@@ -192,7 +223,7 @@ function PeakValleyPage() {
 
           <div className="peak-valley-page__strength-row">
             <div className="peak-valley-page__strength-title">蓄能强度</div>
-            <p className="peak-valley-page__strength-desc">在峰电时段前蓄热多长时间，蓄热后持续放热多长时间</p>
+            <p className="peak-valley-page__strength-desc">在峰电时段前蓄热多长时间，蓄热后持续放热多长时间（拖动滑块设值）</p>
             <div className="peak-valley-page__strength-hours">
               {HOUR_LABELS.map((label, index) => (
                 <span key={`${label}-${index}`} style={{ '--tick-ratio': index / 10 }}>
@@ -203,7 +234,6 @@ function PeakValleyPage() {
             <div
               className="peak-valley-page__strength-slider-wrap"
               style={strengthTrackStyle}
-              onPointerDown={handleStrengthSliderWrapPointerDown}
             >
               <div className="peak-valley-page__strength-track" />
               <div className="peak-valley-page__strength-fill peak-valley-page__strength-fill--charge" />
@@ -216,7 +246,7 @@ function PeakValleyPage() {
                 max={STRENGTH_MAX_VALUE}
                 value={leftSliderValue}
                 onChange={handleChargeSliderChange}
-                onPointerDown={handleStrengthSliderPointerDown}
+                onPointerDown={(event) => handleStrengthSliderPointerDown(event, 'left')}
                 onPointerUp={handleStrengthSliderPointerEnd}
                 onPointerCancel={handleStrengthSliderPointerEnd}
                 disabled={!isEnabled}
@@ -229,7 +259,7 @@ function PeakValleyPage() {
                 max={STRENGTH_MAX_VALUE}
                 value={rightSliderValue}
                 onChange={handleReleaseSliderChange}
-                onPointerDown={handleStrengthSliderPointerDown}
+                onPointerDown={(event) => handleStrengthSliderPointerDown(event, 'right')}
                 onPointerUp={handleStrengthSliderPointerEnd}
                 onPointerCancel={handleStrengthSliderPointerEnd}
                 disabled={!isEnabled}

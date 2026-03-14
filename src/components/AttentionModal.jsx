@@ -1,4 +1,4 @@
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import './SettingCards.css'
 
 function AttentionModal({
@@ -14,20 +14,31 @@ function AttentionModal({
   onConfirm,
   onCancel,
 }) {
+  const openedAtRef = useRef(0)
+
   useEffect(() => {
     if (!isOpen) {
       return undefined
     }
 
+    openedAtRef.current = Date.now()
+
     const handleEscape = (event) => {
-      if (event.key === 'Escape') {
-        onClose?.()
+      if (event.key !== 'Escape') {
+        return
       }
+
+      if (showCancel && onCancel) {
+        onCancel()
+        return
+      }
+
+      onClose?.()
     }
 
     window.addEventListener('keydown', handleEscape)
     return () => window.removeEventListener('keydown', handleEscape)
-  }, [isOpen, onClose])
+  }, [isOpen, onCancel, onClose, showCancel])
 
   if (!isOpen) {
     return null
@@ -37,23 +48,45 @@ function AttentionModal({
     .filter(Boolean)
     .join(' ')
   const backdropStyle = Number.isFinite(zIndex) ? { zIndex } : undefined
+
+  const handleDismiss = () => {
+    if (showCancel && onCancel) {
+      onCancel()
+      return
+    }
+
+    onClose?.()
+  }
+
+  const handleBackdropClick = () => {
+    // Ignore the opening gesture's synthetic click on touch devices.
+    if (Date.now() - openedAtRef.current < 300) {
+      return
+    }
+
+    handleDismiss()
+  }
+
   const handleConfirm = () => {
     if (onConfirm) {
       onConfirm()
       return
     }
+
     onClose?.()
   }
+
   const handleCancel = () => {
     if (onCancel) {
       onCancel()
       return
     }
+
     onClose?.()
   }
 
   return (
-    <div className={backdropClassName} style={backdropStyle} role="presentation" onClick={onClose}>
+    <div className={backdropClassName} style={backdropStyle} role="presentation" onClick={handleBackdropClick}>
       <section
         className="attention-modal"
         role="dialog"
@@ -63,8 +96,8 @@ function AttentionModal({
       >
         <header className="attention-modal__header">
           <h3 className="attention-modal__title">{title}</h3>
-          <button type="button" className="attention-modal__close" onClick={onClose} aria-label="关闭">
-            ×
+          <button type="button" className="attention-modal__close" onClick={handleDismiss} aria-label="close">
+            x
           </button>
         </header>
 
