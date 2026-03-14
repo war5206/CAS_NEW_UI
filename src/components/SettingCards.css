@@ -466,7 +466,7 @@
 }
 
 .attention-modal__header {
-  min-height: 60px;
+  min-height: 45px;
   padding: 0 32px;
   display: flex;
   align-items: center;
@@ -477,7 +477,7 @@
 .attention-modal__title {
   margin: 0;
   color: #ffffff;
-  font-size: 20px;
+  font-size: 16px;
   font-weight: 500;
   line-height: 1;
 }
@@ -489,7 +489,7 @@
   border-radius: 10px;
   background: transparent;
   color: #ffffff;
-  font-size: 35px;
+  font-size: 30px;
   line-height: 1;
   cursor: pointer;
   display: inline-flex;

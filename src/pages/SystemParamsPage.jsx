@@ -22,6 +22,11 @@ import addIcon from '../assets/icons/add.svg'
 import dateIcon from '../assets/icons/date.svg'
 import editIcon from '../assets/edit.svg'
 import { HEAT_PUMP_GRID_ITEMS } from '../config/homeHeatPumps'
+import {
+  ENERGY_PRICE_SEGMENT_COLORS,
+  getStoredEnergyPriceState,
+  setStoredEnergyPriceState,
+} from '../utils/energyPriceState'
 import './SystemParamsPage.css'
 
 const MODULE_ITEMS = [
@@ -111,7 +116,6 @@ const SAVE_CONFIRM_MESSAGE = '确认保存当前参数吗？'
 const ENERGY_PRICE_PLAN_TIME_INVALID_MESSAGE = '时段价格设置需覆盖24小时：首段开始时间必须为00:00，末段结束时间必须为24:00。'
 const ENERGY_PRICE_SEGMENT_INVALID_MESSAGE = '时段设置无效：每段结束时间必须晚于开始时间。'
 /** 能源价格各时段条块颜色，按索引循环使用 */
-const ENERGY_PRICE_SEGMENT_COLORS = ['#2387f0', '#efc443', '#ff7a45', '#2dd283', '#9b6bcc', '#00b4d8']
 const DETAIL_MAIN_KEYS = ['project-system-type', 'loop-pump-count', 'unit-layout', 'energy-price', 'coupling-energy']
 
 const CARD_ICON_MAP = {
@@ -141,26 +145,6 @@ const initialLoopPumpForm = {
 const initialSimpleForms = {
   'energy-price': { value: '0.56' },
   'coupling-energy': { value: '电锅炉 2台' },
-}
-
-const initialEnergyPriceState = {
-  tab: 'water',
-  waterFixed: '9.00',
-  gasFixed: '4.80',
-  electricPlans: [
-    {
-      id: 1,
-      startDate: '01-01',
-      endDate: '06-30',
-      segments: [
-        { start: '00:00', end: '06:00', price: '0.38', color: '#2387f0' },
-        { start: '06:00', end: '12:00', price: '0.60', color: '#efc443' },
-        { start: '12:00', end: '16:00', price: '0.75', color: '#ff7a45' },
-        { start: '16:00', end: '20:00', price: '0.52', color: '#2dd283' },
-        { start: '20:00', end: '24:00', price: '0.75', color: '#ff7a45' },
-      ],
-    },
-  ],
 }
 
 const initialCouplingEnergyState = {
@@ -329,8 +313,8 @@ function SystemParamsPage({
   const [savedLoopPumpForm, setSavedLoopPumpForm] = useState(() => deepClone(initialLoopPumpForm))
   const [simpleForms, setSimpleForms] = useState(() => deepClone(initialSimpleForms))
   const [savedSimpleForms, setSavedSimpleForms] = useState(() => deepClone(initialSimpleForms))
-  const [energyPriceState, setEnergyPriceState] = useState(() => deepClone(initialEnergyPriceState))
-  const [savedEnergyPriceState, setSavedEnergyPriceState] = useState(() => deepClone(initialEnergyPriceState))
+  const [energyPriceState, setEnergyPriceState] = useState(() => getStoredEnergyPriceState())
+  const [savedEnergyPriceState, setSavedEnergyPriceState] = useState(() => getStoredEnergyPriceState())
   const [couplingEnergyState, setCouplingEnergyState] = useState(() => deepClone(initialCouplingEnergyState))
   const [savedCouplingEnergyState, setSavedCouplingEnergyState] = useState(() => deepClone(initialCouplingEnergyState))
   const [energyPriceModalOpen, setEnergyPriceModalOpen] = useState(false)
@@ -725,6 +709,7 @@ function SystemParamsPage({
         return false
       }
       setSavedEnergyPriceState(deepClone(energyPriceState))
+      setStoredEnergyPriceState(energyPriceState)
       return true
     }
 

@@ -160,7 +160,6 @@ function PeakValleyPage() {
         <div className="peak-valley-page__row-list">
           <LabeledSelectRow
             label="蓄能补偿值"
-            description="在原来定温或者气候补偿模式下增加温度"
             value={compensation}
             onChange={setCompensation}
             useModeCardControl

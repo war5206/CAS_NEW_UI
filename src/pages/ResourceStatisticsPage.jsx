@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import DataOverviewChart from '../components/DataOverviewChart'
 import DataOverviewFilterBar from '../components/DataOverviewFilterBar'
 import { syncMonthRange } from '../utils/analysisFilterUtils'
+import { getStoredEnergyPriceState } from '../utils/energyPriceState'
 import './DataOverviewPage.css'
 import './ResourceStatisticsPage.css'
 import { buildResourceStatisticsViewModel, getResourceStatisticsPageConfig } from './resourceStatisticsData'
@@ -38,6 +39,7 @@ function ResourceStatisticsPage({ pageType }) {
   const [compareMode, setCompareMode] = useState('none')
   const [filters, setFilters] = useState(DEFAULT_FILTERS)
   const [titleValue, setTitleValue] = useState(pageConfig.titleOptions[0]?.value ?? '')
+  const [energyPriceState] = useState(() => getStoredEnergyPriceState())
 
   const activeRange = period === '日' ? filters.day : period === '月' ? filters.month : filters.year
 
@@ -48,8 +50,10 @@ function ResourceStatisticsPage({ pageType }) {
         period,
         range: activeRange,
         compareMode,
+        titleValue,
+        energyPriceState,
       }),
-    [activeRange, compareMode, pageType, period],
+    [activeRange, compareMode, energyPriceState, pageType, period, titleValue],
   )
 
   const handleFilterChange = (nextRange) => {

@@ -177,7 +177,6 @@ function SmartStartStopPage() {
 
           <LabeledSelectRow
             label="制冷温差设定（℃）"
-            description="用于评估和执行热泵停止操作时间间隔（0-50）"
             value={coolingDiff}
             suffix="℃"
             onChange={setCoolingDiff}

@@ -100,13 +100,14 @@ function createGradient(stops) {
   return new echarts.graphic.LinearGradient(0, 0, 0, 1, stops)
 }
 
-function formatChartValue(value) {
+function formatChartValue(value, suffix = '') {
   const numericValue = Number(value)
   if (!Number.isFinite(numericValue)) {
     return '-'
   }
 
-  return Number.isInteger(numericValue) ? String(numericValue) : numericValue.toFixed(2)
+  const formattedValue = Number.isInteger(numericValue) ? String(numericValue) : numericValue.toFixed(2)
+  return `${formattedValue}${suffix}`
 }
 
 function resolveMarkerColor(item, chartModel, seriesColorMap) {
@@ -121,7 +122,7 @@ function resolveMarkerColor(item, chartModel, seriesColorMap) {
   return chartModel?.series.find((seriesItem) => seriesItem.name === item.seriesName)?.tooltipColor ?? '#7a46ff'
 }
 
-function buildSharedTooltipContent({ axisLabel, params, yoyPercentage, chartModel = null, seriesColorMap = null }) {
+function buildSharedTooltipContent({ axisLabel, params, yoyPercentage, chartModel = null, seriesColorMap = null, valueSuffix = '' }) {
   const rows = params
     .filter((item) => item.value !== '-' && item.value != null)
     .map((item) => {
@@ -131,7 +132,7 @@ function buildSharedTooltipContent({ axisLabel, params, yoyPercentage, chartMode
         <div style="display:flex;align-items:center;gap:12px;min-width:220px;margin-top:12px;">
           <span style="width:12px;height:12px;border-radius:999px;background:${markerColor};display:inline-block;flex:none;"></span>
           <span style="color:rgba(255,255,255,0.78);">${item.seriesName}</span>
-          <span style="margin-left:auto;">${formatChartValue(item.value)}</span>
+          <span style="margin-left:auto;">${formatChartValue(item.value, valueSuffix)}</span>
         </div>
       `
     })
@@ -182,17 +183,31 @@ function buildComparisonSeriesData(sourceData = []) {
 }
 
 function buildPowerStatisticsOption(chartModel, compareMode) {
-  const baseSeries = chartModel.series.map((item) => ({
-    name: item.name,
-    type: item.type,
-    data: item.data.map((value) => (value == null ? '-' : value)),
-    barWidth: item.barWidth ?? 24,
-    barGap: item.type === 'bar' ? '-100%' : undefined,
-    itemStyle: {
-      color: createGradient(item.gradientStops),
-      borderRadius: [12, 12, 0, 0],
-    },
-  }))
+  const stackTotals = chartModel.labels.map((_, index) =>
+    chartModel.series.reduce((sum, seriesItem) => sum + (Number(seriesItem.data[index]) || 0), 0),
+  )
+  const stackedSeriesNames = new Set(chartModel.series.filter((item) => item.stack).map((item) => item.name))
+  const stackedSeriesCount = chartModel.series.filter((item) => item.stack).length
+
+  const baseSeries = chartModel.series.map((item) => {
+    const isStackedBar = item.type === 'bar' && Boolean(item.stack)
+    const stackedIndex = chartModel.series.filter((seriesItem) => seriesItem.stack).findIndex((seriesItem) => seriesItem.name === item.name)
+    const isLastStackedSegment = isStackedBar && stackedIndex === stackedSeriesCount - 1
+    const seriesColor = item.itemStyleColor ?? item.tooltipColor
+
+    return {
+      name: item.name,
+      type: item.type,
+      stack: item.stack,
+      data: item.data.map((value) => (value == null ? '-' : value)),
+      barWidth: item.barWidth ?? 24,
+      barGap: isStackedBar ? '0%' : item.type === 'bar' ? '-100%' : undefined,
+      itemStyle: {
+        color: item.gradientStops ? createGradient(item.gradientStops) : seriesColor,
+        borderRadius: isStackedBar ? (isLastStackedSegment ? [12, 12, 0, 0] : [0, 0, 0, 0]) : [12, 12, 0, 0],
+      },
+    }
+  })
 
   const compareBasisData =
     chartModel.compareBasisData?.map((value) => (value == null ? null : Number(value))) ??
@@ -204,13 +219,22 @@ function buildPowerStatisticsOption(chartModel, compareMode) {
     value == null || yoyData[index] == null ? null : Number((((value - yoyData[index]) / (yoyData[index] || 1)) * 100).toFixed(1))
   )
   const seriesColorMap = Object.fromEntries(chartModel.legend.map((item) => [item.name, item.color]))
+  const compareColors = chartModel.compareColors ?? {
+    momLine: '#FACC25',
+    yoyBar: '#FACC25',
+    yoyGradientStops: [
+      { offset: 0, color: '#FACC25' },
+      { offset: 0.75, color: '#FACC25' },
+      { offset: 1, color: 'rgba(250, 204, 37, 0)' },
+    ],
+  }
 
   if (compareMode === 'mom') {
-    seriesColorMap[chartModel.compareLegendNames?.mom ?? '涓婁竴鍛ㄦ湡'] = '#FACC25'
+    seriesColorMap[chartModel.compareLegendNames?.mom ?? 'Compare MOM'] = compareColors.momLine
   }
 
   if (compareMode === 'yoy') {
-    seriesColorMap[chartModel.compareLegendNames?.yoy ?? '鍘诲勾鍚屾湡'] = '#FACC25'
+    seriesColorMap[chartModel.compareLegendNames?.yoy ?? 'Compare YOY'] = compareColors.yoyBar
   }
 
   const series = [...baseSeries]
@@ -227,14 +251,14 @@ function buildPowerStatisticsOption(chartModel, compareMode) {
       smooth: false,
       symbol: 'circle',
       symbolSize: 8,
-      lineStyle: { color: '#FACC25', width: 2 },
-      itemStyle: { color: '#FACC25' },
+      lineStyle: { color: compareColors.momLine, width: 2 },
+      itemStyle: { color: compareColors.momLine },
       z: 3,
     })
 
     legendData.push({
       name: chartModel.compareLegendNames?.mom ?? '上一周期',
-      itemStyle: { color: '#FACC25' },
+      itemStyle: { color: compareColors.momLine },
     })
   }
 
@@ -245,11 +269,7 @@ function buildPowerStatisticsOption(chartModel, compareMode) {
       data: yoyData.map((value) => (value == null ? '-' : value)),
       barWidth: 16,
       itemStyle: {
-        color: createGradient([
-          { offset: 0, color: '#FACC25' },
-          { offset: 0.75, color: '#FACC25' },
-          { offset: 1, color: 'rgba(250, 204, 37, 0)' },
-        ]),
+        color: createGradient(compareColors.yoyGradientStops),
         borderRadius: [12, 12, 0, 0],
       },
       z: 2,
@@ -257,7 +277,7 @@ function buildPowerStatisticsOption(chartModel, compareMode) {
 
     legendData.push({
       name: chartModel.compareLegendNames?.yoy ?? '去年同期',
-      itemStyle: { color: '#FACC25' },
+      itemStyle: { color: compareColors.yoyBar },
     })
   }
 
@@ -283,15 +303,125 @@ function buildPowerStatisticsOption(chartModel, compareMode) {
 
         const labelIndex = activeItem.dataIndex
         const axisLabel = chartModel.tooltipLabels?.[labelIndex] ?? activeItem.axisValueLabel
-        const percentage = compareMode === 'yoy' ? yoyPercentages[labelIndex] : null
+        const comparePercentage =
+          compareMode === 'mom'
+            ? compareBasisData[labelIndex] == null || prevData[labelIndex] == null
+              ? null
+              : Number((((compareBasisData[labelIndex] - prevData[labelIndex]) / (prevData[labelIndex] || 1)) * 100).toFixed(1))
+            : compareMode === 'yoy'
+              ? yoyPercentages[labelIndex]
+              : null
+        const total = stackTotals[labelIndex] || 0
+        const currentRows = params.filter(
+          (item) =>
+            item.value !== '-' &&
+            item.value != null &&
+            (stackedSeriesNames.has(item.seriesName) || chartModel.currentSeriesNames?.includes(item.seriesName)),
+        )
+        const compareRows = params.filter(
+          (item) =>
+            item.value !== '-' &&
+            item.value != null &&
+            !stackedSeriesNames.has(item.seriesName) &&
+            !chartModel.currentSeriesNames?.includes(item.seriesName),
+        )
+        const breakdownRows = currentRows
+          .filter((item) => stackedSeriesNames.has(item.seriesName))
+          .map((item) => {
+            const markerColor = resolveMarkerColor(item, chartModel, seriesColorMap)
+            const itemValue = Number(item.value)
+            const stackPercentage =
+              total > 0 && stackedSeriesNames.has(item.seriesName) ? Number(((itemValue / total) * 100).toFixed(1)) : null
 
-        return buildSharedTooltipContent({
-          axisLabel,
-          params,
-          yoyPercentage: percentage,
-          chartModel,
-          seriesColorMap,
-        })
+            return `
+              <div style="display:flex;align-items:center;gap:12px;min-width:260px;margin-top:12px;">
+                <span style="width:12px;height:12px;border-radius:999px;background:${markerColor};display:inline-block;flex:none;"></span>
+                <span style="color:rgba(255,255,255,0.78);">${item.seriesName}</span>
+                ${
+                  stackPercentage == null
+                    ? ''
+                    : `<span style="margin-left:auto;color:rgba(255,255,255,0.62);">${stackPercentage.toFixed(1)}%</span>`
+                }
+                <span style="margin-left:${stackPercentage == null ? 'auto' : '18px'};">${formatChartValue(item.value, chartModel.valueSuffix ?? '')}</span>
+              </div>
+            `
+          })
+
+        const currentTotalRow = `
+          <div style="display:flex;align-items:center;gap:12px;min-width:260px;margin-top:12px;">
+            <span style="color:rgba(255,255,255,0.78);">${chartModel.currentTotalLabel ?? '当前总用电量'}</span>
+            <span style="margin-left:auto;">${formatChartValue(compareBasisData[labelIndex], chartModel.valueSuffix ?? '')}</span>
+          </div>
+        `
+
+        const breakdownSection =
+          breakdownRows.length === 0
+            ? ''
+            : `
+              <div style="margin-top:12px;padding-top:12px;border-top:1px solid rgba(255,255,255,0.12);">
+                <div style="color:rgba(255,255,255,0.56);font-size:16px;">${chartModel.breakdownTitle ?? '????'}</div>
+                ${breakdownRows.join('')}
+              </div>
+            `
+
+        const compareSection =
+          compareRows.length === 0
+            ? ''
+            : `
+              <div style="margin-top:12px;padding-top:12px;border-top:1px solid rgba(255,255,255,0.12);">
+                ${compareRows
+                  .map((item) => {
+                    const markerColor = resolveMarkerColor(item, chartModel, seriesColorMap)
+                    return `
+                      <div style="display:flex;align-items:center;gap:12px;min-width:260px;margin-top:12px;">
+                        <span style="width:12px;height:12px;border-radius:999px;background:${markerColor};display:inline-block;flex:none;"></span>
+                        <span style="color:rgba(255,255,255,0.78);">${item.seriesName}</span>
+                        <span style="margin-left:auto;">${formatChartValue(item.value, chartModel.valueSuffix ?? '')}</span>
+                      </div>
+                    `
+                  })
+                  .join('')}
+                ${
+                  comparePercentage == null
+                    ? ''
+                    : `
+                      <div style="display:flex;align-items:center;gap:12px;min-width:260px;margin-top:12px;">
+                        <span style="color:rgba(255,255,255,0.78);">${compareMode === 'mom' ? '环比变化' : '同比变化'}</span>
+                        <span style="margin-left:auto;color:${comparePercentage >= 0 ? '#ff5d3a' : '#34ddbb'};">
+                          ${comparePercentage >= 0 ? '+' : ''}${comparePercentage.toFixed(1)}%
+                        </span>
+                      </div>
+                    `
+                }
+              </div>
+            `
+
+        const extraCurrentRows =
+          currentRows.length > 0 && breakdownRows.length === 0
+            ? currentRows
+                .filter((item) => !stackedSeriesNames.has(item.seriesName))
+                .map((item) => {
+                  const markerColor = resolveMarkerColor(item, chartModel, seriesColorMap)
+                  return `
+                    <div style="display:flex;align-items:center;gap:12px;min-width:260px;margin-top:12px;">
+                      <span style="width:12px;height:12px;border-radius:999px;background:${markerColor};display:inline-block;flex:none;"></span>
+                      <span style="color:rgba(255,255,255,0.78);">${item.seriesName}</span>
+                      <span style="margin-left:auto;">${formatChartValue(item.value, chartModel.valueSuffix ?? '')}</span>
+                    </div>
+                  `
+                })
+                .join('')
+            : ''
+
+        return `
+          <div style="min-width:260px;">
+            <div style="font-size:18px;color:#FFFFFF;">${axisLabel}</div>
+            ${currentTotalRow}
+            ${extraCurrentRows}
+            ${breakdownSection}
+            ${compareSection}
+          </div>
+        `
       },
     },
     legend: {

@@ -360,6 +360,17 @@
   vertical-align: middle;
 }
 
+.alerts-table--fault-tree tbody tr:nth-child(odd),
+.alerts-table--fault-tree tbody tr:nth-child(even) {
+  background: #222a35;
+}
+
+.alerts-table--fault-tree th,
+.alerts-table--fault-tree td {
+  border-right: 1px solid rgba(140, 163, 196, 0.58);
+  border-bottom: 1px solid rgba(140, 163, 196, 0.42);
+}
+
 .alerts-actions {
   display: flex;
   justify-content: center;

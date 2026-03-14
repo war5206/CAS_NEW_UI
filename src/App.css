@@ -801,11 +801,11 @@
 }
 
 .home-system-node--heat-pump-click-tip {
-  top: 8%;
-  left: 0.5%;
+  top: 25%;
+  left: 4.5%;
   margin-top: 0.48em;
   font-size: 0.82em;
-  color: rgba(201, 224, 255, 0.86);
+  color: #0e0e14;
 }
 
 .home-system-caption.is-fault,
@@ -976,10 +976,10 @@
 }
 
 .home-system-node--terminal-building-tip {
-  left: 83%;
-  top: 44%;
+  left: 89%;
+  top: 59.8%;
   font-size: 14px;
-  color: rgba(201, 224, 255, 0.86);
+  color: #0e0e14;
 }
 
 .home-hp,

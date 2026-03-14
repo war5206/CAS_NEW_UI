@@ -5,6 +5,7 @@ import TimePickerModal from '../components/TimePickerModal'
 import dateIcon from '../assets/icons/date.svg'
 import closeIcon from '../assets/icons/close.svg'
 import { getStoredClimateMode } from '../utils/climateModeState'
+import { getStoredEnergyPriceState } from '../utils/energyPriceState'
 import { getStoredTemperatureMode } from '../utils/temperatureModeState'
 import './OperationsSystemManagementPage.css'
 
@@ -16,11 +17,111 @@ const DATETIME_MINUTES = Array.from({ length: 60 }, (_, index) => index)
 const HOUR_IN_MS = 60 * 60 * 1000
 const DAY_IN_MS = 24 * HOUR_IN_MS
 
-const SETTING_OPTIONS = [{ value: 'mode-select', label: '模式选择' }]
+const SETTING_OPTIONS = [
+  { value: 'mode-select', label: '模式选择' },
+  { value: 'climate-compensation', label: '气候补偿' },
+  { value: 'smart-timer', label: '智能定时' },
+  { value: 'smart-start-stop', label: '智能启停' },
+  { value: 'peak-valley', label: '热电协同' },
+  { value: 'coupling-energy', label: '耦合能源' },
+  { value: 'heat-pump', label: '热泵' },
+  { value: 'water-pump', label: '水泵' },
+  { value: 'constant-pressure-pump', label: '定压泵' },
+  { value: 'heat-trace', label: '伴热带' },
+  { value: 'drain-valve', label: '排污阀' },
+  { value: 'relief-valve', label: '泄压阀' },
+  { value: 'project-system-type', label: '项目系统类型' },
+  { value: 'energy-price', label: '能源价格' },
+  { value: 'system', label: '系统' },
+  { value: 'heat-pump-meter-1', label: '热泵电表1' },
+  { value: 'heat-pump-meter-2', label: '热泵电表2' },
+  { value: 'water-pump-meter', label: '水泵电表' },
+  { value: 'water-heat-meter', label: '水表和热表' },
+]
 const UNIT_OPTIONS = Array.from({ length: 33 }, (_, index) => ({
   value: `heat-pump-${index + 1}`,
   label: `热泵${index + 1}`,
 }))
+
+const PROJECT_TYPE_OPTIONS = [
+  { value: 'heating', label: '采暖' },
+  { value: 'cooling-heating', label: '冷暖' },
+  { value: 'hot-water', label: '热水' },
+]
+
+const TERMINAL_FORM_OPTIONS = [
+  { value: 'floor-heating', label: '地暖' },
+  { value: 'radiator', label: '暖气片' },
+  { value: 'fan-coil', label: '风机盘管' },
+]
+
+const SYSTEM_TYPE_OPTIONS = [
+  { value: 'primary', label: '一次系统' },
+  { value: 'secondary', label: '二次系统' },
+]
+
+const REGION_OPTIONS = [
+  {
+    value: 'jiangsu',
+    label: '江苏省',
+    cities: [
+      { value: 'nanjing', label: '南京市' },
+      { value: 'lianyungang', label: '连云港市' },
+      { value: 'suzhou', label: '苏州市' },
+    ],
+  },
+  {
+    value: 'zhejiang',
+    label: '浙江省',
+    cities: [
+      { value: 'hangzhou', label: '杭州市' },
+      { value: 'ningbo', label: '宁波市' },
+    ],
+  },
+  {
+    value: 'beijing',
+    label: '北京市',
+    cities: [
+      { value: 'chaoyang', label: '朝阳区' },
+      { value: 'haidian', label: '海淀区' },
+    ],
+  },
+]
+
+const COUPLING_ENERGY_TYPES = ['无耦合能源', '电锅炉', '燃气锅炉', '水源热泵', '风冷热泵']
+const WATER_PUMP_MODE_STATES = ['定频', '变频']
+const SYSTEM_RUNNING_MODE_STATES = ['手动模式', '智能模式']
+const HEAT_PUMP_MODE_STATES = ['制冷模式', '制热模式']
+
+const REGION_LABEL_MAP = REGION_OPTIONS.reduce((map, province) => {
+  map[province.value] = province.label
+  province.cities.forEach((city) => {
+    map[city.value] = city.label
+  })
+  return map
+}, {})
+
+const PROJECT_SYSTEM_DEFAULTS = {
+  projectType: 'cooling-heating',
+  terminalForm: 'floor-heating',
+  systemType: 'primary',
+  province: 'jiangsu',
+  city: 'lianyungang',
+  heatPumpCount: '33',
+}
+
+const COUPLING_ENERGY_DEFAULTS = {
+  type: '电锅炉',
+  count: '2',
+}
+
+const LOOP_PUMP_DEFAULTS = {
+  mainPumpCount: '2',
+  standbyPumpCount: '1',
+}
+
+const SMART_TIMER_TEMPERATURES = ['35', '34', '33', '32', '31', '30', '29', '28', '27', '26', '25', '24']
+const SMART_TIMER_ENABLED = [true, true, true, false, false, false, false, false, false, false, false, false]
 
 const SYSTEM_STATUS_ITEMS = [
   { key: 'hp-pump-1', label: '热泵循环泵1号运行反馈', value: '运行', unit: 'state', chartType: 'state' },
@@ -135,116 +236,317 @@ function getSeriesPointCount(span) {
   return Math.min(31, Math.max(2, Math.round(span / DAY_IN_MS) + 1))
 }
 
-function buildSystemSettingItems() {
+function createEnumMetric(key, label, value, chartStates, unit = '状态') {
+  return {
+    key,
+    label,
+    value,
+    unit,
+    chartType: 'enum',
+    chartStates,
+  }
+}
+
+function createSwitchMetric(key, label, enabled) {
+  return createEnumMetric(key, label, enabled ? '开启' : '关闭', ['关闭', '开启'], '开关')
+}
+
+function createValueMetric(key, label, value, unit = '', chartType = 'number') {
+  return {
+    key,
+    label,
+    value,
+    unit,
+    chartType,
+  }
+}
+
+function findOptionLabel(options, value, fallback = '--') {
+  return options.find((item) => item.value === value)?.label ?? fallback
+}
+
+function buildModeSelectItems() {
   const climateMode = getStoredClimateMode()
   const heatPumpMode = getStoredTemperatureMode()
 
   return [
-    {
-      key: 'run-mode',
-      label: '系统运行模式',
-      value: '智能模式',
-      unit: 'mode',
-      chartType: 'enum',
-      chartStates: ['手动模式', '智能模式'],
-    },
-    {
-      key: 'weather-comp',
-      label: '气候补偿',
-      value: climateMode === 'constant' ? '定温模式' : '气候补偿',
-      unit: 'mode',
-      chartType: 'enum',
-      chartStates: ['定温模式', '气候补偿'],
-    },
-    {
-      key: 'timer-mode',
-      label: '智能定时',
-      value: '方案一',
-      unit: 'mode',
-      chartType: 'enum',
-      chartStates: ['全天候模式', '方案一'],
-    },
-    {
-      key: 'smart-start',
-      label: '智能启停',
-      value: '开启',
-      unit: 'switch',
-      chartType: 'enum',
-      chartStates: ['关闭', '开启'],
-    },
-    {
-      key: 'peak-valley',
-      label: '热电协同',
-      value: '开启',
-      unit: 'switch',
-      chartType: 'enum',
-      chartStates: ['关闭', '开启'],
-    },
-    {
-      key: 'coupling-energy',
-      label: '耦合能源',
-      value: '电锅炉 2台',
-      unit: 'mode',
-      chartType: 'enum',
-      chartStates: ['无耦合能源', '电锅炉 2台'],
-    },
-    {
-      key: 'terminal-linkage',
-      label: '末端联动功能',
-      value: '开启',
-      unit: 'switch',
-      chartType: 'enum',
-      chartStates: ['关闭', '开启'],
-    },
-    {
-      key: 'protect-mode',
-      label: '热泵长时间运行保护功能',
-      value: '开启',
-      unit: 'switch',
-      chartType: 'enum',
-      chartStates: ['关闭', '开启'],
-    },
-    {
-      key: 'heat-pump-mode',
-      label: '热泵总运行模式',
-      value: heatPumpMode === 'cooling' ? '制冷模式' : '制热模式',
-      unit: 'mode',
-      chartType: 'enum',
-      chartStates: ['制冷模式', '制热模式'],
-    },
-    {
-      key: 'heat-trace',
-      label: '伴热带',
-      value: '10℃启动',
-      unit: 'mode',
-      chartType: 'enum',
-      chartStates: ['关闭', '10℃启动'],
-    },
-    {
-      key: 'constant-pressure-pump',
-      label: '定压泵',
-      value: '1号运行',
-      unit: 'state',
-      chartType: 'enum',
-      chartStates: ['全部关闭', '1号运行'],
-    },
-    {
-      key: 'drain-valve',
-      label: '排污阀',
-      value: '关闭',
-      unit: 'switch',
-      chartType: 'enum',
-      chartStates: ['关闭', '开启'],
-    },
-    {
-      key: 'relief-valve',
-      label: '泄压阀',
-      value: '关闭',
-      unit: 'switch',
-      chartType: 'enum',
-      chartStates: ['关闭', '开启'],
-    }
+    createEnumMetric('run-mode', '系统运行模式', '智能模式', SYSTEM_RUNNING_MODE_STATES, '模式'),
+    createSwitchMetric('climate-comp-enabled', '气候补偿功能', climateMode === 'climate'),
+    createSwitchMetric('smart-timer-enabled', '智能定时模式', true),
+    createSwitchMetric('smart-start-enabled', '智能启停功能', true),
+    createSwitchMetric('peak-valley-enabled', '热电协同功能', true),
+    createSwitchMetric('coupling-energy-enabled', '耦合能源功能', true),
+    createSwitchMetric('terminal-linkage-enabled', '末端联动功能', true),
+    createSwitchMetric('heat-pump-protect-enabled', '热泵长时间运行保护功能', true),
+    createEnumMetric(
+      'heat-pump-total-mode',
+      '热泵总运行模式',
+      heatPumpMode === 'cooling' ? '制冷模式' : '制热模式',
+      HEAT_PUMP_MODE_STATES,
+      '模式',
+    ),
   ]
+}
+
+function buildClimateCompensationItems() {
+  const heatPumpMode = getStoredTemperatureMode()
+  const targetReturnTemp = heatPumpMode === 'cooling' ? '18.0 ℃' : '24.0 ℃'
+
+  return [
+    createValueMetric('target-return-temp', '目标回水温度', targetReturnTemp, '℃', 'temperature'),
+    createValueMetric('constant-return-temp', '定温回水温度', '10.0 ℃', '℃', 'temperature'),
+  ]
+}
+
+function buildSmartTimerItems() {
+  const temperatureItems = SMART_TIMER_TEMPERATURES.map((value, index) =>
+    createValueMetric(
+      `smart-timer-temp-${index + 1}`,
+      `定时段${index + 1}定温回水温度设定`,
+      `${value}.0 ℃`,
+      '℃',
+      'temperature',
+    ),
+  )
+
+  const enabledItems = SMART_TIMER_ENABLED.map((enabled, index) =>
+    createSwitchMetric(`smart-timer-enabled-${index + 1}`, `定时段${index + 1}使能`, enabled),
+  )
+
+  return [...temperatureItems, ...enabledItems]
+}
+
+function buildSmartStartStopItems() {
+  return [
+    createValueMetric('smart-start-temp-diff', '加减载温差', '10.0 ℃', '℃', 'temperature'),
+    createValueMetric('smart-start-load-cycle', '加载周期', '10 分钟', '分钟', 'duration'),
+    createValueMetric('smart-start-unload-cycle', '减载周期', '10 分钟', '分钟', 'duration'),
+    createValueMetric('smart-start-min-freq', '最低频率', '5 Hz', 'Hz', 'frequency'),
+    createValueMetric('smart-start-max-freq', '最高频率', '14 Hz', 'Hz', 'frequency'),
+    createValueMetric('smart-start-cooling-diff', '制冷温差设定', '10.0 ℃', '℃', 'temperature'),
+  ]
+}
+
+function buildPeakValleyItems() {
+  return [
+    createValueMetric('peak-valley-compensation', '蓄能补偿值', '2', '', 'number'),
+    createValueMetric('peak-valley-charge', '蓄热值', '95 分钟', '分钟', 'duration'),
+    createValueMetric('peak-valley-release', '放热值', '95 分钟', '分钟', 'duration'),
+    createValueMetric('peak-valley-expense-rate', '费用倍率值', '50 %', '%', 'percentage'),
+  ]
+}
+
+function buildCouplingEnergyItems() {
+  return [
+    createEnumMetric(
+      'coupling-energy-type',
+      '耦合能源类型',
+      COUPLING_ENERGY_DEFAULTS.type,
+      COUPLING_ENERGY_TYPES,
+      '类型',
+    ),
+    createValueMetric('coupling-energy-count', '耦合能源台数', `${COUPLING_ENERGY_DEFAULTS.count} 台`, '台', 'count'),
+  ]
+}
+
+function buildHeatPumpSettingItems() {
+  return [
+    createValueMetric('heat-pump-protect-judge', '热泵持续运行保护判断时长', '5 h', 'h', 'duration'),
+    createValueMetric('heat-pump-protect-stop', '热泵运行保护停机时长', '5 min', 'min', 'duration'),
+    createValueMetric('heat-pump-running-count', '机组正在运行台数', '2 台', '台', 'count'),
+    createValueMetric('heat-pump-min-runtime', '热泵最小运行时长', '10 min', 'min', 'duration'),
+  ]
+}
+
+function buildWaterPumpItems() {
+  return [
+    createSwitchMetric('loop-pump-1-switch', '热泵循环泵1号开关', true),
+    createSwitchMetric('loop-pump-2-switch', '热泵循环泵2号开关', false),
+    createSwitchMetric('loop-pump-3-switch', '热泵循环泵3号开关', false),
+    createValueMetric('loop-pump-main-count', '热泵循环泵主泵台数', `${LOOP_PUMP_DEFAULTS.mainPumpCount} 台`, '台', 'count'),
+    createValueMetric('loop-pump-standby-count', '热泵循环泵备泵台数', `${LOOP_PUMP_DEFAULTS.standbyPumpCount} 台`, '台', 'count'),
+    createEnumMetric('loop-pump-mode', '运行模式', '变频', WATER_PUMP_MODE_STATES, '模式'),
+    createSwitchMetric('loop-pump-saving', '热泵循环泵间隔循环节能功能', false),
+    createValueMetric('loop-pump-start-interval', '热泵循环泵间隔启动时间', '10 分钟', '分钟', 'duration'),
+    createValueMetric('loop-pump-stop-interval', '热泵循环泵间隔停止时间', '10 分钟', '分钟', 'duration'),
+    createValueMetric('loop-pump-rotation-time', '热泵循环泵轮值时间', '72 天', '天', 'duration'),
+  ]
+}
+
+function buildConstantPressurePumpItems() {
+  return [
+    createSwitchMetric('constant-pressure-pump-1', '定压泵1手动开关', true),
+    createSwitchMetric('constant-pressure-pump-2', '定压泵2手动开关', false),
+    createValueMetric('constant-pressure-start', '定压泵启动压力', '10.0 kPa', 'kPa', 'pressure'),
+    createValueMetric('constant-pressure-stop', '定压泵停止压力', '20.0 kPa', 'kPa', 'pressure'),
+  ]
+}
+
+function buildHeatTraceItems() {
+  return [
+    createSwitchMetric('heat-trace-manual', '伴热带手动开关', false),
+    createValueMetric('heat-trace-start-temp', '伴热带启动温度设置', '10.0 ℃', '℃', 'temperature'),
+    createValueMetric('heat-trace-stop-temp', '伴热带关闭温度设置', '10.0 ℃', '℃', 'temperature'),
+    createValueMetric('heat-trace-delay-close', '延时关闭时间', '10 分钟', '分钟', 'duration'),
+  ]
+}
+
+function buildDrainValveItems() {
+  return [
+    createSwitchMetric('drain-valve-manual', '排污阀手动开关', false),
+    createValueMetric('drain-valve-cycle', '排污周期（天）', '5 天', '天', 'duration'),
+    createValueMetric('drain-valve-time', '排污时间点', '08:00', '', 'timepoint'),
+    createValueMetric('drain-valve-duration', '排污持续时间（s）', '10 s', 's', 'duration'),
+  ]
+}
+
+function buildReliefValveItems() {
+  return [
+    createSwitchMetric('relief-valve-manual', '泄压阀手动开关', false),
+    createValueMetric('relief-valve-start', '泄压阀启动压力', '10.0 kPa', 'kPa', 'pressure'),
+    createValueMetric('relief-valve-stop', '泄压阀停止压力', '10.0 kPa', 'kPa', 'pressure'),
+  ]
+}
+
+function buildProjectSystemTypeItems() {
+  const areaLabel = `${REGION_LABEL_MAP[PROJECT_SYSTEM_DEFAULTS.province]} / ${REGION_LABEL_MAP[PROJECT_SYSTEM_DEFAULTS.city]}`
+
+  return [
+    createEnumMetric(
+      'project-type',
+      '项目类型',
+      findOptionLabel(PROJECT_TYPE_OPTIONS, PROJECT_SYSTEM_DEFAULTS.projectType),
+      PROJECT_TYPE_OPTIONS.map((item) => item.label),
+      '类型',
+    ),
+    createEnumMetric(
+      'terminal-form',
+      '末端形式',
+      findOptionLabel(TERMINAL_FORM_OPTIONS, PROJECT_SYSTEM_DEFAULTS.terminalForm),
+      TERMINAL_FORM_OPTIONS.map((item) => item.label),
+      '类型',
+    ),
+    createEnumMetric(
+      'system-type',
+      '系统类型',
+      findOptionLabel(SYSTEM_TYPE_OPTIONS, PROJECT_SYSTEM_DEFAULTS.systemType),
+      SYSTEM_TYPE_OPTIONS.map((item) => item.label),
+      '类型',
+    ),
+    createEnumMetric('project-area', '区域', areaLabel, Object.values(REGION_LABEL_MAP), '区域'),
+    createValueMetric('project-heat-pump-count', '热泵总台数', `${PROJECT_SYSTEM_DEFAULTS.heatPumpCount} 台`, '台', 'count'),
+  ]
+}
+
+function buildEnergyPriceItems() {
+  const energyPriceState = getStoredEnergyPriceState()
+  const electricityItems = energyPriceState.electricPlans.flatMap((plan, planIndex) =>
+    plan.segments.map((segment, segmentIndex) =>
+      createValueMetric(
+        `energy-price-electric-${plan.id}-${segmentIndex}`,
+        `电价${planIndex + 1}-${segmentIndex + 1}`,
+        `${segment.start}-${segment.end} / ${segment.price || '--'} 元/kWh`,
+        '元/kWh',
+        'price',
+      ),
+    ),
+  )
+
+  return [
+    ...electricityItems,
+    createValueMetric('energy-price-water', '水价', `${energyPriceState.waterFixed} 元/m³`, '元/m³', 'price'),
+    createValueMetric('energy-price-gas', '气价', `${energyPriceState.gasFixed} 元/m³`, '元/m³', 'price'),
+  ]
+}
+
+function buildSystemItems() {
+  return [
+    createSwitchMetric('system-power', '系统开关机', true),
+    createValueMetric('system-indoor-avg-1d', '一天的室内温度平均值', '22.6 ℃', '℃', 'temperature'),
+    createValueMetric('system-indoor-avg-3d', '三天的室内温度平均值', '22.3 ℃', '℃', 'temperature'),
+    createValueMetric('system-heating-season-avg', '采暖季累计的室内平均值', '21.8 ℃', '℃', 'temperature'),
+    createValueMetric('system-cooling-season-avg', '制冷季累计的室内平均值', '25.4 ℃', '℃', 'temperature'),
+  ]
+}
+
+function buildPowerMeterItems(prefix) {
+  return [
+    createValueMetric(`${prefix}-voltage-a`, 'A相电压', '381 V', 'V', 'voltage'),
+    createValueMetric(`${prefix}-voltage-b`, 'B相电压', '384 V', 'V', 'voltage'),
+    createValueMetric(`${prefix}-voltage-c`, 'C相电压', '379 V', 'V', 'voltage'),
+    createValueMetric(`${prefix}-current-a`, 'A相电流', '16.2 A', 'A', 'current'),
+    createValueMetric(`${prefix}-current-b`, 'B相电流', '15.8 A', 'A', 'current'),
+    createValueMetric(`${prefix}-current-c`, 'C相电流', '16.5 A', 'A', 'current'),
+    createValueMetric(`${prefix}-power-a`, 'A相功率', '6.2 kW', 'kW', 'power'),
+    createValueMetric(`${prefix}-power-b`, 'B相功率', '6.0 kW', 'kW', 'power'),
+    createValueMetric(`${prefix}-power-c`, 'C相功率', '6.4 kW', 'kW', 'power'),
+    createValueMetric(`${prefix}-energy-total`, '累计耗电量', '12850.0 kWh', 'kWh', 'energy'),
+  ]
+}
+
+function buildWaterHeatMeterItems() {
+  return [
+    createValueMetric('water-meter-total-flow', '水表累计流量', '3256.0 m³', 'm³', 'flow'),
+    createValueMetric('heat-meter-supply-temp', '热表供水温度', '38.6 ℃', '℃', 'temperature'),
+    createValueMetric('heat-meter-return-temp', '热表回水温度', '31.4 ℃', '℃', 'temperature'),
+    createValueMetric('heat-meter-power', '热表功率', '186.0 kW', 'kW', 'power'),
+    createValueMetric('heat-meter-flow', '热表瞬时流量', '18.5 m³/h', 'm³/h', 'flow'),
+    createValueMetric('heat-meter-total-flow', '热表累计流量', '4980.0 m³', 'm³', 'flow'),
+    createValueMetric('heat-meter-total-heat', '热表累计热量', '12680.0 kWh', 'kWh', 'energy'),
+    createValueMetric('heat-meter-total-cool', '热表累计冷量', '9320.0 kWh', 'kWh', 'energy'),
+  ]
+}
+
+function buildSystemSettingItems(settingKey) {
+  switch (settingKey) {
+    case 'mode-select':
+      return buildModeSelectItems()
+    case 'climate-compensation':
+      return buildClimateCompensationItems()
+    case 'smart-timer':
+      return buildSmartTimerItems()
+    case 'smart-start-stop':
+      return buildSmartStartStopItems()
+    case 'peak-valley':
+      return buildPeakValleyItems()
+    case 'coupling-energy':
+      return buildCouplingEnergyItems()
+    case 'heat-pump':
+      return buildHeatPumpSettingItems()
+    case 'water-pump':
+      return buildWaterPumpItems()
+    case 'constant-pressure-pump':
+      return buildConstantPressurePumpItems()
+    case 'heat-trace':
+      return buildHeatTraceItems()
+    case 'drain-valve':
+      return buildDrainValveItems()
+    case 'relief-valve':
+      return buildReliefValveItems()
+    case 'project-system-type':
+      return buildProjectSystemTypeItems()
+    case 'energy-price':
+      return buildEnergyPriceItems()
+    case 'system':
+      return buildSystemItems()
+    case 'heat-pump-meter-1':
+      return buildPowerMeterItems('heat-pump-meter-1')
+    case 'heat-pump-meter-2':
+      return buildPowerMeterItems('heat-pump-meter-2')
+    case 'water-pump-meter':
+      return buildPowerMeterItems('water-pump-meter')
+    case 'water-heat-meter':
+      return buildWaterHeatMeterItems()
+    default:
+      return buildModeSelectItems()
+  }
+}
+
+function formatTimePointValue(totalMinutes) {
+  const safeMinutes = Math.min(24 * 60, Math.max(0, Math.round(Number(totalMinutes) || 0)))
+  const hour = Math.floor(safeMinutes / 60)
+  const minute = safeMinutes % 60
+  return `${padNumber(hour)}:${padNumber(minute)}`
 }
 
 function createRandomSeries(metric, rangeStart, rangeEnd, _revision = 0) {
@@ -261,8 +563,16 @@ function createRandomSeries(metric, rangeStart, rangeEnd, _revision = 0) {
     humidity: { min: 25, max: 95, decimals: 1 },
     noise: { min: 20, max: 70, decimals: 1 },
     current: { min: 0, max: 25, decimals: 1 },
+    voltage: { min: 360, max: 410, decimals: 1 },
     energy: { min: 900, max: 1500, decimals: 1 },
     power: { min: 5200, max: 7600, decimals: 1 },
+    flow: { min: 5, max: 80, decimals: 1 },
+    count: { min: 0, max: 40, decimals: 0 },
+    price: { min: 0.2, max: 1.2, decimals: 2 },
+    duration: { min: 0, max: 120, decimals: 0 },
+    frequency: { min: 0, max: 20, decimals: 0 },
+    percentage: { min: 0, max: 100, decimals: 0 },
+    timepoint: { min: 0, max: 24 * 60, decimals: 0 },
     opening: { min: 0, max: 100, decimals: 1 },
     angle: { min: 0, max: 360, decimals: 1 },
     gear: { min: 0, max: 5, decimals: 0 },
@@ -353,6 +663,20 @@ function getMetricPresentation(metric) {
     }
   }
 
+  if (metric.chartType === 'timepoint') {
+    return {
+      lineLabel: metric.label,
+      yAxisLabel: '时间',
+      ticks: [1440, 1080, 720, 360, 0],
+      min: 0,
+      max: 24 * 60,
+      visualMin: -30,
+      visualMax: 24 * 60 + 30,
+      formatter: (value) => formatTimePointValue(value),
+      tooltipFormatter: (value) => formatTimePointValue(value),
+    }
+  }
+
   return {
     lineLabel: metric.label,
     yAxisLabel: metric.unit || '数值',
@@ -367,10 +691,24 @@ function getMetricPresentation(metric) {
               ? 80
             : metric.chartType === 'current'
               ? 30
+            : metric.chartType === 'voltage'
+              ? 450
             : metric.chartType === 'energy'
               ? 1600
             : metric.chartType === 'power'
               ? 8000
+            : metric.chartType === 'flow'
+              ? 100
+            : metric.chartType === 'count'
+              ? 40
+            : metric.chartType === 'price'
+              ? 2
+            : metric.chartType === 'duration'
+              ? 180
+            : metric.chartType === 'frequency'
+              ? 20
+            : metric.chartType === 'percentage'
+              ? 100
             : metric.chartType === 'angle'
               ? 360
                 : metric.chartType === 'opening'
@@ -413,16 +751,31 @@ function getChartAxisInterval(metric) {
   switch (metric.chartType) {
     case 'pressure':
       return 50
+    case 'voltage':
+      return 10
     case 'humidity':
     case 'noise':
     case 'opening':
+    case 'percentage':
       return 20
     case 'current':
       return 5
+    case 'flow':
+      return 10
     case 'energy':
       return 200
     case 'power':
       return 1000
+    case 'price':
+      return 0.2
+    case 'duration':
+      return 30
+    case 'frequency':
+      return 5
+    case 'count':
+      return 5
+    case 'timepoint':
+      return 360
     case 'angle':
       return 60
     case 'fault':
@@ -763,11 +1116,15 @@ function OperationsSystemManagementPage({ tabId }) {
   const [startTime, setStartTime] = useState(defaultTrendTimeRange.startTime)
   const [endTime, setEndTime] = useState(defaultTrendTimeRange.endTime)
   const [chartVersion, setChartVersion] = useState(0)
-  const systemSettingItems = useMemo(() => buildSystemSettingItems(), [])
+  const systemSettingItems = buildSystemSettingItems(activeSetting)
   const chartData = useMemo(
     () => (activeMetric ? createRandomSeries(activeMetric, startTime, endTime, chartVersion) : []),
     [activeMetric, chartVersion, endTime, startTime],
   )
+
+  useEffect(() => {
+    setActiveMetric(null)
+  }, [activeSetting, activeUnit, tabId])
 
   const selectedUnit = useMemo(
     () => UNIT_OPTIONS.find((item) => item.value === activeUnit) ?? UNIT_OPTIONS[0],

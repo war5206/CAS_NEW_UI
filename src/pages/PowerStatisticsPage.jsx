@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import DataOverviewFilterBar from '../components/DataOverviewFilterBar'
 import DataOverviewChart from '../components/DataOverviewChart'
 import { syncMonthRange } from '../utils/analysisFilterUtils'
+import { getStoredEnergyPriceState } from '../utils/energyPriceState'
 import { buildPowerStatisticsViewModel, getPowerTypeOptions } from './powerStatisticsData'
 import './DataOverviewPage.css'
 import './PowerStatisticsPage.css'
@@ -37,6 +38,7 @@ function PowerStatisticsPage() {
   const [compareMode, setCompareMode] = useState('none')
   const [equipmentType, setEquipmentType] = useState('heat-pump')
   const [filters, setFilters] = useState(DEFAULT_FILTERS)
+  const [energyPriceState] = useState(() => getStoredEnergyPriceState())
 
   const activeRange = period === '日' ? filters.day : period === '月' ? filters.month : filters.year
 
@@ -47,8 +49,9 @@ function PowerStatisticsPage() {
         range: activeRange,
         compareMode,
         equipmentType,
+        energyPriceState,
       }),
-    [activeRange, compareMode, equipmentType, period],
+    [activeRange, compareMode, energyPriceState, equipmentType, period],
   )
 
   const handleFilterChange = (nextRange) => {
