@@ -5,7 +5,7 @@ import { useActionConfirm } from '../hooks/useActionConfirm'
 import peakValleyIcon from '../assets/peak-valley-white.svg'
 import './PeakValleyPage.css'
 
-const HOUR_LABELS = ['5h', '4h', '3h', '2h', '1h', '0', '1h', '2h', '3h', '4h', '5h']
+const HOUR_LABELS = ['5', '4', '3', '2', '1', '0', '1', '2', '3', '4', '5']
 const STRENGTH_MINUTES_LIMIT = 300
 const STRENGTH_CENTER_VALUE = STRENGTH_MINUTES_LIMIT
 const STRENGTH_MAX_VALUE = STRENGTH_MINUTES_LIMIT * 2
@@ -21,10 +21,15 @@ function isThumbHit(clientX, rect, value, min, max) {
   return Math.abs(pointerX - thumbCenter) <= STRENGTH_SLIDER_THUMB_WIDTH / 2
 }
 
+const STRENGTH_STEP_MINUTES = 6
+
 function minutesToText(minutes) {
-  const hours = Math.floor(minutes / 60)
-  const mins = minutes % 60
-  return `${hours}h${String(mins).padStart(2, '0')}m`
+  const decimalHours = Math.round((minutes / 60) * 10) / 10
+  return String(decimalHours)
+}
+
+function roundToStep(minutes) {
+  return Math.round(minutes / STRENGTH_STEP_MINUTES) * STRENGTH_STEP_MINUTES
 }
 
 function PeakValleyPage() {
@@ -32,11 +37,11 @@ function PeakValleyPage() {
   const [isEnabled, setIsEnabled] = useState(true)
   const [compensation, setCompensation] = useState('2')
   const [expenseRate, setExpenseRate] = useState('50')
-  const [chargeMinutes, setChargeMinutes] = useState(95)
-  const [releaseMinutes, setReleaseMinutes] = useState(95)
+  const [chargeMinutes, setChargeMinutes] = useState(90)
+  const [releaseMinutes, setReleaseMinutes] = useState(90)
   const strengthFinalizeTimeoutRef = useRef(null)
-  const strengthRangeStartRef = useRef({ chargeMinutes: 95, releaseMinutes: 95 })
-  const strengthRangeValueRef = useRef({ chargeMinutes: 95, releaseMinutes: 95 })
+  const strengthRangeStartRef = useRef({ chargeMinutes: 90, releaseMinutes: 90 })
+  const strengthRangeValueRef = useRef({ chargeMinutes: 90, releaseMinutes: 90 })
   const isStrengthDraggingRef = useRef(false)
 
   const chargeText = useMemo(() => minutesToText(chargeMinutes), [chargeMinutes])
@@ -89,8 +94,9 @@ function PeakValleyPage() {
 
     const rawValue = Number(event.target.value)
     const nextValue = Math.min(Math.max(rawValue, 0), STRENGTH_CENTER_VALUE)
+    const chargeMins = roundToStep(STRENGTH_CENTER_VALUE - nextValue)
     previewStrengthRange({
-      chargeMinutes: STRENGTH_CENTER_VALUE - nextValue,
+      chargeMinutes: chargeMins,
       releaseMinutes: strengthRangeValueRef.current.releaseMinutes,
     })
   }
@@ -102,9 +108,10 @@ function PeakValleyPage() {
 
     const rawValue = Number(event.target.value)
     const nextValue = Math.min(Math.max(rawValue, STRENGTH_CENTER_VALUE), STRENGTH_MAX_VALUE)
+    const releaseMins = roundToStep(nextValue - STRENGTH_CENTER_VALUE)
     previewStrengthRange({
       chargeMinutes: strengthRangeValueRef.current.chargeMinutes,
-      releaseMinutes: nextValue - STRENGTH_CENTER_VALUE,
+      releaseMinutes: releaseMins,
     })
   }
 
@@ -194,13 +201,13 @@ function PeakValleyPage() {
         icon={peakValleyIcon}
         iconAlt="热电协同"
         title="热电协同"
-        description={
-          <>
-            开启时，处于低电时段，提升运行目标温度，
-            <br />
-            进行蓄热，当前模式仅适用于供热
-          </>
-        }
+        // description={
+        //   <>
+        //     开启时，处于低电时段，提升运行目标温度，
+        //     <br />
+        //     进行蓄热，当前模式仅适用于供热
+        //   </>
+        // }
         selected={isEnabled}
         onClick={() => setIsEnabled((previous) => !previous)}
         className="peak-valley-page__card"
@@ -223,7 +230,7 @@ function PeakValleyPage() {
 
           <div className="peak-valley-page__strength-row">
             <div className="peak-valley-page__strength-title">蓄能强度</div>
-            <p className="peak-valley-page__strength-desc">在峰电时段前蓄热多长时间，蓄热后持续放热多长时间（拖动滑块设值）</p>
+            <p className="peak-valley-page__strength-desc">在峰电时段前蓄热能力，蓄热后持续放热强度（拖动滑块设值）</p>
             <div className="peak-valley-page__strength-hours">
               {HOUR_LABELS.map((label, index) => (
                 <span key={`${label}-${index}`} style={{ '--tick-ratio': index / 10 }}>
@@ -244,6 +251,7 @@ function PeakValleyPage() {
                 type="range"
                 min={0}
                 max={STRENGTH_MAX_VALUE}
+                step={STRENGTH_STEP_MINUTES}
                 value={leftSliderValue}
                 onChange={handleChargeSliderChange}
                 onPointerDown={(event) => handleStrengthSliderPointerDown(event, 'left')}
@@ -257,6 +265,7 @@ function PeakValleyPage() {
                 type="range"
                 min={0}
                 max={STRENGTH_MAX_VALUE}
+                step={STRENGTH_STEP_MINUTES}
                 value={rightSliderValue}
                 onChange={handleReleaseSliderChange}
                 onPointerDown={(event) => handleStrengthSliderPointerDown(event, 'right')}
@@ -276,13 +285,13 @@ function PeakValleyPage() {
 
           <LabeledSelectRow
             label="费用倍率值"
-            description="放热区间费用比蓄热区间费用的差值"
+            // description="放热区间费用比蓄热区间费用的差值"
             value={expenseRate}
-            suffix="%"
+            // suffix="%"
             onChange={setExpenseRate}
             useModeCardControl
             disabled={!isEnabled}
-            confirmConfig={({ nextValue }) => ({ message: `确认将费用倍率值设置为 ${nextValue}% 吗？` })}
+            confirmConfig={({ nextValue }) => ({ message: `确认将费用倍率值设置为 ${nextValue} 吗？` })}
           />
         </div>
       </section>

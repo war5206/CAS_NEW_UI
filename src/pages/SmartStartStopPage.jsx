@@ -3,8 +3,8 @@ import LabeledSelectRow from '../components/LabeledSelectRow'
 import { useActionConfirm } from '../hooks/useActionConfirm'
 import './SmartStartStopPage.css'
 
-const SLIDER_MIN = 0
-const SLIDER_MAX = 20
+const SLIDER_MIN = 30
+const SLIDER_MAX = 120
 const SLIDER_THUMB_WIDTH = 56
 
 function valueFromTrackClick(event, min, max) {
@@ -24,10 +24,10 @@ function SmartStartStopPage() {
   const [loadCycle, setLoadCycle] = useState('10')
   const [unloadCycle, setUnloadCycle] = useState('10')
   const [coolingDiff, setCoolingDiff] = useState('10')
-  const [minFreq, setMinFreq] = useState(5)
-  const [maxFreq, setMaxFreq] = useState(14)
-  const freqRangeStartRef = useRef({ minFreq: 5, maxFreq: 14 })
-  const freqRangeValueRef = useRef({ minFreq: 5, maxFreq: 14 })
+  const [minFreq, setMinFreq] = useState(55)
+  const [maxFreq, setMaxFreq] = useState(120)
+  const freqRangeStartRef = useRef({ minFreq: 55, maxFreq: 120 })
+  const freqRangeValueRef = useRef({ minFreq: 55, maxFreq: 120 })
   const isFreqRangeDraggingRef = useRef(false)
 
   const rangeText = useMemo(() => `${minFreq}  -  ${maxFreq}`, [minFreq, maxFreq])

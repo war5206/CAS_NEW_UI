@@ -13,12 +13,12 @@ const HEAT_PUMP_OPTIONS = Array.from({ length: 33 }, (_, index) => ({
 }))
 
 const PARAMETER_ROWS = [
-  { id: 'heatingTemp', label: '制热温度（℃）', min: 0, max: 20, step: 1, suffix: '℃' },
-  { id: 'coolingTemp', label: '制冷温度（℃）', min: 0, max: 20, step: 1, suffix: '℃' },
-  { id: 'heatControlDiff', label: '制热控制回差（℃）', min: 0, max: 20, step: 1, suffix: '℃' },
-  { id: 'coolControlDiff', label: '制冷控制回差（℃）', min: 0, max: 20, step: 1, suffix: '℃' },
-  { id: 'runProtectionJudge', label: '热泵持续运行保护判断时长（h）', min: 0, max: 20, step: 1, suffix: 'h' },
-  { id: 'shutdownProtection', label: '热泵运行保护停机时长（min）', min: 0, max: 20, step: 1, suffix: 'min' },
+  { id: 'heatingTemp', label: '制热温度（℃）', min: 20, max: 60, step: 1, suffix: '℃' },
+  { id: 'coolingTemp', label: '制冷温度（℃）', min: 7, max: 20, step: 1, suffix: '℃' },
+  { id: 'heatControlDiff', label: '制热控制回差（℃）', min: 0, max: 5, step: 1, suffix: '℃' },
+  { id: 'coolControlDiff', label: '制冷控制回差（℃）', min: 0, max: 5, step: 1, suffix: '℃' },
+  { id: 'runProtectionJudge', label: '热泵持续运行保护判断时长（h）', min: 0, max: 50, step: 1, suffix: 'h' },
+  { id: 'shutdownProtection', label: '热泵运行保护停机时长（min）', min: 0, max: 60, step: 1, suffix: 'min' },
 ]
 
 const DETAIL_METRICS = [
@@ -43,12 +43,12 @@ function HeatPumpPage() {
   const [isGroupControlEnabled, setIsGroupControlEnabled] = useState(true)
   const [selectedHeatPumpId, setSelectedHeatPumpId] = useState(1)
   const [parameters, setParameters] = useState({
-    heatingTemp: '5',
-    coolingTemp: '5',
-    heatControlDiff: '5',
-    coolControlDiff: '5',
-    runProtectionJudge: '5',
-    shutdownProtection: '5',
+    heatingTemp: '50',
+    coolingTemp: '15',
+    heatControlDiff: '3',
+    coolControlDiff: '3',
+    runProtectionJudge: '25',
+    shutdownProtection: '30',
   })
 
   const updateParameter = (key, value) => {
