@@ -10,20 +10,20 @@ const DEVICE_TABS = [
   { id: 'loop-pump', label: '热泵循环水泵' },
 ]
 
-const HEAT_PUMP_DATA = [
+const DEFAULT_HEAT_PUMP_DATA = [
   { name: '运行', value: HEAT_PUMP_STATUS_SUMMARY.running, color: ['#3B9EFF', '#1F5FB8'] },
   { name: '待机', value: HEAT_PUMP_STATUS_SUMMARY.shutdown, color: ['#9FAABD', '#69778E'] },
   { name: '化霜', value: HEAT_PUMP_STATUS_SUMMARY.defrosting, color: ['#F4CE52', '#A77A1F'] },
   { name: '故障', value: HEAT_PUMP_STATUS_SUMMARY.malfunction, color: ['#FF671E', '#A93600'] },
 ]
 
-const LOOP_PUMP_DATA = [
+const DEFAULT_LOOP_PUMP_DATA = [
   { name: '水泵一', status: '运行中', tone: 'running' },
   { name: '水泵二', status: '已关闭', tone: 'off' },
   { name: '水泵三', status: '有故障', tone: 'fault' },
 ]
 
-function HeatPumpStatusChart() {
+function HeatPumpStatusChart({ chartData }) {
   const chartRef = useRef(null)
   const shouldInitChart = useDeferredVisible(chartRef)
 
@@ -32,6 +32,9 @@ function HeatPumpStatusChart() {
       return undefined
     }
 
+    const normalizedChartData = Array.isArray(chartData) && chartData.length > 0 ? chartData : DEFAULT_HEAT_PUMP_DATA
+    const yAxisMax = Math.max(20, ...normalizedChartData.map((item) => Number(item.value) || 0))
+    const yAxisInterval = Math.max(1, Math.ceil(yAxisMax / 4))
     const chart = echarts.init(chartRef.current)
     chart.setOption({
       animation: false,
@@ -44,7 +47,7 @@ function HeatPumpStatusChart() {
       },
       xAxis: {
         type: 'category',
-        data: HEAT_PUMP_DATA.map((item) => item.name),
+        data: normalizedChartData.map((item) => item.name),
         axisTick: { show: false },
         axisLine: {
           lineStyle: {
@@ -60,8 +63,8 @@ function HeatPumpStatusChart() {
       yAxis: {
         type: 'value',
         min: 0,
-        max: 20,
-        interval: 5,
+        max: yAxisMax,
+        interval: yAxisInterval,
         axisTick: { show: false },
         axisLine: { show: false },
         axisLabel: {
@@ -81,7 +84,7 @@ function HeatPumpStatusChart() {
         {
           type: 'bar',
           barWidth: 24,
-          data: HEAT_PUMP_DATA.map((item) => ({
+          data: normalizedChartData.map((item) => ({
             value: item.value,
             itemStyle: {
               borderRadius: [12, 12, 0, 0],
@@ -112,12 +115,12 @@ function HeatPumpStatusChart() {
       resizeObserver.disconnect()
       chart.dispose()
     }
-  }, [shouldInitChart])
+  }, [chartData, shouldInitChart])
 
   return <div ref={chartRef} className="home-heat-pump-chart" />
 }
 
-function DeviceStatusPanel() {
+function DeviceStatusPanel({ heatPumpData = DEFAULT_HEAT_PUMP_DATA, loopPumpData = DEFAULT_LOOP_PUMP_DATA }) {
   const [activeTab, setActiveTab] = useState('heat-pump')
 
   return (
@@ -157,10 +160,10 @@ function DeviceStatusPanel() {
 
       <div className="home-device-body">
         {activeTab === 'heat-pump' ? (
-          <HeatPumpStatusChart />
+          <HeatPumpStatusChart chartData={heatPumpData} />
         ) : (
           <div className="home-device-pump-grid">
-            {LOOP_PUMP_DATA.map((item) => (
+            {loopPumpData.map((item) => (
               <div key={item.name} className="home-device-pump-card">
                 <span className={`home-device-pump-name is-${item.tone}`}>{item.name}</span>
                 <span className={`home-device-pump-state is-${item.tone}`}>{item.status}</span>

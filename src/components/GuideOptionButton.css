@@ -1,0 +1,51 @@
+.guide-option-button {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 1 0 0;
+  min-width: 0;
+  min-height: 72px;
+  height: 72px;
+  padding: 16px 24px;
+  border-radius: 16px;
+  background: var(--灰-深灰, #22262d);
+  border: none;
+  cursor: default;
+  user-select: none;
+}
+
+.guide-option-button.is-clickable {
+  cursor: pointer;
+}
+
+.guide-option-button.is-clickable:hover {
+  background: var(--灰-深灰-hover, #2a2f38);
+}
+
+.guide-option-button.is-selected {
+  background: var(--红黄蓝绿-蓝, #197cdf);
+}
+
+.guide-option-button.is-selected:hover {
+  background: var(--红黄蓝绿-蓝-hover, #1a8df5);
+}
+
+.guide-option-button.is-disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.guide-option-button__label {
+  font-family: "Alibaba PuHuiTi 2.0", sans-serif;
+  font-size: 20px;
+  font-weight: 550;
+  line-height: normal;
+  color: var(--白-100白, white);
+  text-align: left;
+  white-space: nowrap;
+}
+
+.guide-option-button.is-selected .guide-option-button__label {
+  text-align: center;
+}

@@ -1,0 +1,764 @@
+.guide-page {
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  overflow: hidden;
+  background: #0e0e14;
+  display: flex;
+  align-items: stretch;
+  justify-content: center;
+}
+
+.guide-page__content {
+  display: grid;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  grid-template-rows: repeat(15, minmax(0, 1fr));
+  gap: 24px 64px;
+  width: 100%;
+  height: 100%;
+  padding: 88px;
+  box-sizing: border-box;
+}
+
+/* 循环泵页中间区块：子项直接参与 guide-page__content 网格 */
+.guide-page__grid {
+  display: contents;
+}
+
+.guide-page__header {
+  grid-column: 1 / span 12;
+  grid-row: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  align-items: center;
+  justify-self: stretch;
+  text-align: center;
+  align-self: start;
+}
+
+.guide-page__title {
+  color: #FFF;
+  font-family: "Alibaba PuHuiTi 2.0", sans-serif;
+  font-size: 32px;
+  font-weight: 500;
+  line-height: normal;
+  letter-spacing: 3.2px;
+  margin: 0;
+  width: 100%;
+}
+
+.guide-page__title.is-error {
+  color: #FF8451;
+}
+
+.guide-page__subtitle {
+  color: #909DA2;
+  font-family: "Alibaba PuHuiTi 2.0", sans-serif;
+  font-size: 16px;
+  font-weight: 450;
+  line-height: normal;
+  letter-spacing: 1.6px;
+  margin: 0;
+  width: 100%;
+}
+
+.guide-page__section {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: space-between;
+  justify-self: stretch;
+  align-self: stretch;
+}
+
+.guide-page__section-header {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  align-items: flex-start;
+  width: 100%;
+}
+
+.guide-page__section-title {
+  margin: 0;
+  color: var(--白-100白, white);
+  font-family: "Alibaba PuHuiTi 2.0", sans-serif;
+  font-size: 24px;
+  font-weight: 650;
+  line-height: normal;
+  letter-spacing: 2.4px;
+}
+
+/* 循环泵配置区块标题 — Figma 65 Medium */
+.guide-page__section--pump-main .guide-page__section-title,
+.guide-page__section--pump-spare .guide-page__section-title,
+.guide-page__section--pump-mode .guide-page__section-title {
+  font-weight: 500;
+}
+
+.guide-page__section-desc {
+  margin: 0;
+  color: var(--灰-灰, #909da2);
+  font-family: "Alibaba PuHuiTi 2.0", sans-serif;
+  font-size: 16px;
+  font-weight: 550;
+  line-height: normal;
+  letter-spacing: 1.6px;
+}
+
+.guide-page__option-group {
+  display: flex;
+  gap: 18px;
+  align-items: center;
+  width: 100%;
+}
+
+.guide-page__slider-wrap {
+  width: 100%;
+}
+
+/* 系统选择与配置页面 - 网格布局 */
+.guide-page__section--project-type {
+  grid-column: 1 / span 6;
+  grid-row: 3 / span 3;
+}
+
+.guide-page__section--heatpump-count {
+  grid-column: 7 / span 6;
+  grid-row: 3 / span 3;
+}
+
+.guide-page__section--terminal-type {
+  grid-column: 1 / span 6;
+  grid-row: 7 / span 3;
+}
+
+.guide-page__section--couple-energy-type {
+  grid-column: 7 / span 6;
+  grid-row: 7 / span 3;
+}
+
+.guide-page__section--system-type {
+  grid-column: 1 / span 6;
+  grid-row: 11 / span 3;
+}
+
+.guide-page__section--couple-energy-count {
+  grid-column: 7 / span 6;
+  grid-row: 11 / span 3;
+}
+
+/* 项目基本信息页面 */
+.guide-page__section--heating-acreage {
+  grid-column: 1 / span 6;
+  grid-row: 3 / span 3;
+}
+
+.guide-page__section--cooling-acreage {
+  grid-column: 1 / span 6;
+  grid-row: 7 / span 3;
+}
+
+.guide-page__section--heating-season {
+  grid-column: 1 / span 6;
+  grid-row: 11 / span 3;
+}
+
+.guide-page__numeric-input {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  height: 72px;
+  padding: 16px 24px;
+  border-radius: 16px;
+  background: var(--灰-深灰, #22262d);
+  box-sizing: border-box;
+  cursor: pointer;
+  border: none;
+}
+
+.guide-page__numeric-input--active {
+  border: 2px solid var(--红黄蓝绿-蓝, #197cdf);
+}
+
+.guide-page__numeric-input:hover {
+  background: var(--灰-深灰-hover, #2a2f38);
+}
+
+.guide-page__numeric-input-value {
+  flex: 1;
+  color: var(--白-100白, white);
+  font-family: "Alibaba PuHuiTi 2.0", sans-serif;
+  font-size: 20px;
+  font-weight: 550;
+  line-height: normal;
+  white-space: nowrap;
+  text-align: left;
+}
+
+.guide-page__numeric-input-value--placeholder {
+  color: var(--白-30, rgba(255, 255, 255, 0.3));
+}
+
+.guide-page__numeric-input-unit {
+  color: var(--白-100白, white);
+  font-family: "Alibaba PuHuiTi 2.0", sans-serif;
+  font-size: 20px;
+  font-weight: 550;
+  line-height: normal;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.guide-page__date-picker-group {
+  display: flex;
+  gap: 18px;
+  align-items: center;
+  width: 100%;
+}
+
+.guide-page__date-picker {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex: 1;
+  width: 394px;
+  height: 72px;
+  padding: 16px 24px;
+  border-radius: 16px;
+  background: var(--灰-深灰, #22262d);
+  box-sizing: border-box;
+  cursor: pointer;
+  border: none;
+  color: white;
+  font-size: 20px;
+}
+
+.guide-page__date-picker .month-day-picker__value {
+  color: white;
+}
+
+.guide-page__date-picker .month-day-picker__value--placeholder {
+  color: rgba(255, 255, 255, 0.3);
+}
+
+.guide-page__date-picker--active {
+  border: 2px solid var(--红黄蓝绿-蓝, #197cdf);
+}
+
+.guide-page__date-picker:hover {
+  background: var(--灰-深灰-hover, #2a2f38);
+}
+
+.guide-page__date-separator {
+  width: 16px;
+  height: 0;
+  flex-shrink: 0;
+  position: relative;
+}
+
+.guide-page__date-separator::before {
+  content: '';
+  position: absolute;
+  inset: -1px 0;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='2' viewBox='0 0 16 2'%3E%3Cpath d='M1 1h14' stroke='%23909da2' stroke-width='2' stroke-linecap='round'/%3E%3C/svg%3E");
+  background-size: contain;
+  background-repeat: no-repeat;
+  background-position: center;
+}
+
+.guide-page__keypad {
+  grid-column: 8 / span 5;
+  grid-row: 4 / span 8;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-rows: repeat(4, minmax(0, 1fr));
+  gap: 24px;
+  justify-self: stretch;
+  align-self: stretch;
+}
+
+.guide-page__keypad-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  justify-self: stretch;
+  align-self: stretch;
+  padding: 16px 24px;
+  border-radius: 16px;
+  background: var(--灰-深灰, #22262d);
+  border: none;
+  cursor: pointer;
+}
+
+.guide-page__keypad-button:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.guide-page__keypad-button-text {
+  color: var(--白-100白, white);
+  font-family: "D-DIN-PRO", sans-serif;
+  font-size: 36px;
+  font-weight: bold;
+  line-height: normal;
+  text-align: center;
+}
+
+.guide-page__keypad-button-icon {
+  width: 40px;
+  height: 40px;
+  flex-shrink: 0;
+}
+
+/* 区域选择页面 */
+.guide-page__area-container {
+  grid-column: 1 / span 12;
+  grid-row: 3 / 14;
+  display: grid;
+  grid-template-columns: repeat(12, minmax(0, 1fr));
+  gap: 64px;
+  width: 100%;
+}
+
+.guide-page__hot-cities {
+  grid-column: 1 / span 6;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  align-items: flex-start;
+  justify-self: stretch;
+  overflow: hidden;
+  min-height: 0;
+}
+
+.guide-page__hot-cities-title {
+  margin: 0;
+  color: var(--白-100白, white);
+  font-family: "Alibaba PuHuiTi 2.0", sans-serif;
+  font-size: 24px;
+  font-weight: 650;
+  line-height: normal;
+  letter-spacing: 2.4px;
+}
+
+.guide-page__hot-cities-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 24px;
+  align-items: flex-start;
+  align-content: flex-start;
+  justify-self: stretch;
+  flex: 1;
+  padding-right: 8px;
+  overflow: auto;
+  scrollbar-width: none;       /* Firefox */
+  -ms-overflow-style: none;    /* IE 和 Edge */
+}
+
+.guide-page__hot-cities-grid::-webkit-scrollbar {
+  width: 6px;
+}
+
+.guide-page__hot-cities-grid::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.guide-page__hot-cities-grid::-webkit-scrollbar-thumb {
+  background: var(--灰-深灰, #22262d);
+  border-radius: 3px;
+}
+
+.guide-page__city-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 200px;
+  height: 72px;
+  padding: 16px 32px;
+  border-radius: 16px;
+  background: var(--灰-深灰, #22262d);
+  border: none;
+  cursor: pointer;
+  position: relative;
+  flex-shrink: 0;
+}
+
+.guide-page__city-button::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  box-shadow: inset 3px 3px 8px 0px rgba(63, 88, 106, 0.08);
+  pointer-events: none;
+}
+
+.guide-page__city-button:hover {
+  background: var(--灰-深灰-hover, #2a2f38);
+}
+
+.guide-page__city-button--selected {
+  background: var(--红黄蓝绿-蓝, #197cdf);
+}
+
+.guide-page__city-button-text {
+  color: var(--白-100白, white);
+  font-family: "Alibaba PuHuiTi 2.0", sans-serif;
+  font-size: 24px;
+  font-weight: 550;
+  line-height: normal;
+  text-align: center;
+  white-space: nowrap;
+}
+
+.guide-page__province-city-selector {
+  --guide-picker-row-height: 110px;
+  /* 选中框比行高略矮，避免贴满整行 */
+  --guide-picker-highlight-height: calc(var(--guide-picker-row-height) - 20px);
+  --guide-picker-visible-rows: 5;
+  /* 与 TimePicker 一致：可视 n 行时上下各 (n-1)/2 行 padding，使中间槽对齐选中项 */
+  --guide-picker-padding-rows: 2;
+  grid-column: 7 / span 6;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  align-items: stretch;
+  justify-self: stretch;
+  overflow: hidden;
+  text-align: center;
+  width: 100%;
+  min-height: 0;
+}
+
+.guide-page__selector-body {
+  position: relative;
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: center;
+}
+
+/* 仅包裹滚轮实际高度，避免选中框 position: top 50% 相对被 flex 拉高的容器而跑偏 */
+.guide-page__selector-wheel-track {
+  position: relative;
+  width: 100%;
+  flex-shrink: 0;
+}
+
+.guide-page__selector-header-row {
+  display: flex;
+  flex-direction: row;
+  gap: 256px;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  flex-shrink: 0;
+  box-sizing: border-box;
+}
+
+.guide-page__selector-column-wrap--label {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.guide-page__selector-wrapper--wheel {
+  position: relative;
+  display: flex;
+  flex-direction: row;
+  gap: 256px;
+  align-items: flex-start;
+  justify-content: center;
+  width: 100%;
+}
+
+.guide-page__selector-highlight {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  height: var(--guide-picker-highlight-height);
+  border-radius: 16px;
+  border: 2px solid var(--红黄蓝绿-蓝, #197cdf);
+  background: var(--灰-深灰, #22262d);
+  box-sizing: border-box;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.guide-page__selector-column-wrap {
+  position: relative;
+  z-index: 1;
+  flex: 1 1 0;
+  min-width: 0;
+  max-width: 200px;
+}
+
+.guide-page__selector-column {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  min-width: 0;
+  height: calc(var(--guide-picker-row-height) * var(--guide-picker-visible-rows));
+  padding-block: calc(var(--guide-picker-row-height) * var(--guide-picker-padding-rows));
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  touch-action: pan-y;
+  scrollbar-width: none;
+  cursor: grab;
+}
+
+.guide-page__selector-column::-webkit-scrollbar {
+  display: none;
+}
+
+.guide-page__selector-column.is-dragging {
+  cursor: grabbing;
+}
+
+.guide-page__selector-option {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-height: var(--guide-picker-row-height);
+  height: var(--guide-picker-row-height);
+  padding: 4px 8px;
+  box-sizing: border-box;
+  border: none;
+  background: transparent;
+  color: var(--白-60, rgba(255, 255, 255, 0.6));
+  font-family: "Alibaba PuHuiTi 2.0", sans-serif;
+  font-size: 24px;
+  font-weight: 650;
+  line-height: 1.15;
+  text-align: center;
+  cursor: pointer;
+  user-select: none;
+  transition: color 120ms ease, font-size 120ms ease;
+}
+
+.guide-page__selector-option--province {
+  font-size: 24px;
+  word-break: break-word;
+  hyphens: auto;
+}
+
+.guide-page__selector-option.is-selected {
+  color: var(--白-100白, white);
+  font-size: 32px;
+}
+
+.guide-page__selector-option--province.is-selected {
+  font-size: 32px;
+}
+
+.guide-page__selector-header-text {
+  display: block;
+  width: 100%;
+  margin: 0;
+  color: var(--白-60, rgba(255, 255, 255, 0.6));
+  font-family: "Alibaba PuHuiTi 2.0", sans-serif;
+  font-size: 24px;
+  font-weight: 650;
+  line-height: normal;
+  text-align: center;
+}
+
+.guide-page__selector-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  align-items: flex-start;
+  overflow-y: auto;
+  flex: 1;
+  width: 100%;
+  padding-right: 8px;
+}
+
+.guide-page__selector-list::-webkit-scrollbar {
+  width: 6px;
+}
+
+.guide-page__selector-list::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.guide-page__selector-list::-webkit-scrollbar-thumb {
+  background: var(--灰-深灰, #22262d);
+  border-radius: 3px;
+}
+
+.guide-page__selector-row {
+  display: flex;
+  gap: 256px;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 72px;
+  padding: 0 24px;
+  box-sizing: border-box;
+  flex-shrink: 0;
+}
+
+.guide-page__selector-row--highlighted {
+  background: var(--灰-深灰, #22262d);
+  border: 1px solid var(--红黄蓝绿-蓝, #197cdf);
+  border-radius: 16px;
+  height: 88px;
+}
+
+.guide-page__selector-row--highlighted .guide-page__selector-item {
+  font-size: 32px;
+  color: var(--白-100白, white);
+}
+
+.guide-page__selector-item {
+  color: var(--白-60, rgba(255, 255, 255, 0.6));
+  font-family: "Alibaba PuHuiTi 2.0", sans-serif;
+  font-size: 24px;
+  font-weight: 650;
+  line-height: normal;
+  width: 120px;
+  flex-shrink: 0;
+  cursor: pointer;
+}
+
+.guide-page__selector-item:hover {
+  color: var(--白-100白, white);
+}
+
+.guide-page__selector-item--selected {
+  color: var(--白-100白, white);
+}
+
+/* 热泵 / 末端循环水泵页面布局（Figma 8、9） */
+.guide-page__image {
+  grid-column: 1 / span 6;
+  grid-row: 3 / span 13;
+  justify-self: stretch;
+  align-self: start;
+  aspect-ratio: 1536 / 1536;
+  position: relative;
+  overflow: hidden;
+}
+
+.guide-page__image img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  pointer-events: none;
+}
+
+/* 热泵侧 — 与 Figma image 108 裁切一致 */
+.guide-page__image--heat-pump img {
+  inset: auto;
+  left: -6.78%;
+  top: -4.76%;
+  width: 111.45%;
+  height: 111.45%;
+  max-width: none;
+  object-fit: contain;
+}
+
+/* 末端侧 — image 109 满幅覆盖 */
+.guide-page__image--terminal-pump img {
+  object-fit: cover;
+}
+
+.guide-page__section--pump-main {
+  grid-column: 7 / span 6;
+  grid-row: 3 / span 3;
+}
+
+.guide-page__section--pump-spare {
+  grid-column: 7 / span 6;
+  grid-row: 7 / span 3;
+}
+
+.guide-page__section--pump-mode {
+  grid-column: 7 / span 6;
+  grid-row: 11 / span 3;
+}
+
+.guide-page__error {
+  grid-column: 1 / span 12;
+  grid-row: 14;
+  color: #FF8451;
+  font-family: "Alibaba PuHuiTi 2.0", sans-serif;
+  font-size: 16px;
+  text-align: center;
+}
+
+.guide-page__actions {
+  display: contents;
+}
+
+.guide-page__button {
+  display: contents;
+}
+
+.guide-page__button--prev {
+  grid-column: 10 / span 3;
+  grid-row: 15;
+  display: flex;
+  gap: 16px;
+  justify-content: flex-end;
+}
+
+/* 热泵 / 末端循环泵 — 底部双按钮等分（Figma flex 1） */
+.guide-page__button--loop-pump .guide-page__btn {
+  flex: 1 1 0;
+  width: auto;
+  min-width: 0;
+}
+
+.guide-page__button--next {
+  display: contents;
+}
+
+.guide-page__btn {
+  border: none;
+  border-radius: 16px;
+  background: #22262D;
+  color: #FFF;
+  font-family: "Alibaba PuHuiTi 2.0", sans-serif;
+  font-size: 24px;
+  font-weight: 450;
+  line-height: normal;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  padding: 16px 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  justify-self: stretch;
+  width: 186px;
+  box-sizing: border-box;
+  height: 72px;
+}
+
+.guide-page__btn:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.guide-page__btn.is-primary {
+  background: #197CDF;
+}
+
+.guide-page__btn.is-primary:hover:not(:disabled) {
+  background: #166BC4;
+}
+
+.guide-page__btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}

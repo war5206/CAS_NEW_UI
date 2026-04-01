@@ -18,7 +18,7 @@ import HomeTerminalBuildingOverview from '../components/HomeTerminalBuildingOver
 import SavedCostDisplay from '../components/SavedCostDisplay'
 import RealTimeTemperatureChart from '../components/RealTimeTemperatureChart'
 import DeviceStatusPanel from '../components/DeviceStatusPanel'
-import { HEAT_PUMP_STATUS_SUMMARY } from '../config/homeHeatPumps'
+import { useHomeOverviewQuery } from '../features/home/hooks/useHomeOverviewQuery'
 
 const HOME_PAGE_VIEW = {
   DASHBOARD: 'dashboard',
@@ -90,6 +90,8 @@ function HomePage({ onActivePageChange, committedUnitLayoutSlots }) {
   const location = useLocation()
   const [activePage, setActivePage] = useState(HOME_PAGE_VIEW.DASHBOARD)
   const [isSystemImageLoaded, setIsSystemImageLoaded] = useState(false)
+  const isHomeRoute = location.pathname === '/home' || location.pathname === '/home/'
+  const { data: homeOverview, error, isFetching, isFallbackData, lastSuccessAt } = useHomeOverviewQuery({ enabled: isHomeRoute })
 
   useEffect(() => {
     onActivePageChange?.(HOME_PAGE_TITLE_MAP[activePage] ?? HOME_PAGE_TITLE_MAP[HOME_PAGE_VIEW.DASHBOARD])
@@ -104,6 +106,14 @@ function HomePage({ onActivePageChange, committedUnitLayoutSlots }) {
   const goBackHome = () => setActivePage(HOME_PAGE_VIEW.DASHBOARD)
   const goToHeatPumpOverview = () => setActivePage(HOME_PAGE_VIEW.HEAT_PUMP_OVERVIEW)
   const goToTerminalBuilding = () => setActivePage(HOME_PAGE_VIEW.TERMINAL_BUILDING)
+  const statusSummary = homeOverview.system.heatPumpSummary
+  const dataStatusText = isFallbackData
+    ? '数据刷新失败，当前显示上次成功数据'
+    : isFetching
+      ? '数据刷新中...'
+      : lastSuccessAt
+        ? `最近更新 ${new Date(lastSuccessAt).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}`
+        : '等待首次刷新'
 
   return (
     <div className="home-pager">
@@ -123,17 +133,17 @@ function HomePage({ onActivePageChange, committedUnitLayoutSlots }) {
                   <div className="home-system-caption home-system-caption--title">{HOME_TEXT.HEAT_PUMP_GROUP}</div>
                   <div className="home-system-row">
                     <span className="home-system-caption">{HOME_TEXT.RUNNING_COUNT}</span>
-                    <span className="home-system-value">{HEAT_PUMP_STATUS_SUMMARY.running}</span>
+                    <span className="home-system-value">{statusSummary.running}</span>
                     <span className="home-system-extra">
-                      ({HOME_TEXT.DEFROST} <span className="home-system-value is-defrost">{HEAT_PUMP_STATUS_SUMMARY.defrosting}</span>
+                      ({HOME_TEXT.DEFROST} <span className="home-system-value is-defrost">{statusSummary.defrosting}</span>
                       {HOME_TEXT.UNIT})
                     </span>
                   </div>
                   <div className="home-system-row">
                     <span className="home-system-caption">{HOME_TEXT.STANDBY_COUNT}</span>
-                    <span className="home-system-value">{HEAT_PUMP_STATUS_SUMMARY.shutdown}</span>
+                    <span className="home-system-value">{statusSummary.shutdown}</span>
                     <span className="home-system-extra">
-                      ({HOME_TEXT.FAULT} <span className="home-system-value is-fault">{HEAT_PUMP_STATUS_SUMMARY.malfunction}</span>
+                      ({HOME_TEXT.FAULT} <span className="home-system-value is-fault">{statusSummary.malfunction}</span>
                       {HOME_TEXT.UNIT})
                     </span>
                   </div>
@@ -141,7 +151,7 @@ function HomePage({ onActivePageChange, committedUnitLayoutSlots }) {
 
                 <div className="home-system-node home-system-node--outdoor-temperature home-system-inline">
                   <span className="home-system-caption">{HOME_TEXT.OUTDOOR_TEMP}</span>
-                  <span className="home-system-value">-2.1</span>
+                  <span className="home-system-value">{homeOverview.system.outdoorTemp}</span>
                   <span className="home-system-unit">{HOME_TEXT.CELSIUS}</span>
                 </div>
 
@@ -149,95 +159,103 @@ function HomePage({ onActivePageChange, committedUnitLayoutSlots }) {
 
                 <div className="home-system-node home-system-node--heat-tracing home-system-inline">
                   <span className="home-system-caption">{HOME_TEXT.HEAT_TRACING_BELT}</span>
-                  <span className="home-system-state is-off">{HOME_TEXT.OFF}</span>
+                  <span className={`home-system-state ${homeOverview.system.heatTracingEnabled ? 'is-on' : 'is-off'}`}>
+                    {homeOverview.system.heatTracingEnabled ? HOME_TEXT.ON : HOME_TEXT.OFF}
+                  </span>
                   <span className="home-system-caption">{HOME_TEXT.CONDENSATE_PIPE}</span>
-                  <span className="home-system-value">-2.1</span>
+                  <span className="home-system-value">{homeOverview.system.condensatePipeTemp}</span>
                   <span className="home-system-unit">{HOME_TEXT.CELSIUS}</span>
                 </div>
 
                 <div className="home-system-node home-system-node--coupling-energy home-system-inline">
                   <span className="home-system-caption">{HOME_TEXT.COUPLING_ENERGY}</span>
-                  <span className="home-system-state is-on">{HOME_TEXT.ON}</span>
+                  <span className={`home-system-state ${homeOverview.system.couplingEnergyEnabled ? 'is-on' : 'is-off'}`}>
+                    {homeOverview.system.couplingEnergyEnabled ? HOME_TEXT.ON : HOME_TEXT.OFF}
+                  </span>
                 </div>
 
                 <div className="home-system-node home-system-node--pump-status home-system-inline">
                   <span className="home-system-caption">{HOME_TEXT.WATER_PUMP}</span>
-                  <span className="home-system-state is-on">{HOME_TEXT.ON}</span>
+                  <span className={`home-system-state ${homeOverview.system.waterPumpEnabled ? 'is-on' : 'is-off'}`}>
+                    {homeOverview.system.waterPumpEnabled ? HOME_TEXT.ON : HOME_TEXT.OFF}
+                  </span>
                 </div>
 
                 <div className="home-system-node home-system-node--supply-temperature home-system-inline">
                   <span className="home-system-caption">{HOME_TEXT.SUPPLY_TEMP}</span>
-                  <span className="home-system-value">-2.1</span>
+                  <span className="home-system-value">{homeOverview.system.supplyTemp}</span>
                   <span className="home-system-unit">{HOME_TEXT.CELSIUS}</span>
                 </div>
 
                 <div className="home-system-node home-system-node--supply-pressure home-system-inline">
                   <span className="home-system-caption">{HOME_TEXT.SUPPLY_PRESSURE}</span>
-                  <span className="home-system-value">-2.1</span>
+                  <span className="home-system-value">{homeOverview.system.supplyPressure}</span>
                   <span className="home-system-unit">Mpa</span>
                 </div>
 
                 <div className="home-system-node home-system-node--return-pressure home-system-inline">
                   <span className="home-system-caption">{HOME_TEXT.RETURN_PRESSURE}</span>
-                  <span className="home-system-value">-2.1</span>
+                  <span className="home-system-value">{homeOverview.system.returnPressure}</span>
                   <span className="home-system-unit">Mpa</span>
                 </div>
 
                 <div className="home-system-node home-system-node--return-temperature home-system-inline">
                   <span className="home-system-caption">{HOME_TEXT.RETURN_TEMP}</span>
-                  <span className="home-system-value">-2.1</span>
+                  <span className="home-system-value">{homeOverview.system.returnTemp}</span>
                   <span className="home-system-unit">{HOME_TEXT.CELSIUS}</span>
                 </div>
 
                 <div className="home-system-node home-system-node--circulation-pump">
                   <div className="home-system-caption home-system-caption--title">{HOME_TEXT.HEAT_PUMP_LOOP_PUMP}</div>
-                  <div className="home-system-row">
-                    <span className="home-system-caption">{HOME_TEXT.PUMP_1}</span>
-                    <span className="home-system-state is-on">{HOME_TEXT.RUNNING}</span>
-                  </div>
-                  <div className="home-system-row">
-                    <span className="home-system-caption">{HOME_TEXT.PUMP_2}</span>
-                    <span className="home-system-state is-off">{HOME_TEXT.STANDBY}</span>
-                  </div>
-                  <div className="home-system-row">
-                    <span className="home-system-caption is-fault">{HOME_TEXT.PUMP_3}</span>
-                    <span className="home-system-state is-fault">{HOME_TEXT.HAS_FAULT}</span>
-                  </div>
+                  {homeOverview.system.circulationPumps.slice(0, 3).map((pump) => (
+                    <div key={pump.name} className="home-system-row">
+                      <span className={`home-system-caption${pump.tone === 'fault' ? ' is-fault' : ''}`}>{pump.name}</span>
+                      <span className={`home-system-state ${pump.tone === 'running' ? 'is-on' : pump.tone === 'fault' ? 'is-fault' : 'is-off'}`}>
+                        {pump.status}
+                      </span>
+                    </div>
+                  ))}
                 </div>
 
                 <div className="home-system-node home-system-node--bypass-valve">{HOME_TEXT.DIFFERENTIAL_BYPASS_VALVE}</div>
 
                 <div className="home-system-node home-system-node--drain-valve home-system-inline">
                   <span className="home-system-caption">{HOME_TEXT.DRAIN_VALVE}</span>
-                  <span className="home-system-state is-on">{HOME_TEXT.ON}</span>
+                  <span className={`home-system-state ${homeOverview.system.drainValveOpen ? 'is-on' : 'is-off'}`}>
+                    {homeOverview.system.drainValveOpen ? HOME_TEXT.ON : HOME_TEXT.OFF}
+                  </span>
                 </div>
 
                 <div className="home-system-node home-system-node--pressure-tank home-system-inline">
                   <span className="home-system-caption">{HOME_TEXT.PRESSURE_TANK}</span>
-                  <span className="home-system-state is-on">{HOME_TEXT.ON}</span>
+                  <span className={`home-system-state ${homeOverview.system.pressureTankOpen ? 'is-on' : 'is-off'}`}>
+                    {homeOverview.system.pressureTankOpen ? HOME_TEXT.ON : HOME_TEXT.OFF}
+                  </span>
                 </div>
 
                 <div className="home-system-node home-system-node--pressure-valve home-system-inline">
                   <span className="home-system-caption">{HOME_TEXT.PRESSURE_VALVE}</span>
-                  <span className="home-system-state is-on">{HOME_TEXT.ON}</span>
+                  <span className={`home-system-state ${homeOverview.system.pressureValveOpen ? 'is-on' : 'is-off'}`}>
+                    {homeOverview.system.pressureValveOpen ? HOME_TEXT.ON : HOME_TEXT.OFF}
+                  </span>
                 </div>
 
                 <div className="home-system-node home-system-node--makeup-pump">
                   <div className="home-system-caption">{HOME_TEXT.MAKEUP_PUMP}</div>
-                  <div className="home-system-row">
-                    <span className="home-system-caption">{HOME_TEXT.PUMP_1}</span>
-                    <span className="home-system-state is-on">{HOME_TEXT.RUNNING}</span>
-                  </div>
-                  <div className="home-system-row">
-                    <span className="home-system-caption">{HOME_TEXT.PUMP_2}</span>
-                    <span className="home-system-state is-off">{HOME_TEXT.STANDBY}</span>
-                  </div>
+                  {homeOverview.system.makeupPumps.slice(0, 2).map((pump) => (
+                    <div key={pump.name} className="home-system-row">
+                      <span className={`home-system-caption${pump.tone === 'fault' ? ' is-fault' : ''}`}>{pump.name}</span>
+                      <span className={`home-system-state ${pump.tone === 'running' ? 'is-on' : pump.tone === 'fault' ? 'is-fault' : 'is-off'}`}>
+                        {pump.status}
+                      </span>
+                    </div>
+                  ))}
                 </div>
 
                 <div className="home-system-node home-system-node--water-tank">
                   <div className="home-system-caption">{HOME_TEXT.WATER_TANK}</div>
                   <div className="home-system-inline">
-                    <span className="home-system-value">50</span>
+                    <span className="home-system-value">{homeOverview.system.waterTankLevel}</span>
                     <span className="home-system-unit">%</span>
                   </div>
                 </div>
@@ -264,6 +282,21 @@ function HomePage({ onActivePageChange, committedUnitLayoutSlots }) {
           </section>
 
           <aside className="home-side-panel">
+            <div
+              style={{
+                marginBottom: '12px',
+                padding: '10px 14px',
+                borderRadius: '14px',
+                border: '1px solid rgba(111, 143, 184, 0.24)',
+                background: isFallbackData ? 'rgba(255, 132, 81, 0.12)' : 'rgba(67, 116, 187, 0.14)',
+                color: '#DDEBFF',
+                fontSize: '12px',
+                lineHeight: 1.5,
+              }}
+            >
+              <div>{dataStatusText}</div>
+              {error ? <div style={{ marginTop: '4px', color: 'rgba(255, 214, 201, 0.9)' }}>{error.message}</div> : null}
+            </div>
             <HomeWidget title={HOME_TEXT.MODE_STATUS} icon={modeStatusIcon} className="home-widget-mode">
               <div className="home-mode-card">
                 <div className="home-mode-avatar">
@@ -272,7 +305,7 @@ function HomePage({ onActivePageChange, committedUnitLayoutSlots }) {
                 <div className="home-mode-body">
                   <div className="home-mode-row">
                     <img src={modeArrowRight} alt="" aria-hidden="true" className="home-mode-row-icon" />
-                    <div className="home-mode-name">{HOME_TEXT.SMART_MODE_RUNNING}</div>
+                    <div className="home-mode-name">{homeOverview.mode.name}</div>
                   </div>
                   <img src={modeDivider} alt="" aria-hidden="true" className="home-mode-divider" />
                   <div className="home-mode-row">
@@ -285,8 +318,8 @@ function HomePage({ onActivePageChange, committedUnitLayoutSlots }) {
                 </div>
               </div>
 
-              <SavedCostDisplay value="222.7" />
-              <div className="home-stat-note">{HOME_TEXT.COST_NOTE}</div>
+              <SavedCostDisplay value={homeOverview.mode.savedCost} />
+              <div className="home-stat-note">{homeOverview.cost.note}</div>
             </HomeWidget>
 
             <HomeWidget title={HOME_TEXT.COST_ANALYSIS} icon={costAnalysisIcon} className="home-widget-cost">
@@ -297,33 +330,41 @@ function HomePage({ onActivePageChange, committedUnitLayoutSlots }) {
                     <span className="home-cost-item-label">{HOME_TEXT.THIS_MONTH}</span>
                   </div>
                   <div className="home-cost-item-value">
-                    <span className="home-cost-item-number">108.13</span>
+                    <span className="home-cost-item-number">{homeOverview.cost.month}</span>
                     <span className="home-cost-item-unit">{HOME_TEXT.YUAN}</span>
                   </div>
                 </div>
                 <div className="home-cost-item">
                   <span className="home-cost-item-label">{HOME_TEXT.TODAY}</span>
                   <div className="home-cost-item-value">
-                    <span className="home-cost-item-number">7.33</span>
+                    <span className="home-cost-item-number">{homeOverview.cost.today}</span>
                     <span className="home-cost-item-unit">{HOME_TEXT.YUAN}</span>
                   </div>
                 </div>
                 <div className="home-cost-item">
                   <span className="home-cost-item-label">{HOME_TEXT.YESTERDAY}</span>
                   <div className="home-cost-item-value">
-                    <span className="home-cost-item-number">8.12</span>
+                    <span className="home-cost-item-number">{homeOverview.cost.yesterday}</span>
                     <span className="home-cost-item-unit">{HOME_TEXT.YUAN}</span>
                   </div>
                 </div>
               </div>
             </HomeWidget>
 
-            <HomeWidget title={HOME_TEXT.REAL_TIME_TEMP} icon={temperatureIcon} titleRight={HOME_TEXT.AMBIENT_TEMP}>
-              <RealTimeTemperatureChart />
+            <HomeWidget title={HOME_TEXT.REAL_TIME_TEMP} icon={temperatureIcon} titleRight={homeOverview.mode.ambientTempText}>
+              <RealTimeTemperatureChart
+                labels={homeOverview.temperature.labels}
+                supplySeries={homeOverview.temperature.supplyData}
+                returnSeries={homeOverview.temperature.returnData}
+                targetSeries={homeOverview.temperature.targetData}
+              />
             </HomeWidget>
 
             <HomeWidget title={HOME_TEXT.DEVICE_STATUS} icon={deviceStatusIcon}>
-              <DeviceStatusPanel />
+              <DeviceStatusPanel
+                heatPumpData={homeOverview.deviceStatus.heatPumpData}
+                loopPumpData={homeOverview.deviceStatus.loopPumpItems}
+              />
             </HomeWidget>
           </aside>
         </div>
@@ -331,7 +372,11 @@ function HomePage({ onActivePageChange, committedUnitLayoutSlots }) {
         {activePage === HOME_PAGE_VIEW.HEAT_PUMP_OVERVIEW ? (
           <div className="home-page home-hp is-active">
             <div className="home-subpage">
-              <HomeHeatPumpOverview onBack={goBackHome} committedUnitLayoutSlots={committedUnitLayoutSlots} />
+              <HomeHeatPumpOverview
+                onBack={goBackHome}
+                committedUnitLayoutSlots={committedUnitLayoutSlots}
+                heatPumpItems={homeOverview.heatPumpItems}
+              />
             </div>
           </div>
         ) : null}

@@ -57,7 +57,7 @@ const HEAT_PUMP_OVERVIEW_TEXT = {
   TIP: '蓝色设备运行中，红色设备有故障，灰色设备已待机，黄色设备正在化霜；点击热泵可查看详情。',
 }
 
-function HomeHeatPumpOverview({ onBack, committedUnitLayoutSlots }) {
+function HomeHeatPumpOverview({ onBack, committedUnitLayoutSlots, heatPumpItems: externalHeatPumpItems = null }) {
   const [activePump, setActivePump] = useState(null)
   const [isOverviewModalOpen, setIsOverviewModalOpen] = useState(false)
   const [overviewPage, setOverviewPage] = useState(1)
@@ -101,6 +101,10 @@ function HomeHeatPumpOverview({ onBack, committedUnitLayoutSlots }) {
   )
 
   const boardHeatPumpItems = useMemo(() => {
+    if (Array.isArray(externalHeatPumpItems) && externalHeatPumpItems.length > 0 && (!Array.isArray(committedUnitLayoutSlots) || committedUnitLayoutSlots.length === 0)) {
+      return externalHeatPumpItems
+    }
+
     if (!Array.isArray(committedUnitLayoutSlots) || committedUnitLayoutSlots.length === 0) {
       return HEAT_PUMP_GRID_ITEMS
     }
@@ -135,7 +139,7 @@ function HomeHeatPumpOverview({ onBack, committedUnitLayoutSlots }) {
         details: [],
       }
     })
-  }, [committedUnitLayoutSlots])
+  }, [committedUnitLayoutSlots, externalHeatPumpItems])
 
   const allHeatPumps = useMemo(() => boardHeatPumpItems.filter((item) => item.id !== null), [boardHeatPumpItems])
 

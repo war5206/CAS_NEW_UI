@@ -9,6 +9,7 @@ import waterPumpIcon from '../assets/water-pump.svg'
 import weatherCompensationIcon from '../assets/home/weather-compensation.svg'
 import thermometerIcon from '../assets/thermometer.svg'
 import { clearStoredToken, getStoredToken, parseUserFromToken, setStoredToken } from '../api/client/auth'
+import { getStoredApiBaseUrl, setStoredApiBaseUrl } from '../api/client/config'
 import { executeAlgorithmProcess, loginWithPassword } from '../api/modules/playground'
 import './PlaygroundPage.css'
 
@@ -43,7 +44,7 @@ function PlaygroundPage() {
   const [timeValue3Columns, setTimeValue3Columns] = useState([12, 38, 38])
   const [apiResponse, setApiResponse] = useState(null)
   const [apiLoading, setApiLoading] = useState(false)
-  const [apiBaseUrl, setApiBaseUrl] = useState('http://127.0.0.1:8090')
+  const [apiBaseUrl, setApiBaseUrl] = useState(() => getStoredApiBaseUrl())
   const [username, setUsername] = useState('admin')
   const [password, setPassword] = useState('FinforWorx3.0')
   const [token, setToken] = useState(() => getStoredToken())
@@ -61,6 +62,10 @@ function PlaygroundPage() {
     clearStoredToken()
     setUserInfo(null)
   }, [token])
+
+  useEffect(() => {
+    setStoredApiBaseUrl(apiBaseUrl)
+  }, [apiBaseUrl])
 
   const handleLogin = async () => {
     setLoginLoading(true)

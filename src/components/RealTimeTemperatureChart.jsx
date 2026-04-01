@@ -2,10 +2,10 @@ import { useEffect, useRef } from 'react'
 import * as echarts from 'echarts'
 import { useDeferredVisible } from '../hooks/useDeferredVisible'
 
-const xAxisData = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9']
-const supplyData = [42, 43, 44, 38, 37, 42, 43, 40, 36, 35]
-const returnData = [31, 32, 33, 31, 30.5, 30.8, 31, 30.7, 30.2, 28]
-const targetData = [31, 31.4, 31.8, 30.8, 30.9, 31, 30.8, 31, 31.2, 32]
+const DEFAULT_X_AXIS_DATA = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9']
+const DEFAULT_SUPPLY_DATA = [42, 43, 44, 38, 37, 42, 43, 40, 36, 35]
+const DEFAULT_RETURN_DATA = [31, 32, 33, 31, 30.5, 30.8, 31, 30.7, 30.2, 28]
+const DEFAULT_TARGET_DATA = [31, 31.4, 31.8, 30.8, 30.9, 31, 30.8, 31, 31.2, 32]
 
 const SUPPLY_COLOR = '#F04E2A'
 const RETURN_COLOR = '#F1BF3F'
@@ -16,7 +16,12 @@ const LEGEND_ITEMS = [
   { label: '目标回水温度', color: TARGET_COLOR },
 ]
 
-function RealTimeTemperatureChart() {
+function RealTimeTemperatureChart({
+  labels = DEFAULT_X_AXIS_DATA,
+  supplySeries = DEFAULT_SUPPLY_DATA,
+  returnSeries = DEFAULT_RETURN_DATA,
+  targetSeries = DEFAULT_TARGET_DATA,
+}) {
   const chartRef = useRef(null)
   const shouldInitChart = useDeferredVisible(chartRef)
 
@@ -25,6 +30,10 @@ function RealTimeTemperatureChart() {
       return undefined
     }
 
+    const xAxisData = Array.isArray(labels) && labels.length > 0 ? labels : DEFAULT_X_AXIS_DATA
+    const supplyData = Array.isArray(supplySeries) && supplySeries.length > 0 ? supplySeries : DEFAULT_SUPPLY_DATA
+    const returnData = Array.isArray(returnSeries) && returnSeries.length > 0 ? returnSeries : DEFAULT_RETURN_DATA
+    const targetData = Array.isArray(targetSeries) && targetSeries.length > 0 ? targetSeries : DEFAULT_TARGET_DATA
     const chart = echarts.init(chartRef.current)
     chart.setOption({
       animation: false,
@@ -178,7 +187,7 @@ function RealTimeTemperatureChart() {
       resizeObserver.disconnect()
       chart.dispose()
     }
-  }, [shouldInitChart])
+  }, [labels, returnSeries, shouldInitChart, supplySeries, targetSeries])
 
   return (
     <div className="home-temperature-chart-panel">

@@ -1,0 +1,18 @@
+.month-day-picker__value {
+  font-family: "Alibaba PuHuiTi 2.0", sans-serif;
+  font-size: 20px;
+  font-weight: 550;
+  line-height: normal;
+  color: white;
+  white-space: nowrap;
+}
+
+.month-day-picker__value--placeholder {
+  color: rgba(255, 255, 255, 0.3);
+}
+
+.month-day-picker__icon {
+  width: 32px;
+  height: 32px;
+  flex-shrink: 0;
+}

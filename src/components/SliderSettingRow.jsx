@@ -30,6 +30,8 @@ function SliderSettingRow({
   keypadTitle = '输入',
   className = '',
   showInput = true,
+  /** 向导页 Figma 样式：仅滑轨 + 右侧数值胶囊，无顶栏与范围文案 */
+  variant = 'default',
   confirmConfig,
 }) {
   const { requestConfirm, confirmModal } = useActionConfirm()
@@ -50,8 +52,11 @@ function SliderSettingRow({
     return (draftSliderValue - min) / (max - min)
   }, [draftSliderValue, max, min])
 
-  const rowClassName = ['slider-setting-row', className].filter(Boolean).join(' ')
-  const textValue = String(draftSliderValue).padStart(2, '0')
+  const isGuide = variant === 'guide'
+  const rowClassName = ['slider-setting-row', isGuide ? 'slider-setting-row--guide' : '', className]
+    .filter(Boolean)
+    .join(' ')
+  const textValue = isGuide ? String(draftSliderValue) : String(draftSliderValue).padStart(2, '0')
   const suffixText = suffix == null ? '' : String(suffix).trim()
   const rangeText = suffixText ? `${min}${suffixText}-${max}${suffixText}` : `${min}-${max}`
 
@@ -122,22 +127,24 @@ function SliderSettingRow({
   return (
     <>
       <section className={rowClassName}>
-        <div className={`slider-setting-row__header${showInput ? '' : ' is-input-hidden'}`}>
-          <label className="slider-setting-row__label">{label}</label>
-          {showInput ? (
-            <button
-              type="button"
-              className="slider-setting-row__input"
-              onClick={() => setIsModalOpen(true)}
-              aria-label={`${label}数值输入`}
-            >
-              <span>{textValue}</span>
-              {suffixText ? <span className="slider-setting-row__input-suffix">{suffixText}</span> : null}
-            </button>
-          ) : null}
-        </div>
+        {!isGuide ? (
+          <div className={`slider-setting-row__header${showInput ? '' : ' is-input-hidden'}`}>
+            <label className="slider-setting-row__label">{label}</label>
+            {showInput ? (
+              <button
+                type="button"
+                className="slider-setting-row__input"
+                onClick={() => setIsModalOpen(true)}
+                aria-label={`${label}数值输入`}
+              >
+                <span>{textValue}</span>
+                {suffixText ? <span className="slider-setting-row__input-suffix">{suffixText}</span> : null}
+              </button>
+            ) : null}
+          </div>
+        ) : null}
 
-        <div className="slider-setting-row__slider-wrap">
+        <div className={`slider-setting-row__slider-wrap${isGuide ? ' slider-setting-row__slider-wrap--guide' : ''}`}>
           <div className="slider-setting-row__slider-track-wrap" style={{ '--slider-ratio': ratio }}>
             <div className="slider-setting-row__value-pill">{textValue}</div>
             <input
@@ -154,11 +161,11 @@ function SliderSettingRow({
               onChange={handleSliderChange}
             />
           </div>
-          <div className="slider-setting-row__range-text">{`（${rangeText}）`}</div>
+          {!isGuide ? <div className="slider-setting-row__range-text">{`（${rangeText}）`}</div> : null}
         </div>
       </section>
 
-      {showInput ? (
+      {showInput && !isGuide ? (
         <NumericKeypadModal
           isOpen={isModalOpen}
           title={keypadTitle}

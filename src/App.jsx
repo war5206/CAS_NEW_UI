@@ -6,6 +6,17 @@ import CasLayout from './layout/CasLayout'
 import HomePage from './pages/HomePage'
 import ModulePage from './pages/ModulePage'
 import PlaygroundPage from './pages/PlaygroundPage'
+import ScreenProtectPage from './pages/ScreenProtectPage'
+import SetOperationPasswordPage from './pages/auth/SetOperationPasswordPage'
+import ConfirmPasswordPage from './pages/auth/ConfirmPasswordPage'
+import LoginPage from './pages/auth/LoginPage'
+import SystemSelectPage from './pages/auth/SystemSelectPage'
+import SystemSelectConfigPage from './pages/guide/SystemSelectConfigPage'
+import ProjectInfoPage from './pages/guide/ProjectInfoPage'
+import AreaSelectPage from './pages/guide/AreaSelectPage'
+import HeatPumpLoopPumpConfigPage from './pages/guide/HeatPumpLoopPumpConfigPage'
+import TerminalLoopPumpConfigPage from './pages/guide/TerminalLoopPumpConfigPage'
+import HeatPumpLayoutPage from './pages/guide/HeatPumpLayoutPage'
 
 const DESIGN_WIDTH = 1920
 const DESIGN_HEIGHT = 1080
@@ -62,9 +73,20 @@ function AppRoutes({ homePageTitle, onHomePageTitleChange }) {
       ) : null}
 
       <Routes>
-        <Route path="/" element={<Navigate to={HOME_PATH} replace />} />
+        <Route path="/" element={<Navigate to="/auth/set-password" replace />} />
+        <Route path="/auth/set-password" element={<SetOperationPasswordPage />} />
+        <Route path="/auth/confirm-password" element={<ConfirmPasswordPage />} />
+        <Route path="/auth/login" element={<LoginPage />} />
+        <Route path="/auth/system-select" element={<SystemSelectPage />} />
         <Route path={HOME_PATH} element={null} />
         <Route path="/playground" element={<PlaygroundPage />} />
+        <Route path="/screen-protect" element={<ScreenProtectPage />} />
+        <Route path="/guide/system-config" element={<SystemSelectConfigPage />} />
+        <Route path="/guide/project-info" element={<ProjectInfoPage />} />
+        <Route path="/guide/area-select" element={<AreaSelectPage />} />
+        <Route path="/guide/heat-pump-loop-pump" element={<HeatPumpLoopPumpConfigPage />} />
+        <Route path="/guide/terminal-loop-pump" element={<TerminalLoopPumpConfigPage />} />
+        <Route path="/guide/heat-pump-layout" element={<HeatPumpLayoutPage />} />
         {redirectEntries.map((entry) => (
           <Route key={`redirect-${entry.from}`} path={entry.from} element={<Navigate to={entry.to} replace />} />
         ))}

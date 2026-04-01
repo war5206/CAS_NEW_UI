@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { Link } from 'react-router-dom'
 import FeatureInfoCard from '../components/FeatureInfoCard'
 import TimePickerModal from '../components/TimePickerModal'
 import AttentionModal from '../components/AttentionModal'
@@ -199,6 +200,10 @@ function DeviceLockView() {
         onClick={handleClick}
         className="basic-setting-page__device-lock-card"
       />
+
+      <Link to="/playground" className="basic-setting-page__playground-link">
+        进入 Playground
+      </Link>
 
       <AttentionModal
         isOpen={showConfirm}
