@@ -15,6 +15,7 @@ function LoginPage() {
   const navigate = useNavigate()
   const authStore = useAuthStore()
   const [error, setError] = useState('')
+  const [errorKey, setErrorKey] = useState(0)
 
   const handleLoginSuccess = async (password) => {
     try {
@@ -23,13 +24,15 @@ function LoginPage() {
       if (response.data.result.state === 'success') {
         resetLoginFailCount()
         setUserRole(response.data.result.message)
-        navigate('/auth/system-select')
+        navigate('/guide/system-config')
       } else {
         incrementLoginFailCount()
+        setErrorKey((k) => k + 1)
         setError('登录失败，请重新输入')
       }
     } catch (err) {
       incrementLoginFailCount()
+      setErrorKey((k) => k + 1)
       setError('登录失败，请重新输入')
     }
   }
@@ -59,8 +62,9 @@ function LoginPage() {
       <div className="login-page__content">
         <PasswordKeypad
           title="登录"
-          subtitle="密码为4位数字，输入3次错误后将进行锁定"
+          subtitle="请输入刚才设置的四位密码"
           error={error}
+          errorKey={errorKey}
           extraBottomButtons={extraBottomButtons}
           onComplete={handleLoginSuccess}
           layoutMode="login"

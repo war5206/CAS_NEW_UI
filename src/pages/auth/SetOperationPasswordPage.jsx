@@ -8,23 +8,28 @@ import { setTempPassword, clearTempPassword } from '@/features/auth/store/authSt
 function SetOperationPasswordPage() {
   const navigate = useNavigate()
   const [error, setError] = useState('')
+  const [errorKey, setErrorKey] = useState(0)
 
   const handleConfirm = async (password) => {
     try {
-      const response = await setOperationPassword(password, '1234')
+      const response = await setOperationPassword(password)
       if (response.data.state === 'success') {
         setTempPassword(password)
         navigate('/auth/confirm-password')
+      } else {
+        setErrorKey((k) => k + 1)
+        setError('设置密码失败，请重试')
       }
     } catch (error) {
       console.error('Failed to set password:', error)
+      setErrorKey((k) => k + 1)
       setError('设置密码失败，请重试')
     }
   }
 
   const handleSkip = async () => {
     try {
-      const response = await setOperationPassword('1357', '1234')
+      const response = await setOperationPassword('1234')
       if (response.data.state === 'success') {
         clearTempPassword()
         navigate('/auth/login')
@@ -40,7 +45,7 @@ function SetOperationPasswordPage() {
       onClick: handleSkip,
     },
     {
-      label: '确认',
+      label: '下一步',
       className: 'is-primary',
       requiresPassword: true,
     },
@@ -53,8 +58,10 @@ function SetOperationPasswordPage() {
           title="锁屏密码设置"
           subtitle="密码为4位数字，此密码为本设备待机后进入系统的凭证，如不需要设置锁屏密码，可以跳过"
           error={error}
+          errorKey={errorKey}
           bottomButtons={bottomButtons}
           onComplete={handleConfirm}
+          triggerCompleteOnFill={false}
         />
       </div>
     </div>

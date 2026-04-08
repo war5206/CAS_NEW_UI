@@ -1,9 +1,10 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import './GuidePage.css'
 import GuideOptionButton from '@/components/GuideOptionButton'
 import SliderSettingRow from '@/components/SliderSettingRow'
 import { saveTerminalCirculatingPumpConfig } from '@/api/modules/home'
+import { useGuideStore } from '@/features/guide/hooks/useGuideStore'
 import terminalWaterpumpFigma from '@/assets/guide-init/terminal-waterpump-figma.png'
 
 // 循环泵运行模式配置
@@ -14,13 +15,38 @@ const PUMP_MODE_OPTIONS = [
 
 function TerminalLoopPumpConfigPage() {
   const navigate = useNavigate()
+  const {
+    terminalCirculationPumpMain: savedTerminalCirculationPumpMain,
+    terminalCirculationPumpSpare: savedTerminalCirculationPumpSpare,
+    terminalCirculationPumpMode: savedTerminalCirculationPumpMode,
+    setTerminalLoopPumpConfig,
+  } = useGuideStore()
 
-  // 表单状态
-  const [terminalCirculationPumpMain, setTerminalCirculationPumpMain] = useState('1')
-  const [terminalCirculationPumpSpare, setTerminalCirculationPumpSpare] = useState('1')
-  const [terminalCirculationPumpMode, setTerminalCirculationPumpMode] = useState('定频')
+  // 表单状态 - 从 store 初始化
+  const [terminalCirculationPumpMain, setTerminalCirculationPumpMain] = useState(
+    savedTerminalCirculationPumpMain || '1',
+  )
+  const [terminalCirculationPumpSpare, setTerminalCirculationPumpSpare] = useState(
+    savedTerminalCirculationPumpSpare || '1',
+  )
+  const [terminalCirculationPumpMode, setTerminalCirculationPumpMode] = useState(
+    savedTerminalCirculationPumpMode || '定频',
+  )
   const [isSaving, setIsSaving] = useState(false)
   const [errorMessage, setErrorMessage] = useState('')
+
+  useEffect(() => {
+    setTerminalLoopPumpConfig({
+      terminalCirculationPumpMain,
+      terminalCirculationPumpSpare,
+      terminalCirculationPumpMode,
+    })
+  }, [
+    terminalCirculationPumpMain,
+    terminalCirculationPumpSpare,
+    terminalCirculationPumpMode,
+    setTerminalLoopPumpConfig,
+  ])
 
   const handleNext = async () => {
     setIsSaving(true)
@@ -34,7 +60,7 @@ function TerminalLoopPumpConfigPage() {
       })
 
       if (response.data?.state === 'success') {
-        navigate('/guide/heat-pump-layout')
+        navigate('/guide/heat-pump-layout', { state: { queryArrangeOnReturn: true } })
       } else {
         setErrorMessage(response.data?.message || '保存失败，请重试')
       }

@@ -17,6 +17,7 @@ import AreaSelectPage from './pages/guide/AreaSelectPage'
 import HeatPumpLoopPumpConfigPage from './pages/guide/HeatPumpLoopPumpConfigPage'
 import TerminalLoopPumpConfigPage from './pages/guide/TerminalLoopPumpConfigPage'
 import HeatPumpLayoutPage from './pages/guide/HeatPumpLayoutPage'
+import EnergyPriceGuidePage from './pages/guide/EnergyPriceGuidePage'
 
 const DESIGN_WIDTH = 1920
 const DESIGN_HEIGHT = 1080
@@ -87,6 +88,7 @@ function AppRoutes({ homePageTitle, onHomePageTitleChange }) {
         <Route path="/guide/heat-pump-loop-pump" element={<HeatPumpLoopPumpConfigPage />} />
         <Route path="/guide/terminal-loop-pump" element={<TerminalLoopPumpConfigPage />} />
         <Route path="/guide/heat-pump-layout" element={<HeatPumpLayoutPage />} />
+        <Route path="/guide/energy-price" element={<EnergyPriceGuidePage />} />
         {redirectEntries.map((entry) => (
           <Route key={`redirect-${entry.from}`} path={entry.from} element={<Navigate to={entry.to} replace />} />
         ))}

@@ -8,11 +8,13 @@ function ConfirmPasswordPage() {
   const navigate = useNavigate()
   const authStore = useAuthStore()
   const [error, setError] = useState('')
+  const [errorKey, setErrorKey] = useState(0)
 
   const handleNext = (password) => {
     if (password === authStore.tempPassword) {
       navigate('/auth/login')
     } else {
+      setErrorKey((k) => k + 1)
       setError('密码错误')
     }
   }
@@ -28,7 +30,7 @@ function ConfirmPasswordPage() {
       onClick: handlePrev,
     },
     {
-      label: '下一步',
+      label: '确认',
       className: 'is-primary',
       requiresPassword: true,
     },
@@ -41,8 +43,10 @@ function ConfirmPasswordPage() {
           title={error ? '密码错误' : '确认密码'}
           subtitle={error ? '' : '再次输入密码，请保持和前一次所输入的完全一致'}
           error={error}
+          errorKey={errorKey}
           bottomButtons={bottomButtons}
           onComplete={handleNext}
+          triggerCompleteOnFill={false}
         />
       </div>
     </div>

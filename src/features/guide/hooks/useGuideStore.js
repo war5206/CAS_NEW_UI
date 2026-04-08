@@ -16,5 +16,8 @@ export function useGuideStore() {
     setSystemTypeId: guideStore.setSystemTypeId,
     setSystemConfig: guideStore.setSystemConfig,
     setProjectInfo: guideStore.setProjectInfo,
+    setAreaSelection: guideStore.setAreaSelection,
+    setHeatPumpLoopPumpConfig: guideStore.setHeatPumpLoopPumpConfig,
+    setTerminalLoopPumpConfig: guideStore.setTerminalLoopPumpConfig,
   }
 }

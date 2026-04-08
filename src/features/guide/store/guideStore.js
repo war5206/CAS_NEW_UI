@@ -13,6 +13,20 @@ let state = {
   coldAcreage: '',
   startHeatingSeason: '',
   endHeatingSeason: '',
+
+  // 区域选择
+  areaSelectedProvince: '江苏省',
+  areaSelectedCity: '连云港市',
+
+  // 热泵侧循环水泵配置
+  heatCirculationPumpMain: '2',
+  heatCirculationPumpSpare: '1',
+  heatCirculationPumpMode: '定频',
+
+  // 末端循环水泵配置
+  terminalCirculationPumpMain: '1',
+  terminalCirculationPumpSpare: '1',
+  terminalCirculationPumpMode: '定频',
 }
 
 const listeners = new Set()
@@ -43,6 +57,18 @@ function setProjectInfo(info) {
   setState(info)
 }
 
+function setAreaSelection(selection) {
+  setState(selection)
+}
+
+function setHeatPumpLoopPumpConfig(config) {
+  setState(config)
+}
+
+function setTerminalLoopPumpConfig(config) {
+  setState(config)
+}
+
 export const guideStore = {
   getState,
   setState,
@@ -50,4 +76,7 @@ export const guideStore = {
   setSystemTypeId,
   setSystemConfig,
   setProjectInfo,
+  setAreaSelection,
+  setHeatPumpLoopPumpConfig,
+  setTerminalLoopPumpConfig,
 }

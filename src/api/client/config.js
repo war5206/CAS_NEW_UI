@@ -46,4 +46,9 @@ export const ALGORITHM_PROCESS_IDS = {
   SAVE_AREA_CONFIG: 'saveAreaConfig',
   SAVE_BEGIN_CIRCULATING_PUMP_CONFIG: 'saveBeginCirculatingPumpConfig',
   SAVE_TERMINAL_CIRCULATING_PUMP_CONFIG: 'saveTerminalCirculatingPumpConfig',
+  SCAN_DEVICE_STATE: 'scanDeviceState',
+  SAVE_DEVICE_ARRANGE: 'saveDeviceArrange',
+  QUERY_DEVICE_ARRANGE: 'queryDeviceArrange',
+  /** 电价方案：新增/编辑合一（后端先按清除区间 DELETE 再批量 INSERT） */
+  SAVE_ENERGY_PRICE_PLAN: 'saveEnergyPricePlan',
 }

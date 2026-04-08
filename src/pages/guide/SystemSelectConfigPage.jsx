@@ -26,7 +26,8 @@ const SYSTEM_TYPE_OPTIONS = [
   { id: '2', label: '二次系统' },
 ]
 
-// 耦合能源类型配置
+// 耦合能源类型配置（id '5' 为无耦合能源，台数须为 0）
+const COUPLE_ENERGY_TYPE_NONE_ID = '5'
 const COUPLE_ENERGY_TYPE_OPTIONS = [
   { id: '1', label: '电锅炉' },
   { id: '2', label: '燃气锅炉' },
@@ -77,6 +78,15 @@ function SystemSelectConfigPage() {
     setIsSaving(true)
     setErrorMessage('')
 
+    let coupleEnergyNumberToSave = coupleEnergyNumber
+    if (
+      coupleEnergyTypeId === COUPLE_ENERGY_TYPE_NONE_ID &&
+      coupleEnergyNumber !== '0'
+    ) {
+      coupleEnergyNumberToSave = '0'
+      setCoupleEnergyNumber('0')
+    }
+
     try {
       const response = await saveSystemConfig({
         projectTypeId,
@@ -84,7 +94,7 @@ function SystemSelectConfigPage() {
         terminalTypeId,
         coupleEnergyTypeId,
         systemTypeId,
-        coupleEnergyNumber,
+        coupleEnergyNumber: coupleEnergyNumberToSave,
       })
 
       if (response.data?.state === 'success') {
@@ -99,10 +109,6 @@ function SystemSelectConfigPage() {
     } finally {
       setIsSaving(false)
     }
-  }
-
-  const handleBack = () => {
-    navigate('/auth/system-select')
   }
 
   return (
@@ -196,7 +202,12 @@ function SystemSelectConfigPage() {
                 key={option.id}
                 label={option.label}
                 selected={coupleEnergyTypeId === option.id}
-                onClick={() => setCoupleEnergyTypeId(option.id)}
+                onClick={() => {
+                  setCoupleEnergyTypeId(option.id)
+                  if (option.id === COUPLE_ENERGY_TYPE_NONE_ID) {
+                    setCoupleEnergyNumber('0')
+                  }
+                }}
               />
             ))}
           </div>
@@ -242,16 +253,7 @@ function SystemSelectConfigPage() {
           </div>
         </div>
 
-        {/* 底部按钮 - 返回和下一步 */}
         <div className="guide-page__button guide-page__button--prev">
-          <button
-            type="button"
-            className="guide-page__btn"
-            onClick={handleBack}
-            disabled={isSaving}
-          >
-            返回
-          </button>
           <button
             type="button"
             className="guide-page__btn is-primary"

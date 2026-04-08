@@ -908,6 +908,49 @@ body.unit-layout-drag-lock {
   padding: 0 !important;
 }
 
+/* 向导：从能源价格返回后仅查看排布，除「复位」外操作流程按钮为黑色且不可点 */
+.guide-unit-layout--arrange-view-only .unit-layout-flow__step button:disabled {
+  background: #000000;
+  color: rgba(255, 255, 255, 0.35);
+  cursor: not-allowed;
+}
+
+.guide-unit-layout--arrange-view-only .unit-layout-flow__step button.unit-layout-flow__smart-scan:disabled,
+.guide-unit-layout--arrange-view-only .unit-layout-flow__step button.unit-layout-flow__complete-layout:disabled {
+  background: #000000;
+  color: rgba(255, 255, 255, 0.35);
+  cursor: not-allowed;
+}
+
+.guide-unit-layout--arrange-view-only .unit-layout-flow__step button.is-active:disabled {
+  background: #000000;
+  color: rgba(255, 255, 255, 0.35);
+}
+
+.guide-unit-layout--arrange-view-only .unit-layout-flow__header button.unit-layout-flow__reset:not(:disabled) {
+  background: #080b12;
+  color: #fff;
+  cursor: pointer;
+}
+
+.guide-unit-layout--arrange-view-only .unit-layout-pending-arrow:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.guide-unit-layout--arrange-view-only .unit-layout-pending-card:disabled:not(.is-placeholder) {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.guide-unit-layout--arrange-view-only .unit-layout-slot.is-arrange-view-only {
+  cursor: not-allowed;
+}
+
+.guide-unit-layout--arrange-view-only .unit-layout-slot.is-numbering.is-arrange-view-only {
+  cursor: not-allowed;
+}
+
 .energy-price-tabs {
   width: 296px;
   height: 66px;

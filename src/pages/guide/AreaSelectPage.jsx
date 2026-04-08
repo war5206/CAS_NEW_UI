@@ -2,6 +2,7 @@ import { useState, useMemo, useRef, useEffect, useLayoutEffect, useCallback } fr
 import { useNavigate } from 'react-router-dom'
 import './GuidePage.css'
 import { saveAreaConfig } from '@/api/modules/home'
+import { useGuideStore } from '@/features/guide/hooks/useGuideStore'
 
 // 省份城市数据（与产品文档一致；projectAreaId 可先统一为 "1"）
 const RAW_CITY_DATA = {
@@ -134,12 +135,19 @@ function clampIndex(index, length) {
 
 function AreaSelectPage() {
   const navigate = useNavigate()
+  const {
+    areaSelectedProvince: savedAreaSelectedProvince,
+    areaSelectedCity: savedAreaSelectedCity,
+    setAreaSelection,
+  } = useGuideStore()
 
-  const [selectedProvince, setSelectedProvince] = useState('江苏省')
-  const [selectedCity, setSelectedCity] = useState('连云港市')
+  const [selectedProvince, setSelectedProvince] = useState(
+    savedAreaSelectedProvince || '江苏省',
+  )
+  const [selectedCity, setSelectedCity] = useState(savedAreaSelectedCity || '连云港市')
   const [hotCityHighlight, setHotCityHighlight] = useState({
-    province: '江苏省',
-    city: '连云港市',
+    province: savedAreaSelectedProvince || '江苏省',
+    city: savedAreaSelectedCity || '连云港市',
   })
   const [isSaving, setIsSaving] = useState(false)
   const [errorMessage, setErrorMessage] = useState('')
@@ -173,6 +181,13 @@ function AreaSelectPage() {
     const parsed = Number.parseFloat(raw)
     return Number.isFinite(parsed) && parsed > 0 ? parsed : 110
   }, [])
+
+  useEffect(() => {
+    setAreaSelection({
+      areaSelectedProvince: selectedProvince,
+      areaSelectedCity: selectedCity,
+    })
+  }, [selectedProvince, selectedCity, setAreaSelection])
 
   useEffect(() => {
     const timerId = window.setTimeout(() => {

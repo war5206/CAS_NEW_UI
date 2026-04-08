@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import './PasswordKeypad.css'
 import deleteIcon from '@/assets/common/delete.svg'
 
@@ -12,7 +12,7 @@ const KEYPAD_KEYS = [
   { key: '7', position: '7' },
   { key: '8', position: '8' },
   { key: '9', position: '9' },
-  { key: '', position: 'empty' },
+  { position: 'empty', decorativeDot: true },
   { key: '0', position: '0' },
   { key: 'delete', position: 'delete' },
 ]
@@ -26,8 +26,16 @@ function PasswordKeypad({
   onComplete,
   error,
   layoutMode = 'default', // 'default' | 'login'
+  triggerCompleteOnFill = true,
+  errorKey = 0,
 }) {
   const [password, setPassword] = useState('')
+
+  useEffect(() => {
+    if (errorKey > 0) {
+      setPassword('')
+    }
+  }, [errorKey])
 
   const handleKeyPress = (key) => {
     if (key === 'delete') {
@@ -43,7 +51,7 @@ function PasswordKeypad({
       const newPassword = password + key
       setPassword(newPassword)
 
-      if (newPassword.length === passwordLength && onComplete) {
+      if (triggerCompleteOnFill && newPassword.length === passwordLength && onComplete) {
         onComplete(newPassword)
       }
     }
@@ -53,7 +61,11 @@ function PasswordKeypad({
     if (button.requiresPassword && password.length < passwordLength) {
       return
     }
-    button.onClick?.(password)
+    if (button.onClick) {
+      button.onClick(password)
+    } else if (button.requiresPassword && onComplete) {
+      onComplete(password)
+    }
   }
 
   const getButtonPositionClass = (label) => {
@@ -91,21 +103,34 @@ function PasswordKeypad({
       </div>
 
       <div className="password-keypad__grid">
-        {KEYPAD_KEYS.map(({ key, position }) => {
+        {KEYPAD_KEYS.map((item) => {
+          const { key, position, decorativeDot } = item
+          if (decorativeDot) {
+            return (
+              <div
+                key={position}
+                className={`password-keypad__key password-keypad__key--${position} password-keypad__key--decorative-dot`}
+                aria-hidden="true"
+              >
+                .
+              </div>
+            )
+          }
+
           const isDelete = key === 'delete'
-          const isEmpty = key === ''
 
           return (
             <button
               key={position}
               type="button"
-              className={`password-keypad__key password-keypad__key--${position}${isDelete ? ' is-delete' : ''}${isEmpty ? ' is-empty' : ''}`}
+              className={`password-keypad__key password-keypad__key--${position}${isDelete ? ' is-delete' : ''}`}
               onClick={() => handleKeyPress(key)}
-              disabled={isEmpty}
             >
               {isDelete ? (
                 <img src={deleteIcon} alt="删除" className="password-keypad__key-icon" />
-              ) : key}
+              ) : (
+                key
+              )}
             </button>
           )
         })}

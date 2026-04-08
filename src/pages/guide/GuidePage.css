@@ -4,6 +4,7 @@
   min-height: 0;
   overflow: hidden;
   background: #0e0e14;
+  color: #e9f1ff;
   display: flex;
   align-items: stretch;
   justify-content: center;
@@ -309,6 +310,50 @@
   width: 40px;
   height: 40px;
   flex-shrink: 0;
+}
+
+/* 复用系统参数模块（机组排布、能源价格等） */
+.guide-page__system-params-host {
+  grid-column: 1 / -1;
+  grid-row: 3 / 14;
+  min-height: 0;
+  overflow: auto;
+  align-self: stretch;
+  justify-self: stretch;
+}
+
+.guide-page__system-params-host .system-params-detail--guide-energy {
+  min-height: 0;
+}
+
+/* 能源价格：隐藏宿主与内容区横向滚动条，避免从热泵布局进入时底部先闪出再消失 */
+.guide-page--energy-price .guide-page__system-params-host {
+  overflow-x: hidden;
+  overflow-y: auto;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.guide-page--energy-price .guide-page__system-params-host::-webkit-scrollbar {
+  display: none;
+}
+
+.guide-page--energy-price .guide-page__system-params-host .system-params-detail--guide-energy {
+  max-width: 100%;
+  overflow-x: hidden;
+  box-sizing: border-box;
+}
+
+/* 热泵布局：主内容紧贴标题（原第 2 行为副标题预留，已取消副标题故从第 2 行起排） */
+.guide-page--heat-pump-layout .guide-page__system-params-host {
+  grid-row: 2 / 15;
+  overflow: auto;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.guide-page--heat-pump-layout .guide-page__system-params-host::-webkit-scrollbar {
+  display: none;
 }
 
 /* 区域选择页面 */

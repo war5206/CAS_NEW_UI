@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import './GuidePage.css'
 import GuideOptionButton from '@/components/GuideOptionButton'
@@ -15,14 +15,39 @@ const PUMP_MODE_OPTIONS = [
 
 function HeatPumpLoopPumpConfigPage() {
   const navigate = useNavigate()
-  const { systemTypeId } = useGuideStore()
+  const {
+    systemTypeId,
+    heatCirculationPumpMain: savedHeatCirculationPumpMain,
+    heatCirculationPumpSpare: savedHeatCirculationPumpSpare,
+    heatCirculationPumpMode: savedHeatCirculationPumpMode,
+    setHeatPumpLoopPumpConfig,
+  } = useGuideStore()
 
-  // 表单状态
-  const [heatCirculationPumpMain, setHeatCirculationPumpMain] = useState('2')
-  const [heatCirculationPumpSpare, setHeatCirculationPumpSpare] = useState('1')
-  const [heatCirculationPumpMode, setHeatCirculationPumpMode] = useState('定频')
+  // 表单状态 - 从 store 初始化
+  const [heatCirculationPumpMain, setHeatCirculationPumpMain] = useState(
+    savedHeatCirculationPumpMain || '2',
+  )
+  const [heatCirculationPumpSpare, setHeatCirculationPumpSpare] = useState(
+    savedHeatCirculationPumpSpare || '1',
+  )
+  const [heatCirculationPumpMode, setHeatCirculationPumpMode] = useState(
+    savedHeatCirculationPumpMode || '定频',
+  )
   const [isSaving, setIsSaving] = useState(false)
   const [errorMessage, setErrorMessage] = useState('')
+
+  useEffect(() => {
+    setHeatPumpLoopPumpConfig({
+      heatCirculationPumpMain,
+      heatCirculationPumpSpare,
+      heatCirculationPumpMode,
+    })
+  }, [
+    heatCirculationPumpMain,
+    heatCirculationPumpSpare,
+    heatCirculationPumpMode,
+    setHeatPumpLoopPumpConfig,
+  ])
 
   const handleNext = async () => {
     setIsSaving(true)
@@ -39,7 +64,7 @@ function HeatPumpLoopPumpConfigPage() {
         if (systemTypeId === '2') {
           navigate('/guide/terminal-loop-pump')
         } else {
-          navigate('/guide/heat-pump-layout')
+          navigate('/guide/heat-pump-layout', { state: { queryArrangeOnReturn: true } })
         }
       } else {
         setErrorMessage(response.data?.message || '保存失败，请重试')
