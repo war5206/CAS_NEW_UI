@@ -122,6 +122,10 @@ export async function queryDeviceArrange() {
   return callAlgorithmProcess(ALGORITHM_PROCESS_IDS.QUERY_DEVICE_ARRANGE, {})
 }
 
+export async function queryEnergyPrice() {
+  return callAlgorithmProcess(ALGORITHM_PROCESS_IDS.QUERY_ENERGY_PRICE, {})
+}
+
 /**
  * 保存电价方案（新增与编辑同一接口：编辑时传 clear 区间为原日期，若仅改时段可不传 clear，与方案日期一致即可）。
  * @param {object} payload
@@ -131,6 +135,16 @@ export async function queryDeviceArrange() {
  */
 export async function saveEnergyPricePlan(payload) {
   const response = await callAlgorithmProcess(ALGORITHM_PROCESS_IDS.SAVE_ENERGY_PRICE_PLAN, payload)
+  return {
+    ...response,
+    data: adaptGuideResponse(response.data),
+  }
+}
+
+export async function saveEnergyPrice(energyPrice = []) {
+  const response = await callAlgorithmProcess(ALGORITHM_PROCESS_IDS.SAVE_ENERGY_PRICE, {
+    energyPrice,
+  })
   return {
     ...response,
     data: adaptGuideResponse(response.data),

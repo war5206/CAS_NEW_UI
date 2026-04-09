@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { BrowserRouter, HashRouter, Navigate, Route, Routes, useLocation } from 'react-router-dom'
 import './App.css'
 import { createPageEntries, createRedirectEntries } from './config/navigation'
@@ -18,6 +18,7 @@ import HeatPumpLoopPumpConfigPage from './pages/guide/HeatPumpLoopPumpConfigPage
 import TerminalLoopPumpConfigPage from './pages/guide/TerminalLoopPumpConfigPage'
 import HeatPumpLayoutPage from './pages/guide/HeatPumpLayoutPage'
 import EnergyPriceGuidePage from './pages/guide/EnergyPriceGuidePage'
+import SystemDetectGuidePage from './pages/guide/SystemDetectGuidePage'
 
 const DESIGN_WIDTH = 1920
 const DESIGN_HEIGHT = 1080
@@ -39,6 +40,17 @@ const HOME_PATH = '/home'
 const homeEntry = pageEntries.find((entry) => entry.module.id === 'home') ?? null
 const nonHomeEntries = pageEntries.filter((entry) => entry.module.id !== 'home')
 const AppRouter = typeof window !== 'undefined' && window.location.protocol === 'file:' ? HashRouter : BrowserRouter
+const GUIDE_PREVIOUS_PATH_KEY = 'guide_previous_path'
+const GUIDE_ROUTE_ORDER = [
+  '/guide/system-config',
+  '/guide/project-info',
+  '/guide/area-select',
+  '/guide/heat-pump-loop-pump',
+  '/guide/terminal-loop-pump',
+  '/guide/heat-pump-layout',
+  '/guide/energy-price',
+  '/guide/system-detect',
+]
 
 function AppRoutes({ homePageTitle, onHomePageTitleChange }) {
   const location = useLocation()
@@ -51,6 +63,25 @@ function AppRoutes({ homePageTitle, onHomePageTitleChange }) {
   const [moduleBreadcrumbSuffix, setModuleBreadcrumbSuffix] = useState(null)
   const [committedUnitLayoutSlots, setCommittedUnitLayoutSlots] = useState(null)
   const isHomeRoute = location.pathname === HOME_PATH || location.pathname === `${HOME_PATH}/`
+  const previousPathRef = useRef(window.sessionStorage.getItem(GUIDE_PREVIOUS_PATH_KEY))
+
+  const guideTransitionDirection = useMemo(() => {
+    const currentPath = location.pathname
+    const previousPath = previousPathRef.current
+    const currentIndex = GUIDE_ROUTE_ORDER.indexOf(currentPath)
+    const previousIndex = GUIDE_ROUTE_ORDER.indexOf(previousPath)
+    const direction = currentIndex >= 0 && previousIndex >= 0 && currentIndex < previousIndex ? 'backward' : 'forward'
+
+    previousPathRef.current = currentPath
+    window.sessionStorage.setItem(GUIDE_PREVIOUS_PATH_KEY, currentPath)
+    return direction
+  }, [location.pathname])
+
+  const renderGuideRoute = (element) => (
+    <div className={`guide-route-transition guide-route-transition--${guideTransitionDirection}`}>
+      {element}
+    </div>
+  )
 
   useEffect(() => {
     setModuleBreadcrumbSuffix(null)
@@ -82,13 +113,14 @@ function AppRoutes({ homePageTitle, onHomePageTitleChange }) {
         <Route path={HOME_PATH} element={null} />
         <Route path="/playground" element={<PlaygroundPage />} />
         <Route path="/screen-protect" element={<ScreenProtectPage />} />
-        <Route path="/guide/system-config" element={<SystemSelectConfigPage />} />
-        <Route path="/guide/project-info" element={<ProjectInfoPage />} />
-        <Route path="/guide/area-select" element={<AreaSelectPage />} />
-        <Route path="/guide/heat-pump-loop-pump" element={<HeatPumpLoopPumpConfigPage />} />
-        <Route path="/guide/terminal-loop-pump" element={<TerminalLoopPumpConfigPage />} />
-        <Route path="/guide/heat-pump-layout" element={<HeatPumpLayoutPage />} />
-        <Route path="/guide/energy-price" element={<EnergyPriceGuidePage />} />
+        <Route path="/guide/system-config" element={renderGuideRoute(<SystemSelectConfigPage />)} />
+        <Route path="/guide/project-info" element={renderGuideRoute(<ProjectInfoPage />)} />
+        <Route path="/guide/area-select" element={renderGuideRoute(<AreaSelectPage />)} />
+        <Route path="/guide/heat-pump-loop-pump" element={renderGuideRoute(<HeatPumpLoopPumpConfigPage />)} />
+        <Route path="/guide/terminal-loop-pump" element={renderGuideRoute(<TerminalLoopPumpConfigPage />)} />
+        <Route path="/guide/heat-pump-layout" element={renderGuideRoute(<HeatPumpLayoutPage />)} />
+        <Route path="/guide/energy-price" element={renderGuideRoute(<EnergyPriceGuidePage />)} />
+        <Route path="/guide/system-detect" element={renderGuideRoute(<SystemDetectGuidePage />)} />
         {redirectEntries.map((entry) => (
           <Route key={`redirect-${entry.from}`} path={entry.from} element={<Navigate to={entry.to} replace />} />
         ))}

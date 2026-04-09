@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import './GuidePage.css'
 import MonthDayPicker from '@/components/MonthDayPicker'
+import AttentionModal from '@/components/AttentionModal'
 import deleteIcon from '@/assets/common/delete.svg'
 import { saveProjectConfig } from '@/api/modules/home'
 import { useGuideStore } from '@/features/guide/hooks/useGuideStore'
@@ -26,12 +27,19 @@ function ProjectInfoPage() {
   const [endHeatingSeason, setEndHeatingSeason] = useState(savedEndHeatingSeason || '')
   const [isSaving, setIsSaving] = useState(false)
   const [errorMessage, setErrorMessage] = useState('')
+  const [attentionModalMessage, setAttentionModalMessage] = useState('')
 
   // 数字键盘状态
   const [activeKeypad, setActiveKeypad] = useState(null) // 'heating' | 'cooling' | null
 
   // 页面引用用于点击空白区域检测
   const pageRef = useRef(null)
+  const canGoNext = Boolean(
+    String(projectAcreage ?? '').trim()
+    && String(coldAcreage ?? '').trim()
+    && String(startHeatingSeason ?? '').trim()
+    && String(endHeatingSeason ?? '').trim(),
+  )
 
   // 实时保存到store
   useEffect(() => {
@@ -117,6 +125,19 @@ function ProjectInfoPage() {
   }
 
   const handleNext = async () => {
+    if (!canGoNext) {
+      return
+    }
+
+    const isHeatingSeasonInvalid = !startHeatingSeason || !endHeatingSeason
+
+    if (isHeatingSeasonInvalid) {
+      const validationMessage = '请填写完整的供暖季开始/结束时间'
+      setErrorMessage(validationMessage)
+      setAttentionModalMessage(validationMessage)
+      return
+    }
+
     setIsSaving(true)
     setErrorMessage('')
 
@@ -130,19 +151,23 @@ function ProjectInfoPage() {
 
       if (response.data?.state === 'success') {
         navigate('/guide/area-select')
+        return
       } else {
         setErrorMessage(response.data?.message || '保存失败，请重试')
       }
     } catch (error) {
       console.error('保存项目信息失败:', error)
       setErrorMessage('保存失败，请检查网络连接')
-    } finally {
-      setIsSaving(false)
     }
+    setIsSaving(false)
   }
 
   const handleBack = () => {
     navigate('/guide/system-config')
+  }
+
+  const closeAttentionModal = () => {
+    setAttentionModalMessage('')
   }
 
   // 点击日期选择器时退出编辑模式
@@ -278,16 +303,27 @@ function ProjectInfoPage() {
             onClick={() => {
               if (activeKeypad) {
                 handleKeypadConfirm()
-              } else {
-                handleNext()
               }
+              handleNext()
             }}
-            disabled={isSaving && !activeKeypad}
+            disabled={isSaving || !canGoNext}
           >
-            {isSaving ? '保存中...' : (activeKeypad ? '确定' : '下一步')}
+            {isSaving
+              ? <span className="guide-loading-inline"><span className="guide-loading-spinner" aria-hidden="true" />保存中</span>
+              : '下一步'}
           </button>
         </div>
       </div>
+      {isSaving ? <div className="guide-page__blocking-mask" aria-hidden="true" /> : null}
+      <AttentionModal
+        isOpen={Boolean(attentionModalMessage)}
+        title="提示"
+        message={attentionModalMessage}
+        confirmText="确定"
+        showCancel={false}
+        onClose={closeAttentionModal}
+        onConfirm={closeAttentionModal}
+      />
     </div>
   )
 }

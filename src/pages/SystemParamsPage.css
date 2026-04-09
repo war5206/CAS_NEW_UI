@@ -1089,6 +1089,10 @@ body.unit-layout-drag-lock {
   align-items: center;
   color: #fff;
   font-size: 20px;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .energy-price-plan__bar div:first-child {

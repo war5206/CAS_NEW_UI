@@ -1,4 +1,4 @@
-import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useState } from 'react'
+import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useRef, useState } from 'react'
 import NumericKeypadModal from '../NumericKeypadModal'
 import TimePickerModal from '../TimePickerModal'
 import AttentionModal from '../AttentionModal'
@@ -8,7 +8,9 @@ import { saveEnergyPricePlan } from '../../api/modules/home'
 import {
   ENERGY_PRICE_SEGMENT_COLORS,
   getStoredEnergyPriceState,
+  getStoredEnergyPriceStateForGuide,
   setStoredEnergyPriceState,
+  setStoredEnergyPriceStateForGuide,
 } from '../../utils/energyPriceState'
 
 /** 与后端尖峰平谷命名一致；按时段顺序循环映射 */
@@ -36,9 +38,18 @@ const TIME_PICKER_MINUTES = Array.from({ length: 60 }, (_, index) => index)
 
 const ENERGY_PRICE_PLAN_TIME_INVALID_MESSAGE = '时段价格设置需覆盖24小时：首段开始时间必须为00:00，末段结束时间必须为24:00。'
 const ENERGY_PRICE_SEGMENT_INVALID_MESSAGE = '时段设置无效：每段结束时间必须晚于开始时间。'
+const ENERGY_PRICE_SEGMENT_MIN_LABEL_WIDTH = 70
+const ENERGY_PRICE_SHORT_SEGMENT_THRESHOLD_MINUTES = 50
+const ENERGY_PRICE_SHORT_SEGMENT_END_MARKER_TOP = 95
 
 function deepClone(value) {
   return JSON.parse(JSON.stringify(value))
+}
+
+/** 用于向导：水、气固定价须为大于 0 的数值 */
+function isPositivePriceInput(value) {
+  const n = parseFloat(String(value ?? '').trim())
+  return Number.isFinite(n) && n > 0
 }
 
 function parseTimeToMinutes(value) {
@@ -109,11 +120,14 @@ function normalizeEnergyPlanDraftSegments(segments) {
 }
 
 const SystemParamsEnergyPrice = forwardRef(function SystemParamsEnergyPrice(
-  { variant = 'settings', settingsHeader = null, onDirtyChange },
+  { variant = 'settings', settingsHeader = null, onDirtyChange, onGuideFormReadyChange },
   ref,
 ) {
-  const [energyPriceState, setEnergyPriceState] = useState(() => getStoredEnergyPriceState())
-  const [savedEnergyPriceState, setSavedEnergyPriceState] = useState(() => getStoredEnergyPriceState())
+  const loadStoredEnergyPriceState = variant === 'guide' ? getStoredEnergyPriceStateForGuide : getStoredEnergyPriceState
+  const persistStoredEnergyPriceState = variant === 'guide' ? setStoredEnergyPriceStateForGuide : setStoredEnergyPriceState
+
+  const [energyPriceState, setEnergyPriceState] = useState(() => loadStoredEnergyPriceState())
+  const [savedEnergyPriceState, setSavedEnergyPriceState] = useState(() => loadStoredEnergyPriceState())
   const [energyPriceModalOpen, setEnergyPriceModalOpen] = useState(false)
   const [editingEnergyPlanId, setEditingEnergyPlanId] = useState(null)
   /** 编辑打开弹窗时的原方案日期，用于保存时 clear 旧区间 */
@@ -123,6 +137,10 @@ const SystemParamsEnergyPrice = forwardRef(function SystemParamsEnergyPrice(
   const [energyPricePickerState, setEnergyPricePickerState] = useState({ open: false, type: null, segmentIndex: null })
   const [keypadState, setKeypadState] = useState({ open: false, field: null, moduleKey: null })
   const [alertDialog, setAlertDialog] = useState({ open: false, title: '', message: '' })
+  const [energyPlanBarWidths, setEnergyPlanBarWidths] = useState({})
+  const energyPlanBarNodeMapRef = useRef(new Map())
+  const energyPlanBarObserverRef = useRef(null)
+  const energyPlanBarRefCallbackMapRef = useRef(new Map())
 
   const energyPricePickerValue = useMemo(() => {
     if (!energyPricePickerState.open) return []
@@ -142,6 +160,68 @@ const SystemParamsEnergyPrice = forwardRef(function SystemParamsEnergyPrice(
     onDirtyChange?.(isDirty)
   }, [isDirty, onDirtyChange])
 
+  useEffect(() => {
+    if (typeof ResizeObserver === 'undefined') return undefined
+    const observer = new ResizeObserver((entries) => {
+      setEnergyPlanBarWidths((previous) => {
+        let hasChanged = false
+        const next = { ...previous }
+        entries.forEach((entry) => {
+          const planId = entry.target?.dataset?.planId
+          if (!planId) return
+          const width = Math.max(0, entry.contentRect?.width ?? 0)
+          if (next[planId] === width) return
+          next[planId] = width
+          hasChanged = true
+        })
+        return hasChanged ? next : previous
+      })
+    })
+    energyPlanBarObserverRef.current = observer
+    energyPlanBarNodeMapRef.current.forEach((node) => observer.observe(node))
+    return () => {
+      observer.disconnect()
+      energyPlanBarObserverRef.current = null
+    }
+  }, [])
+
+  const registerEnergyPlanBarRef = useCallback((planId, node) => {
+    const key = String(planId)
+    const nodeMap = energyPlanBarNodeMapRef.current
+    const previousNode = nodeMap.get(key)
+    const observer = energyPlanBarObserverRef.current
+    if (previousNode && previousNode !== node && observer) observer.unobserve(previousNode)
+
+    if (!node) {
+      nodeMap.delete(key)
+      setEnergyPlanBarWidths((previous) => {
+        if (!(key in previous)) return previous
+        const next = { ...previous }
+        delete next[key]
+        return next
+      })
+      return
+    }
+
+    node.dataset.planId = key
+    nodeMap.set(key, node)
+    if (observer) observer.observe(node)
+    const width = Math.max(0, node.getBoundingClientRect().width || 0)
+    setEnergyPlanBarWidths((previous) => (previous[key] === width ? previous : { ...previous, [key]: width }))
+  }, [])
+
+  const getEnergyPlanBarRefCallback = useCallback(
+    (planId) => {
+      const key = String(planId)
+      const callbackMap = energyPlanBarRefCallbackMapRef.current
+      if (!callbackMap.has(key)) {
+        callbackMap.set(key, (node) => registerEnergyPlanBarRef(key, node))
+      }
+      return callbackMap.get(key)
+    },
+    [registerEnergyPlanBarRef],
+  )
+
   const openAlertDialog = useCallback((title, message) => {
     setAlertDialog({ open: true, title, message })
   }, [])
@@ -151,6 +231,16 @@ const SystemParamsEnergyPrice = forwardRef(function SystemParamsEnergyPrice(
   }, [])
 
   const commit = useCallback(() => {
+    if (variant === 'guide') {
+      if (!isPositivePriceInput(energyPriceState.waterFixed)) {
+        openAlertDialog('提示', '水固定价格须填写大于 0 的数值')
+        return false
+      }
+      if (!isPositivePriceInput(energyPriceState.gasFixed)) {
+        openAlertDialog('提示', '气固定价格须填写大于 0 的数值')
+        return false
+      }
+    }
     const hasInvalidPlanTime = energyPriceState.electricPlans.some((plan) => {
       const segments = Array.isArray(plan?.segments) ? plan.segments : []
       if (segments.length === 0) return true
@@ -161,9 +251,9 @@ const SystemParamsEnergyPrice = forwardRef(function SystemParamsEnergyPrice(
       return false
     }
     setSavedEnergyPriceState(deepClone(energyPriceState))
-    setStoredEnergyPriceState(energyPriceState)
+    persistStoredEnergyPriceState(energyPriceState)
     return true
-  }, [energyPriceState, openAlertDialog])
+  }, [energyPriceState, openAlertDialog, persistStoredEnergyPriceState, variant])
 
   useImperativeHandle(ref, () => ({ commit }), [commit])
 
@@ -241,6 +331,27 @@ const SystemParamsEnergyPrice = forwardRef(function SystemParamsEnergyPrice(
   const isWater = energyPriceState.tab === 'water'
   const isElectricity = energyPriceState.tab === 'electricity'
   const isGas = energyPriceState.tab === 'gas'
+  const waterReady =
+    variant === 'guide'
+      ? isPositivePriceInput(energyPriceState.waterFixed)
+      : String(energyPriceState.waterFixed ?? '').trim() !== ''
+  const gasReady =
+    variant === 'guide'
+      ? isPositivePriceInput(energyPriceState.gasFixed)
+      : String(energyPriceState.gasFixed ?? '').trim() !== ''
+  const electricityReady = Array.isArray(energyPriceState.electricPlans)
+    && energyPriceState.electricPlans.length > 0
+    && energyPriceState.electricPlans.some((plan) => Array.isArray(plan?.segments) && plan.segments.length > 0)
+    && energyPriceState.electricPlans.every((plan) => {
+      const segments = Array.isArray(plan?.segments) ? plan.segments : []
+      if (segments.length === 0) return false
+      return segments.every((segment) => String(segment?.price ?? '').trim() !== '')
+    })
+  const isGuideFormReady = variant === 'guide' ? waterReady && gasReady : waterReady && gasReady && electricityReady
+
+  useEffect(() => {
+    onGuideFormReadyChange?.(isGuideFormReady)
+  }, [isGuideFormReady, onGuideFormReadyChange])
 
   const openEnergyPriceModal = (plan = null) => {
     if (plan) {
@@ -449,12 +560,36 @@ const SystemParamsEnergyPrice = forwardRef(function SystemParamsEnergyPrice(
               return { key: `${plan.id}-${index}`, start: formatMinutesToTime(start), end: formatMinutesToTime(end), duration, price: segment.price, color: segment.color }
             })
             const totalDuration = bars.reduce((sum, item) => sum + item.duration, 0) || 1
+            const currentPlanBarWidth = energyPlanBarWidths[String(plan.id)] ?? 0
             const boundaries = []
             let passed = 0
+            let shouldApplyTopForNextShortBoundary = true
             bars.forEach((item, index) => {
-              boundaries.push({ key: `${item.key}-start`, time: item.start, left: (passed / totalDuration) * 100 })
+              let startMarkerTop = null
+              if (index > 0 && bars[index - 1].duration <= ENERGY_PRICE_SHORT_SEGMENT_THRESHOLD_MINUTES) {
+                startMarkerTop = shouldApplyTopForNextShortBoundary ? ENERGY_PRICE_SHORT_SEGMENT_END_MARKER_TOP : null
+                shouldApplyTopForNextShortBoundary = !shouldApplyTopForNextShortBoundary
+              }
+              boundaries.push({
+                key: `${item.key}-start`,
+                time: item.start,
+                left: (passed / totalDuration) * 100,
+                top: startMarkerTop,
+              })
               passed += item.duration
-              if (index === bars.length - 1) boundaries.push({ key: `${item.key}-end`, time: item.end, left: 100 })
+              if (index === bars.length - 1) {
+                let endMarkerTop = null
+                if (item.duration <= ENERGY_PRICE_SHORT_SEGMENT_THRESHOLD_MINUTES) {
+                  endMarkerTop = shouldApplyTopForNextShortBoundary ? ENERGY_PRICE_SHORT_SEGMENT_END_MARKER_TOP : null
+                  shouldApplyTopForNextShortBoundary = !shouldApplyTopForNextShortBoundary
+                }
+                boundaries.push({
+                  key: `${item.key}-end`,
+                  time: item.end,
+                  left: 100,
+                  top: endMarkerTop,
+                })
+              }
             })
             return (
               <div key={plan.id} className="energy-price-plan">
@@ -468,8 +603,9 @@ const SystemParamsEnergyPrice = forwardRef(function SystemParamsEnergyPrice(
                   <div className="energy-price-plan__times-track">
                     {boundaries.map((item) => {
                       const [hh, mm] = item.time.split(':')
+                      const markerStyle = item.top != null ? { left: `${item.left}%`, top: `${item.top}px` } : { left: `${item.left}%` }
                       return (
-                        <span key={item.key} className="energy-price-plan__time-marker" style={{ left: `${item.left}%` }}>
+                        <span key={item.key} className="energy-price-plan__time-marker" style={markerStyle}>
                           <span>{hh}</span>
                           <span className="energy-price-plan__time-sep">:</span>
                           <span>{mm}</span>
@@ -478,12 +614,16 @@ const SystemParamsEnergyPrice = forwardRef(function SystemParamsEnergyPrice(
                     })}
                   </div>
                 </div>
-                <div className="energy-price-plan__bar">
-                  {bars.map((segment) => (
+                <div className="energy-price-plan__bar" ref={getEnergyPlanBarRefCallback(plan.id)}>
+                  {bars.map((segment) => {
+                    const segmentPixelWidth = (segment.duration / totalDuration) * currentPlanBarWidth
+                    const shouldShowPrice = Boolean(segment.price) && segmentPixelWidth >= ENERGY_PRICE_SEGMENT_MIN_LABEL_WIDTH
+                    return (
                     <div key={`${segment.key}-bar`} style={{ background: segment.color, flexGrow: segment.duration, flexBasis: 0 }}>
-                      {segment.price ? `${segment.price} 元/kWh` : ''}
+                      {shouldShowPrice ? `${segment.price} 元/kWh` : ''}
                     </div>
-                  ))}
+                    )
+                  })}
                 </div>
               </div>
             )
@@ -552,7 +692,7 @@ const SystemParamsEnergyPrice = forwardRef(function SystemParamsEnergyPrice(
                 disabled={energyPricePlanSaving}
                 onClick={() => void handleConfirmEnergyPlanModal()}
               >
-                {energyPricePlanSaving ? '保存中…' : '确定'}
+                {energyPricePlanSaving ? <span className="guide-loading-inline"><span className="guide-loading-spinner" aria-hidden="true" />保存中</span> : '确定'}
               </button>
             </div>
           </div>

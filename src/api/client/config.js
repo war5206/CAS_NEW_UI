@@ -49,6 +49,8 @@ export const ALGORITHM_PROCESS_IDS = {
   SCAN_DEVICE_STATE: 'scanDeviceState',
   SAVE_DEVICE_ARRANGE: 'saveDeviceArrange',
   QUERY_DEVICE_ARRANGE: 'queryDeviceArrange',
+  SAVE_ENERGY_PRICE: 'saveEnergyPrice',
+  QUERY_ENERGY_PRICE: 'queryEnergyPrice',
   /** 电价方案：新增/编辑合一（后端先按清除区间 DELETE 再批量 INSERT） */
   SAVE_ENERGY_PRICE_PLAN: 'saveEnergyPricePlan',
 }

@@ -100,15 +100,15 @@ function SystemSelectConfigPage() {
       if (response.data?.state === 'success') {
         setSystemTypeId(systemTypeId)
         navigate('/guide/project-info')
+        return
       } else {
         setErrorMessage(response.data?.message || '保存失败，请重试')
       }
     } catch (error) {
       console.error('保存系统配置失败:', error)
       setErrorMessage('保存失败，请检查网络连接')
-    } finally {
-      setIsSaving(false)
     }
+    setIsSaving(false)
   }
 
   return (
@@ -260,10 +260,11 @@ function SystemSelectConfigPage() {
             onClick={handleNext}
             disabled={isSaving}
           >
-            {isSaving ? '保存中...' : '下一步'}
+            {isSaving ? <span className="guide-loading-inline"><span className="guide-loading-spinner" aria-hidden="true" />保存中</span> : '下一步'}
           </button>
         </div>
       </div>
+      {isSaving ? <div className="guide-page__blocking-mask" aria-hidden="true" /> : null}
     </div>
   )
 }

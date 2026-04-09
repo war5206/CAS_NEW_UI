@@ -66,15 +66,15 @@ function HeatPumpLoopPumpConfigPage() {
         } else {
           navigate('/guide/heat-pump-layout', { state: { queryArrangeOnReturn: true } })
         }
+        return
       } else {
         setErrorMessage(response.data?.message || '保存失败，请重试')
       }
     } catch (error) {
       console.error('保存热泵循环泵配置失败:', error)
       setErrorMessage('保存失败，请检查网络连接')
-    } finally {
-      setIsSaving(false)
     }
+    setIsSaving(false)
   }
 
   const handleBack = () => {
@@ -177,10 +177,11 @@ function HeatPumpLoopPumpConfigPage() {
             onClick={handleNext}
             disabled={isSaving}
           >
-            {isSaving ? '保存中...' : '下一步'}
+            {isSaving ? <span className="guide-loading-inline"><span className="guide-loading-spinner" aria-hidden="true" />保存中</span> : '下一步'}
           </button>
         </div>
       </div>
+      {isSaving ? <div className="guide-page__blocking-mask" aria-hidden="true" /> : null}
     </div>
   )
 }
