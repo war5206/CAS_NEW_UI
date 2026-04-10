@@ -111,7 +111,7 @@ function EnergyPriceGuidePage() {
             返回
           </button>
           <button type="button" className="guide-page__btn is-primary" onClick={() => void handleNext()} disabled={!canNext || submitting}>
-            {submitting ? <span className="guide-loading-inline"><span className="guide-loading-spinner" aria-hidden="true" />提交中</span> : '下一步'}
+            {submitting ? <span className="guide-loading-inline"><span className="guide-loading-spinner" aria-hidden="true" />保存中</span> : '下一步'}
           </button>
         </div>
       </div>

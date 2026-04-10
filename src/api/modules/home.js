@@ -141,6 +141,14 @@ export async function saveEnergyPricePlan(payload) {
   }
 }
 
+export async function scanSystemDevice() {
+  return callAlgorithmProcess(ALGORITHM_PROCESS_IDS.SCAN_SYSTEM_DEVICE, { resultType: '' })
+}
+
+export async function setInitState() {
+  return callAlgorithmProcess(ALGORITHM_PROCESS_IDS.SET_INIT_STATE, { initState: '1' })
+}
+
 export async function saveEnergyPrice(energyPrice = []) {
   const response = await callAlgorithmProcess(ALGORITHM_PROCESS_IDS.SAVE_ENERGY_PRICE, {
     energyPrice,

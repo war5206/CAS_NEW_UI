@@ -53,4 +53,6 @@ export const ALGORITHM_PROCESS_IDS = {
   QUERY_ENERGY_PRICE: 'queryEnergyPrice',
   /** 电价方案：新增/编辑合一（后端先按清除区间 DELETE 再批量 INSERT） */
   SAVE_ENERGY_PRICE_PLAN: 'saveEnergyPricePlan',
+  SCAN_SYSTEM_DEVICE: 'scanSystemDevice',
+  SET_INIT_STATE: 'setInitState',
 }

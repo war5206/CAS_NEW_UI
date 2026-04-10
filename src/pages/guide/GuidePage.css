@@ -890,3 +890,281 @@
     transform: rotate(360deg);
   }
 }
+
+/* --- System Detect Page -------------------------------------------------- */
+
+.guide-page--system-detect {
+  display: flex;
+  align-items: stretch;
+  justify-content: center;
+}
+
+.system-detect {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 88px 88px 0;
+  box-sizing: border-box;
+}
+
+.system-detect__title {
+  color: #FFF;
+  font-family: "Alibaba PuHuiTi 2.0", sans-serif;
+  font-size: 32px;
+  font-weight: 500;
+  line-height: normal;
+  letter-spacing: 3.2px;
+  margin: 0;
+  text-align: center;
+  width: 100%;
+}
+
+.system-detect__progress {
+  position: relative;
+  width: 300px;
+  height: 300px;
+  margin-top: 36px;
+  flex-shrink: 0;
+}
+
+.system-detect__ring {
+  width: 100%;
+  height: 100%;
+}
+
+.system-detect__ring-fill {
+  transition: stroke-dashoffset 0.3s ease;
+}
+
+.system-detect__value {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.system-detect__number {
+  color: white;
+  font-family: "D-DIN-PRO", sans-serif;
+  font-size: 96px;
+  font-weight: bold;
+  line-height: 1;
+}
+
+.system-detect__percent {
+  color: white;
+  font-family: "D-DIN-PRO", sans-serif;
+  font-size: 36px;
+  font-weight: 900;
+  line-height: 1;
+  align-self: center;
+}
+
+.system-detect__result {
+  width: 1443px;
+  max-width: 100%;
+  margin-top: 48px;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  min-height: 0;
+  flex: 1 1 auto;
+  overflow: hidden;
+}
+
+@keyframes system-detect-item-in {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.system-detect__categories {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 64px;
+  flex-shrink: 0;
+}
+
+.system-detect__category {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 72px;
+  padding: 0 32px;
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.1);
+  border: 2px solid transparent;
+  box-sizing: border-box;
+  cursor: pointer;
+  transition: background 0.2s ease, border-color 0.2s ease;
+  font: inherit;
+  color: inherit;
+  animation: system-detect-item-in 400ms ease-out both;
+}
+
+.system-detect__category:hover {
+  background: rgba(255, 255, 255, 0.15);
+}
+
+.system-detect__category.is-selected {
+  border-color: var(--红黄蓝绿-蓝, #197CDF);
+  background: rgba(25, 124, 223, 0.1);
+}
+
+.system-detect__category-left {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.system-detect__category-icon {
+  width: 24px;
+  height: 24px;
+  flex-shrink: 0;
+  object-fit: contain;
+}
+
+.system-detect__category-name {
+  color: white;
+  font-family: "Alibaba PuHuiTi 2.0", sans-serif;
+  font-size: 20px;
+  font-weight: 450;
+  line-height: normal;
+  white-space: nowrap;
+}
+
+.system-detect__status-icon {
+  flex-shrink: 0;
+}
+
+.system-detect__detail {
+  flex: 1 1 0;
+  min-height: 0;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.15) transparent;
+  animation: system-detect-detail-in 300ms ease-out both;
+}
+
+.system-detect__detail::-webkit-scrollbar {
+  width: 6px;
+}
+
+.system-detect__detail::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.system-detect__detail::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 3px;
+}
+
+@keyframes system-detect-detail-in {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.system-detect__detail-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px 64px;
+}
+
+.system-detect__detail-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 56px;
+  padding: 0 24px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.06);
+  box-sizing: border-box;
+}
+
+.system-detect__detail-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.system-detect__detail-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.system-detect__detail-dot.is-pass {
+  background: #52C41A;
+  box-shadow: 0 0 6px rgba(82, 196, 26, 0.4);
+}
+
+.system-detect__detail-dot.is-fail {
+  background: #FF4D4F;
+  box-shadow: 0 0 6px rgba(255, 77, 79, 0.4);
+}
+
+.system-detect__detail-name {
+  color: rgba(255, 255, 255, 0.85);
+  font-family: "Alibaba PuHuiTi 2.0", sans-serif;
+  font-size: 18px;
+  font-weight: 450;
+  line-height: normal;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.system-detect__footer {
+  position: absolute;
+  bottom: 88px;
+  left: 88px;
+  right: 88px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.system-detect__stop-btn {
+  width: 539px;
+  height: 72px;
+  border-radius: 16px;
+  background: var(--红黄蓝绿-蓝, #197CDF);
+  border: none;
+  color: white;
+  font-family: "Alibaba PuHuiTi 2.0", sans-serif;
+  font-size: 24px;
+  font-weight: 450;
+  line-height: normal;
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+
+.system-detect__stop-btn:hover {
+  background: #166BC4;
+}
+
+.system-detect__footer-end {
+  position: absolute;
+  right: 0;
+  display: flex;
+  gap: 16px;
+  align-items: center;
+}
