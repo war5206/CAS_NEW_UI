@@ -149,6 +149,11 @@ export async function setInitState() {
   return callAlgorithmProcess(ALGORITHM_PROCESS_IDS.SET_INIT_STATE, { initState: '1' })
 }
 
+/** 进入系统时查询初始化状态；data.lockStatus / data.initState 为字符串 */
+export async function queryInitState() {
+  return callAlgorithmProcess(ALGORITHM_PROCESS_IDS.QUERY_INIT_STATE, {})
+}
+
 export async function saveEnergyPrice(energyPrice = []) {
   const response = await callAlgorithmProcess(ALGORITHM_PROCESS_IDS.SAVE_ENERGY_PRICE, {
     energyPrice,

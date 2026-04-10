@@ -19,6 +19,7 @@ import TerminalLoopPumpConfigPage from './pages/guide/TerminalLoopPumpConfigPage
 import HeatPumpLayoutPage from './pages/guide/HeatPumpLayoutPage'
 import EnergyPriceGuidePage from './pages/guide/EnergyPriceGuidePage'
 import SystemDetectGuidePage from './pages/guide/SystemDetectGuidePage'
+import InitEntryPage from './pages/InitEntryPage'
 
 const DESIGN_WIDTH = 1920
 const DESIGN_HEIGHT = 1080
@@ -105,7 +106,7 @@ function AppRoutes({ homePageTitle, onHomePageTitleChange }) {
       ) : null}
 
       <Routes>
-        <Route path="/" element={<Navigate to="/auth/set-password" replace />} />
+        <Route path="/" element={<InitEntryPage />} />
         <Route path="/auth/set-password" element={<SetOperationPasswordPage />} />
         <Route path="/auth/confirm-password" element={<ConfirmPasswordPage />} />
         <Route path="/auth/login" element={<LoginPage />} />

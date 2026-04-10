@@ -91,7 +91,7 @@ function HomePage({ onActivePageChange, committedUnitLayoutSlots }) {
   const [activePage, setActivePage] = useState(HOME_PAGE_VIEW.DASHBOARD)
   const [isSystemImageLoaded, setIsSystemImageLoaded] = useState(false)
   const isHomeRoute = location.pathname === '/home' || location.pathname === '/home/'
-  const { data: homeOverview, error, isFetching, isFallbackData, lastSuccessAt } = useHomeOverviewQuery({ enabled: isHomeRoute })
+  const { data: homeOverview } = useHomeOverviewQuery({ enabled: isHomeRoute })
 
   useEffect(() => {
     onActivePageChange?.(HOME_PAGE_TITLE_MAP[activePage] ?? HOME_PAGE_TITLE_MAP[HOME_PAGE_VIEW.DASHBOARD])
@@ -107,14 +107,6 @@ function HomePage({ onActivePageChange, committedUnitLayoutSlots }) {
   const goToHeatPumpOverview = () => setActivePage(HOME_PAGE_VIEW.HEAT_PUMP_OVERVIEW)
   const goToTerminalBuilding = () => setActivePage(HOME_PAGE_VIEW.TERMINAL_BUILDING)
   const statusSummary = homeOverview.system.heatPumpSummary
-  const dataStatusText = isFallbackData
-    ? '数据刷新失败，当前显示上次成功数据'
-    : isFetching
-      ? '数据刷新中...'
-      : lastSuccessAt
-        ? `最近更新 ${new Date(lastSuccessAt).toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}`
-        : '等待首次刷新'
-
   return (
     <div className="home-pager">
       <div className="home-pager-track">
@@ -282,21 +274,6 @@ function HomePage({ onActivePageChange, committedUnitLayoutSlots }) {
           </section>
 
           <aside className="home-side-panel">
-            <div
-              style={{
-                marginBottom: '12px',
-                padding: '10px 14px',
-                borderRadius: '14px',
-                border: '1px solid rgba(111, 143, 184, 0.24)',
-                background: isFallbackData ? 'rgba(255, 132, 81, 0.12)' : 'rgba(67, 116, 187, 0.14)',
-                color: '#DDEBFF',
-                fontSize: '12px',
-                lineHeight: 1.5,
-              }}
-            >
-              <div>{dataStatusText}</div>
-              {error ? <div style={{ marginTop: '4px', color: 'rgba(255, 214, 201, 0.9)' }}>{error.message}</div> : null}
-            </div>
             <HomeWidget title={HOME_TEXT.MODE_STATUS} icon={modeStatusIcon} className="home-widget-mode">
               <div className="home-mode-card">
                 <div className="home-mode-avatar">

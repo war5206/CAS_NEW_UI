@@ -55,4 +55,6 @@ export const ALGORITHM_PROCESS_IDS = {
   SAVE_ENERGY_PRICE_PLAN: 'saveEnergyPricePlan',
   SCAN_SYSTEM_DEVICE: 'scanSystemDevice',
   SET_INIT_STATE: 'setInitState',
+  /** 进入系统：查询是否已完成初始化（initState：1 已初始化，0 需设密码等） */
+  QUERY_INIT_STATE: 'queryInitState',
 }
