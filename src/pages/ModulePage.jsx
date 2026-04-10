@@ -1,31 +1,33 @@
+import { lazy, Suspense } from 'react'
 import PageTransition from '../components/PageTransition'
-import AlertsModulePage from './AlertsModulePage'
-import ArchiveManagementPage from './ArchiveManagementPage'
-import BasicSettingPage from './BasicSettingPage'
-import ClimateCompensationPage from './ClimateCompensationPage'
-import ColdStatisticsPage from './ColdStatisticsPage'
-import ConstantPressurePumpPage from './ConstantPressurePumpPage'
-import CostAnalysisPage from './CostAnalysisPage'
-import CouplingEnergyPage from './CouplingEnergyPage'
-import DataOverviewPage from './DataOverviewPage'
-import DrainValvePage from './DrainValvePage'
-import HeatPumpLoopPumpPage from './HeatPumpLoopPumpPage'
-import HeatPumpPage from './HeatPumpPage'
-import HeatStatisticsPage from './HeatStatisticsPage'
-import HeatTracePage from './HeatTracePage'
-import ModeSelectPage from './ModeSelectPage'
-import MonitorEmptyPage from './MonitorEmptyPage'
-import OperationsDeviceManagementPage from './OperationsDeviceManagementPage'
-import OperationsSystemManagementPage from './OperationsSystemManagementPage'
-import PeakValleyPage from './PeakValleyPage'
-import PowerStatisticsPage from './PowerStatisticsPage'
-import ReliefValvePage from './ReliefValvePage'
-import SmartStartStopPage from './SmartStartStopPage'
-import SmartTimerPage from './SmartTimerPage'
-import SystemManualPage from './SystemManualPage'
-import SystemParamsPage from './SystemParamsPage'
-import TerminalLoopPumpPage from './TerminalLoopPumpPage'
-import WaterStatisticsPage from './WaterStatisticsPage'
+
+const AlertsModulePage = lazy(() => import('./AlertsModulePage'))
+const ArchiveManagementPage = lazy(() => import('./ArchiveManagementPage'))
+const BasicSettingPage = lazy(() => import('./BasicSettingPage'))
+const ClimateCompensationPage = lazy(() => import('./ClimateCompensationPage'))
+const ColdStatisticsPage = lazy(() => import('./ColdStatisticsPage'))
+const ConstantPressurePumpPage = lazy(() => import('./ConstantPressurePumpPage'))
+const CostAnalysisPage = lazy(() => import('./CostAnalysisPage'))
+const CouplingEnergyPage = lazy(() => import('./CouplingEnergyPage'))
+const DataOverviewPage = lazy(() => import('./DataOverviewPage'))
+const DrainValvePage = lazy(() => import('./DrainValvePage'))
+const HeatPumpLoopPumpPage = lazy(() => import('./HeatPumpLoopPumpPage'))
+const HeatPumpPage = lazy(() => import('./HeatPumpPage'))
+const HeatStatisticsPage = lazy(() => import('./HeatStatisticsPage'))
+const HeatTracePage = lazy(() => import('./HeatTracePage'))
+const ModeSelectPage = lazy(() => import('./ModeSelectPage'))
+const MonitorEmptyPage = lazy(() => import('./MonitorEmptyPage'))
+const OperationsDeviceManagementPage = lazy(() => import('./OperationsDeviceManagementPage'))
+const OperationsSystemManagementPage = lazy(() => import('./OperationsSystemManagementPage'))
+const PeakValleyPage = lazy(() => import('./PeakValleyPage'))
+const PowerStatisticsPage = lazy(() => import('./PowerStatisticsPage'))
+const ReliefValvePage = lazy(() => import('./ReliefValvePage'))
+const SmartStartStopPage = lazy(() => import('./SmartStartStopPage'))
+const SmartTimerPage = lazy(() => import('./SmartTimerPage'))
+const SystemManualPage = lazy(() => import('./SystemManualPage'))
+const SystemParamsPage = lazy(() => import('./SystemParamsPage'))
+const TerminalLoopPumpPage = lazy(() => import('./TerminalLoopPumpPage'))
+const WaterStatisticsPage = lazy(() => import('./WaterStatisticsPage'))
 
 function ModulePage({
   routeInfo,
@@ -173,7 +175,11 @@ function ModulePage({
     )
   }
 
-  return <PageTransition transitionKey={routeInfo.key}>{content}</PageTransition>
+  return (
+    <Suspense fallback={null}>
+      <PageTransition transitionKey={routeInfo.key}>{content}</PageTransition>
+    </Suspense>
+  )
 }
 
 export default ModulePage

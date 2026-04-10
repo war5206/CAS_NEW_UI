@@ -3,6 +3,8 @@ import { BrowserRouter, HashRouter, Navigate, Route, Routes, useLocation } from 
 import './App.css'
 import { createPageEntries, createRedirectEntries } from './config/navigation'
 import CasLayout from './layout/CasLayout'
+import AuthGuard from './components/AuthGuard'
+import { getStoredToken } from './api/client/auth'
 import HomePage from './pages/HomePage'
 import ModulePage from './pages/ModulePage'
 import PlaygroundPage from './pages/PlaygroundPage'
@@ -64,6 +66,7 @@ function AppRoutes({ homePageTitle, onHomePageTitleChange }) {
   const [moduleBreadcrumbSuffix, setModuleBreadcrumbSuffix] = useState(null)
   const [committedUnitLayoutSlots, setCommittedUnitLayoutSlots] = useState(null)
   const isHomeRoute = location.pathname === HOME_PATH || location.pathname === `${HOME_PATH}/`
+  const hasToken = Boolean(getStoredToken())
   const previousPathRef = useRef(window.sessionStorage.getItem(GUIDE_PREVIOUS_PATH_KEY))
 
   const guideTransitionDirection = useMemo(() => {
@@ -90,7 +93,7 @@ function AppRoutes({ homePageTitle, onHomePageTitleChange }) {
 
   return (
     <>
-      {homeEntry ? (
+      {homeEntry && hasToken ? (
         <div className={`app-route-cache${isHomeRoute ? ' is-active' : ''}`} aria-hidden={!isHomeRoute}>
           <CasLayout
             routeInfo={homeEntry}
@@ -113,15 +116,15 @@ function AppRoutes({ homePageTitle, onHomePageTitleChange }) {
         <Route path="/auth/system-select" element={<SystemSelectPage />} />
         <Route path={HOME_PATH} element={null} />
         <Route path="/playground" element={<PlaygroundPage />} />
-        <Route path="/screen-protect" element={<ScreenProtectPage />} />
-        <Route path="/guide/system-config" element={renderGuideRoute(<SystemSelectConfigPage />)} />
-        <Route path="/guide/project-info" element={renderGuideRoute(<ProjectInfoPage />)} />
-        <Route path="/guide/area-select" element={renderGuideRoute(<AreaSelectPage />)} />
-        <Route path="/guide/heat-pump-loop-pump" element={renderGuideRoute(<HeatPumpLoopPumpConfigPage />)} />
-        <Route path="/guide/terminal-loop-pump" element={renderGuideRoute(<TerminalLoopPumpConfigPage />)} />
-        <Route path="/guide/heat-pump-layout" element={renderGuideRoute(<HeatPumpLayoutPage />)} />
-        <Route path="/guide/energy-price" element={renderGuideRoute(<EnergyPriceGuidePage />)} />
-        <Route path="/guide/system-detect" element={renderGuideRoute(<SystemDetectGuidePage />)} />
+        <Route path="/screen-protect" element={<AuthGuard><ScreenProtectPage /></AuthGuard>} />
+        <Route path="/guide/system-config" element={<AuthGuard>{renderGuideRoute(<SystemSelectConfigPage />)}</AuthGuard>} />
+        <Route path="/guide/project-info" element={<AuthGuard>{renderGuideRoute(<ProjectInfoPage />)}</AuthGuard>} />
+        <Route path="/guide/area-select" element={<AuthGuard>{renderGuideRoute(<AreaSelectPage />)}</AuthGuard>} />
+        <Route path="/guide/heat-pump-loop-pump" element={<AuthGuard>{renderGuideRoute(<HeatPumpLoopPumpConfigPage />)}</AuthGuard>} />
+        <Route path="/guide/terminal-loop-pump" element={<AuthGuard>{renderGuideRoute(<TerminalLoopPumpConfigPage />)}</AuthGuard>} />
+        <Route path="/guide/heat-pump-layout" element={<AuthGuard>{renderGuideRoute(<HeatPumpLayoutPage />)}</AuthGuard>} />
+        <Route path="/guide/energy-price" element={<AuthGuard>{renderGuideRoute(<EnergyPriceGuidePage />)}</AuthGuard>} />
+        <Route path="/guide/system-detect" element={<AuthGuard>{renderGuideRoute(<SystemDetectGuidePage />)}</AuthGuard>} />
         {redirectEntries.map((entry) => (
           <Route key={`redirect-${entry.from}`} path={entry.from} element={<Navigate to={entry.to} replace />} />
         ))}
@@ -130,7 +133,7 @@ function AppRoutes({ homePageTitle, onHomePageTitleChange }) {
             key={entry.key}
             path={entry.path}
             element={
-              <CasLayout
+              <AuthGuard><CasLayout
                 routeInfo={entry}
                 homePageTitle={homePageTitle}
                 unsavedGuard={unsavedGuard}
@@ -146,7 +149,7 @@ function AppRoutes({ homePageTitle, onHomePageTitleChange }) {
                   onDetailBreadcrumbChange={setModuleBreadcrumbSuffix}
                   onUnitLayoutCommitted={setCommittedUnitLayoutSlots}
                 />
-              </CasLayout>
+              </CasLayout></AuthGuard>
             }
           />
         ))}

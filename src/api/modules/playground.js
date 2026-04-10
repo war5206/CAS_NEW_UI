@@ -1,13 +1,36 @@
-import { encryptPassword } from '../client/auth'
-import { post } from '../client/http'
+import { encryptPasswordAsync } from '../client/auth'
+import { get, post } from '../client/http'
 
 export async function loginWithPassword({ baseUrl, username, password }) {
+  const encryptedPassword = await encryptPasswordAsync(password)
   return post(
     '/FinforWorx/getTokenAndUser',
     {
       username,
-      password: encryptPassword(password),
+      password: encryptedPassword,
     },
+    {
+      baseUrl,
+      token: '',
+    },
+  )
+}
+
+export async function getToken({ baseUrl, username, password }) {
+  const encryptedPassword = await encryptPasswordAsync(password)
+  return get(
+    `/FinforWorx/getToken?username=${encodeURIComponent(username)}&password=${encodeURIComponent(encryptedPassword)}`,
+    {
+      baseUrl,
+      token: '',
+    },
+  )
+}
+
+export async function getTokenAndUser({ baseUrl, username, password }) {
+  const encryptedPassword = await encryptPasswordAsync(password)
+  return get(
+    `/FinforWorx/getTokenAndUser?username=${encodeURIComponent(username)}&password=${encodeURIComponent(encryptedPassword)}`,
     {
       baseUrl,
       token: '',

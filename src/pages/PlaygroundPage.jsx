@@ -10,7 +10,7 @@ import weatherCompensationIcon from '../assets/home/weather-compensation.svg'
 import thermometerIcon from '../assets/thermometer.svg'
 import { clearStoredToken, getStoredToken, parseUserFromToken, setStoredToken } from '../api/client/auth'
 import { getStoredApiBaseUrl, setStoredApiBaseUrl } from '../api/client/config'
-import { executeAlgorithmProcess, loginWithPassword } from '../api/modules/playground'
+import { executeAlgorithmProcess, getToken, getTokenAndUser, loginWithPassword } from '../api/modules/playground'
 import './PlaygroundPage.css'
 
 const DATE_YEARS = [2022, 2023, 2024, 2025, 2026, 2027, 2028]
@@ -51,6 +51,10 @@ function PlaygroundPage() {
   const [userInfo, setUserInfo] = useState(null)
   const [loginLoading, setLoginLoading] = useState(false)
   const [loginResponse, setLoginResponse] = useState(null)
+  const [getTokenLoading, setGetTokenLoading] = useState(false)
+  const [getTokenResponse, setGetTokenResponse] = useState(null)
+  const [getTokenAndUserLoading, setGetTokenAndUserLoading] = useState(false)
+  const [getTokenAndUserResponse, setGetTokenAndUserResponse] = useState(null)
 
   useEffect(() => {
     if (token) {
@@ -93,6 +97,35 @@ function PlaygroundPage() {
   const handleLogout = () => {
     setToken('')
     setLoginResponse(null)
+  }
+
+  const handleGetToken = async () => {
+    setGetTokenLoading(true)
+    setGetTokenResponse(null)
+    try {
+      const response = await getToken({ baseUrl: apiBaseUrl, username, password })
+      setGetTokenResponse({ success: true, data: response.data, status: response.status })
+    } catch (error) {
+      setGetTokenResponse({ success: false, error: error.message, data: error.data })
+    } finally {
+      setGetTokenLoading(false)
+    }
+  }
+
+  const handleGetTokenAndUser = async () => {
+    setGetTokenAndUserLoading(true)
+    setGetTokenAndUserResponse(null)
+    try {
+      const response = await getTokenAndUser({ baseUrl: apiBaseUrl, username, password })
+      setGetTokenAndUserResponse({ success: true, data: response.data, status: response.status })
+      if (response.data?.code === '200' && response.data?.token) {
+        setToken(response.data.token)
+      }
+    } catch (error) {
+      setGetTokenAndUserResponse({ success: false, error: error.message, data: error.data })
+    } finally {
+      setGetTokenAndUserLoading(false)
+    }
   }
 
   const pickerMap = {
@@ -292,6 +325,71 @@ function PlaygroundPage() {
                 placeholder="http://x.x.x.x:xxxx"
               />
             </div>
+          </div>
+        </section>
+
+        <section className="playground-section">
+          <h2 className="playground-section__title">Get Token Test (FinforWorx API)</h2>
+          <div className="playground-api-section">
+            <div className="playground-api-inputs">
+              <div className="playground-api-input-group">
+                <label className="playground-api-label">Username</label>
+                <input
+                  type="text"
+                  className="playground-api-input"
+                  value={username}
+                  onChange={(event) => setUsername(event.target.value)}
+                  placeholder="Enter username"
+                />
+              </div>
+              <div className="playground-api-input-group">
+                <label className="playground-api-label">Password</label>
+                <input
+                  type="password"
+                  className="playground-api-input"
+                  value={password}
+                  onChange={(event) => setPassword(event.target.value)}
+                  placeholder="Enter password"
+                />
+              </div>
+            </div>
+            <p style={{ color: 'rgba(255, 255, 255, 0.5)', fontSize: '12px', margin: '4px 0 8px' }}>
+              Target: {apiBaseUrl}/FinforWorx/getToken &amp; getTokenAndUser
+            </p>
+            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+              <button
+                type="button"
+                className="playground-api-button"
+                onClick={handleGetToken}
+                disabled={getTokenLoading}
+                style={{ flex: 1, minWidth: '200px' }}
+              >
+                {getTokenLoading ? 'Requesting...' : 'GET /getToken'}
+              </button>
+              <button
+                type="button"
+                className="playground-api-button"
+                onClick={handleGetTokenAndUser}
+                disabled={getTokenAndUserLoading}
+                style={{ flex: 1, minWidth: '200px', background: 'linear-gradient(180deg, #3a8fd5, #2d6fa8)' }}
+              >
+                {getTokenAndUserLoading ? 'Requesting...' : 'GET /getTokenAndUser'}
+              </button>
+            </div>
+            {getTokenResponse ? (
+              <div className={`playground-api-response ${getTokenResponse.success ? 'success' : 'error'}`}>
+                <h3>getToken {getTokenResponse.success ? 'Success' : 'Failed'}</h3>
+                {getTokenResponse.status ? <p>Status: {getTokenResponse.status}</p> : null}
+                <pre>{JSON.stringify(getTokenResponse.data || getTokenResponse.error, null, 2)}</pre>
+              </div>
+            ) : null}
+            {getTokenAndUserResponse ? (
+              <div className={`playground-api-response ${getTokenAndUserResponse.success ? 'success' : 'error'}`}>
+                <h3>getTokenAndUser {getTokenAndUserResponse.success ? 'Success' : 'Failed'}</h3>
+                {getTokenAndUserResponse.status ? <p>Status: {getTokenAndUserResponse.status}</p> : null}
+                <pre>{JSON.stringify(getTokenAndUserResponse.data || getTokenAndUserResponse.error, null, 2)}</pre>
+              </div>
+            ) : null}
           </div>
         </section>
 

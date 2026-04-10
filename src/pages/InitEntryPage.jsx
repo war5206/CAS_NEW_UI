@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { queryInitState } from '@/api/modules/home'
+import { acquireSystemToken } from '@/api/modules/auth'
+import { getStoredToken, setStoredToken } from '@/api/client/auth'
 import './InitEntryPage.css'
 
 function resolveInitPath(body) {
@@ -24,6 +26,15 @@ function InitEntryPage() {
   const run = useCallback(async () => {
     setError(null)
     try {
+      if (!getStoredToken()) {
+        const tokenRes = await acquireSystemToken()
+        if (tokenRes.data?.code === '200' && tokenRes.data?.token) {
+          setStoredToken(tokenRes.data.token)
+        } else {
+          throw new Error('获取系统令牌失败')
+        }
+      }
+
       const res = await queryInitState()
       const body = res.data
       const path = resolveInitPath(body)
@@ -33,7 +44,7 @@ function InitEntryPage() {
       }
       navigate('/auth/set-password', { replace: true })
     } catch (e) {
-      console.error('queryInitState failed:', e)
+      console.error('System initialization failed:', e)
       setError(e)
     }
   }, [navigate])
