@@ -53,9 +53,8 @@ export async function setOperationPassword(operatePWD, options) {
 }
 
 export async function loginVerification(loginPWD) {
-  const encryptedPWD = await encryptPasswordAsync(loginPWD)
   const response = await callAlgorithmProcess(ALGORITHM_PROCESS_IDS.LOGIN_VERIFICATION, {
-    loginPWD: encryptedPWD
+    loginPWD
   })
   return {
     ...response,
@@ -155,6 +154,20 @@ export async function setInitState() {
 /** 进入系统时查询初始化状态；data.lockStatus / data.initState 为字符串 */
 export async function queryInitState() {
   return callAlgorithmProcess(ALGORITHM_PROCESS_IDS.QUERY_INIT_STATE, {})
+}
+
+export async function deviceUnlock(unlockPWD) {
+  return callAlgorithmProcess(ALGORITHM_PROCESS_IDS.DEVICE_UNLOCK, {
+    unlockPWD
+  })
+}
+
+export async function writeLockStatus(status = '1') {
+  return callAlgorithmProcess(ALGORITHM_PROCESS_IDS.WRITE_REALVAL_BY_LONG_NAMES, {
+    writeData: {
+      'Sys\\FinforWorx\\LockStatus': status,
+    }
+  })
 }
 
 export async function saveEnergyPrice(energyPrice = []) {

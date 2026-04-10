@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react'
-import { useLocation } from 'react-router-dom'
+import { useEffect, useState, useCallback } from 'react'
+import { useLocation, useNavigate } from 'react-router-dom'
 import './ScreenProtectPage.css'
 import ScreenInfo from '../components/ScreenInfo'
 import screenProtectBg from '../assets/guide-init/screen-protect-bg.png'
@@ -9,12 +9,24 @@ import screenProtectAlert from '../assets/guide-init/screen-protect-alert.png'
 import screenProtectTemperature from '../assets/guide-init/screen-protect-temperature.png'
 import { useScreenDataQuery } from '../features/screen/hooks/useScreenDataQuery'
 
+const FADE_OUT_DURATION = 600
+
 function ScreenProtectPage() {
   const location = useLocation()
+  const navigate = useNavigate()
   const [currentTime, setCurrentTime] = useState(new Date())
   const [isLoaded, setIsLoaded] = useState(false)
+  const [isFadingOut, setIsFadingOut] = useState(false)
   const isScreenProtectRoute = location.pathname === '/screen-protect'
   const { data: screenData } = useScreenDataQuery({ enabled: isScreenProtectRoute })
+
+  const handleScreenClick = useCallback(() => {
+    if (isFadingOut) return
+    setIsFadingOut(true)
+    setTimeout(() => {
+      navigate('/auth/login', { state: { fromScreenProtect: true } })
+    }, FADE_OUT_DURATION)
+  }, [navigate, isFadingOut])
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -51,7 +63,7 @@ function ScreenProtectPage() {
   }
 
   return (
-    <div className={`screen-protect-page ${isLoaded ? 'visible' : ''}`}>
+    <div className={`screen-protect-page ${isLoaded && !isFadingOut ? 'visible' : ''}`} onClick={handleScreenClick} role="button" tabIndex={0}>
       <div className="screen-protect-content">
         <img src={screenProtectBg} alt="" className="screen-protect-bg" />
         <div className="screen-protect-overlay">

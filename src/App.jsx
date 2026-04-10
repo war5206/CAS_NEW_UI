@@ -22,6 +22,7 @@ import HeatPumpLayoutPage from './pages/guide/HeatPumpLayoutPage'
 import EnergyPriceGuidePage from './pages/guide/EnergyPriceGuidePage'
 import SystemDetectGuidePage from './pages/guide/SystemDetectGuidePage'
 import InitEntryPage from './pages/InitEntryPage'
+import { useInactivityTimer } from './hooks/useInactivityTimer'
 
 const DESIGN_WIDTH = 1920
 const DESIGN_HEIGHT = 1080
@@ -67,6 +68,8 @@ function AppRoutes({ homePageTitle, onHomePageTitleChange }) {
   const [committedUnitLayoutSlots, setCommittedUnitLayoutSlots] = useState(null)
   const isHomeRoute = location.pathname === HOME_PATH || location.pathname === `${HOME_PATH}/`
   const hasToken = Boolean(getStoredToken())
+
+  useInactivityTimer()
   const previousPathRef = useRef(window.sessionStorage.getItem(GUIDE_PREVIOUS_PATH_KEY))
 
   const guideTransitionDirection = useMemo(() => {

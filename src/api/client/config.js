@@ -57,4 +57,6 @@ export const ALGORITHM_PROCESS_IDS = {
   SET_INIT_STATE: 'setInitState',
   /** 进入系统：查询是否已完成初始化（initState：1 已初始化，0 需设密码等） */
   QUERY_INIT_STATE: 'queryInitState',
+  DEVICE_UNLOCK: 'deviceUnlock',
+  WRITE_REALVAL_BY_LONG_NAMES: 'writeRealvalByLongNames',
 }

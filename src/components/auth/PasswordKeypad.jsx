@@ -20,6 +20,7 @@ const KEYPAD_KEYS = [
 function PasswordKeypad({
   title,
   subtitle,
+  subtitleClassName,
   passwordLength = 4,
   bottomButtons = [],
   extraBottomButtons = [],
@@ -89,7 +90,7 @@ function PasswordKeypad({
           {error || title}
         </h2>
         {subtitle ? (
-          <p className="password-keypad__subtitle">{subtitle}</p>
+          <p className={`password-keypad__subtitle${subtitleClassName ? ` ${subtitleClassName}` : ''}`}>{subtitle}</p>
         ) : null}
       </div>
 

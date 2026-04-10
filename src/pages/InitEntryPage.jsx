@@ -5,16 +5,25 @@ import { acquireSystemToken } from '@/api/modules/auth'
 import { getStoredToken, setStoredToken } from '@/api/client/auth'
 import './InitEntryPage.css'
 
-function resolveInitPath(body) {
+function resolveInitRoute(body) {
   if (!body?.success || body.code !== 200 || body.data == null) {
     return null
   }
+
+  const lockStatus = String(body.data.lockStatus ?? '')
+  if (lockStatus === '1') {
+    return {
+      path: '/auth/login',
+      state: { deviceLocked: true },
+    }
+  }
+
   const initState = String(body.data.initState ?? '')
   if (initState === '1') {
-    return '/home'
+    return { path: '/home' }
   }
   if (initState === '0') {
-    return '/auth/set-password'
+    return { path: '/auth/set-password' }
   }
   return null
 }
@@ -37,9 +46,9 @@ function InitEntryPage() {
 
       const res = await queryInitState()
       const body = res.data
-      const path = resolveInitPath(body)
-      if (path) {
-        navigate(path, { replace: true })
+      const route = resolveInitRoute(body)
+      if (route) {
+        navigate(route.path, { replace: true, state: route.state })
         return
       }
       navigate('/auth/set-password', { replace: true })
