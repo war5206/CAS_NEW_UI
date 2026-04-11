@@ -1,6 +1,5 @@
 import { post } from '../client/http'
 import { getApiBaseUrl, getAlgorithmProcessPath, ALGORITHM_PROCESS_IDS } from '../client/config'
-import { encryptPasswordAsync } from '../client/auth'
 import { adaptHomeOverview } from '../adapters/home'
 import { adaptScreenData } from '../adapters/screen'
 import { adaptSetOperationPasswordResponse, adaptLoginVerificationResponse } from '../adapters/auth'
@@ -39,12 +38,11 @@ export async function queryScreenData() {
  * @param {{ adminPWD?: string }} [options] - omit for first-time setup; pass adminPWD for forgot-password / key reset
  */
 export async function setOperationPassword(operatePWD, options) {
-  const encryptedPWD = await encryptPasswordAsync(operatePWD)
   const adminPWD = options?.adminPWD
   const paramData =
     adminPWD != null && adminPWD !== ''
-      ? { adminPWD: await encryptPasswordAsync(adminPWD), operatePWD: encryptedPWD }
-      : { operatePWD: encryptedPWD }
+      ? { adminPWD, operatePWD }
+      : { operatePWD }
   const response = await callAlgorithmProcess(ALGORITHM_PROCESS_IDS.SET_OPERATION_PASSWORD, paramData)
   return {
     ...response,
@@ -54,7 +52,7 @@ export async function setOperationPassword(operatePWD, options) {
 
 export async function loginVerification(loginPWD) {
   const response = await callAlgorithmProcess(ALGORITHM_PROCESS_IDS.LOGIN_VERIFICATION, {
-    loginPWD
+    loginPWD,
   })
   return {
     ...response,

@@ -72,7 +72,7 @@ function LoginPage() {
       const result = response.data?.data?.result
       if (result?.state === 'success' && result?.message === '超管') {
         resetLoginFailCount()
-        navigate('/home')
+        navigate('/home', { state: { deviceUnlockSucceeded: true } })
       } else {
         setErrorKey((k) => k + 1)
         setError('密码错误，请联系超级管理员')

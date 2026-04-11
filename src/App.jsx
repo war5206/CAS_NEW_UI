@@ -125,14 +125,14 @@ function AppRoutes({ homePageTitle, onHomePageTitleChange }) {
         <Route path="/auth/confirm-password" element={<ConfirmPasswordPage />} />
         <Route path="/auth/login" element={<LoginPage />} />
         <Route path="/auth/system-select" element={<SystemSelectPage />} />
-        <Route path="/guide/system-config" element={<AuthGuard>{renderGuideRoute(<SystemSelectConfigPage />)}</AuthGuard>} />
-        <Route path="/guide/project-info" element={<AuthGuard>{renderGuideRoute(<ProjectInfoPage />)}</AuthGuard>} />
-        <Route path="/guide/area-select" element={<AuthGuard>{renderGuideRoute(<AreaSelectPage />)}</AuthGuard>} />
-        <Route path="/guide/heat-pump-loop-pump" element={<AuthGuard>{renderGuideRoute(<HeatPumpLoopPumpConfigPage />)}</AuthGuard>} />
-        <Route path="/guide/terminal-loop-pump" element={<AuthGuard>{renderGuideRoute(<TerminalLoopPumpConfigPage />)}</AuthGuard>} />
-        <Route path="/guide/heat-pump-layout" element={<AuthGuard>{renderGuideRoute(<HeatPumpLayoutPage />)}</AuthGuard>} />
-        <Route path="/guide/energy-price" element={<AuthGuard>{renderGuideRoute(<EnergyPriceGuidePage />)}</AuthGuard>} />
-        <Route path="/guide/system-detect" element={<AuthGuard>{renderGuideRoute(<SystemDetectGuidePage />)}</AuthGuard>} />
+        <Route path="/guide/system-config" element={<AuthGuard skipInitLockCheck>{renderGuideRoute(<SystemSelectConfigPage />)}</AuthGuard>} />
+        <Route path="/guide/project-info" element={<AuthGuard skipInitLockCheck>{renderGuideRoute(<ProjectInfoPage />)}</AuthGuard>} />
+        <Route path="/guide/area-select" element={<AuthGuard skipInitLockCheck>{renderGuideRoute(<AreaSelectPage />)}</AuthGuard>} />
+        <Route path="/guide/heat-pump-loop-pump" element={<AuthGuard skipInitLockCheck>{renderGuideRoute(<HeatPumpLoopPumpConfigPage />)}</AuthGuard>} />
+        <Route path="/guide/terminal-loop-pump" element={<AuthGuard skipInitLockCheck>{renderGuideRoute(<TerminalLoopPumpConfigPage />)}</AuthGuard>} />
+        <Route path="/guide/heat-pump-layout" element={<AuthGuard skipInitLockCheck>{renderGuideRoute(<HeatPumpLayoutPage />)}</AuthGuard>} />
+        <Route path="/guide/energy-price" element={<AuthGuard skipInitLockCheck>{renderGuideRoute(<EnergyPriceGuidePage />)}</AuthGuard>} />
+        <Route path="/guide/system-detect" element={<AuthGuard skipInitLockCheck>{renderGuideRoute(<SystemDetectGuidePage />)}</AuthGuard>} />
         <Route element={<InitEntryLayout />}>
           <Route path="/" element={null} />
           <Route path={HOME_PATH} element={null} />
