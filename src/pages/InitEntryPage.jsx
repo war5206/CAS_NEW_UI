@@ -3,6 +3,8 @@ import { Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { queryInitState } from '@/api/modules/home'
 import { acquireSystemToken } from '@/api/modules/auth'
 import { getStoredToken, setStoredToken } from '@/api/client/auth'
+import { markAuthGuardLockCheckComplete } from '@/components/AuthGuard'
+import { useHomeRouteCacheControls } from '@/context/HomeRouteCacheContext'
 import './InitEntryPage.css'
 
 function normalizePathname(pathname) {
@@ -51,6 +53,7 @@ function getTargetFromInitBody(initBody, pathname) {
 function InitEntryLayout() {
   const navigate = useNavigate()
   const location = useLocation()
+  const { setHomeCacheAllowed } = useHomeRouteCacheControls()
   const [error, setError] = useState(null)
   const [initBody, setInitBody] = useState(null)
   const [fetchVersion, setFetchVersion] = useState(0)
@@ -116,6 +119,10 @@ function InitEntryLayout() {
 
   const ready = error == null && initBody != null && aligned
 
+  useEffect(() => {
+    setHomeCacheAllowed(ready)
+  }, [ready, setHomeCacheAllowed])
+
   if (error) {
     return (
       <div className="init-entry-page">
@@ -136,6 +143,7 @@ function InitEntryLayout() {
     )
   }
 
+  markAuthGuardLockCheckComplete()
   return <Outlet />
 }
 

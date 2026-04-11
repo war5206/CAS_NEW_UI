@@ -9,6 +9,11 @@ export function resetLockCheck() {
   lockCheckDone = false
 }
 
+/** Call when init flow has already validated lock state (e.g. InitEntryLayout ready) so the first protected route does not render null. */
+export function markAuthGuardLockCheckComplete() {
+  lockCheckDone = true
+}
+
 function AuthGuard({ children }) {
   const navigate = useNavigate()
   const hasToken = Boolean(getStoredToken())
