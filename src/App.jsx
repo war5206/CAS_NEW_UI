@@ -21,7 +21,7 @@ import TerminalLoopPumpConfigPage from './pages/guide/TerminalLoopPumpConfigPage
 import HeatPumpLayoutPage from './pages/guide/HeatPumpLayoutPage'
 import EnergyPriceGuidePage from './pages/guide/EnergyPriceGuidePage'
 import SystemDetectGuidePage from './pages/guide/SystemDetectGuidePage'
-import InitEntryPage from './pages/InitEntryPage'
+import InitEntryLayout from './pages/InitEntryPage'
 import { useInactivityTimer } from './hooks/useInactivityTimer'
 
 const DESIGN_WIDTH = 1920
@@ -112,14 +112,10 @@ function AppRoutes({ homePageTitle, onHomePageTitleChange }) {
       ) : null}
 
       <Routes>
-        <Route path="/" element={<InitEntryPage />} />
         <Route path="/auth/set-password" element={<SetOperationPasswordPage />} />
         <Route path="/auth/confirm-password" element={<ConfirmPasswordPage />} />
         <Route path="/auth/login" element={<LoginPage />} />
         <Route path="/auth/system-select" element={<SystemSelectPage />} />
-        <Route path={HOME_PATH} element={null} />
-        <Route path="/playground" element={<PlaygroundPage />} />
-        <Route path="/screen-protect" element={<AuthGuard><ScreenProtectPage /></AuthGuard>} />
         <Route path="/guide/system-config" element={<AuthGuard>{renderGuideRoute(<SystemSelectConfigPage />)}</AuthGuard>} />
         <Route path="/guide/project-info" element={<AuthGuard>{renderGuideRoute(<ProjectInfoPage />)}</AuthGuard>} />
         <Route path="/guide/area-select" element={<AuthGuard>{renderGuideRoute(<AreaSelectPage />)}</AuthGuard>} />
@@ -128,35 +124,41 @@ function AppRoutes({ homePageTitle, onHomePageTitleChange }) {
         <Route path="/guide/heat-pump-layout" element={<AuthGuard>{renderGuideRoute(<HeatPumpLayoutPage />)}</AuthGuard>} />
         <Route path="/guide/energy-price" element={<AuthGuard>{renderGuideRoute(<EnergyPriceGuidePage />)}</AuthGuard>} />
         <Route path="/guide/system-detect" element={<AuthGuard>{renderGuideRoute(<SystemDetectGuidePage />)}</AuthGuard>} />
-        {redirectEntries.map((entry) => (
-          <Route key={`redirect-${entry.from}`} path={entry.from} element={<Navigate to={entry.to} replace />} />
-        ))}
-        {nonHomeEntries.map((entry) => (
-          <Route
-            key={entry.key}
-            path={entry.path}
-            element={
-              <AuthGuard><CasLayout
-                routeInfo={entry}
-                homePageTitle={homePageTitle}
-                unsavedGuard={unsavedGuard}
-                hideSecondaryNav={hideSecondaryNav}
-                hideModuleTabs={hideModuleTabs}
-                extraBreadcrumbLabel={moduleBreadcrumbSuffix}
-              >
-                <ModulePage
+        <Route element={<InitEntryLayout />}>
+          <Route path="/" element={null} />
+          <Route path={HOME_PATH} element={null} />
+          <Route path="/playground" element={<PlaygroundPage />} />
+          <Route path="/screen-protect" element={<AuthGuard><ScreenProtectPage /></AuthGuard>} />
+          {redirectEntries.map((entry) => (
+            <Route key={`redirect-${entry.from}`} path={entry.from} element={<Navigate to={entry.to} replace />} />
+          ))}
+          {nonHomeEntries.map((entry) => (
+            <Route
+              key={entry.key}
+              path={entry.path}
+              element={
+                <AuthGuard><CasLayout
                   routeInfo={entry}
-                  onUnsavedGuardChange={setUnsavedGuard}
-                  onSecondaryNavVisibilityChange={setHideSecondaryNav}
-                  onModuleTabsVisibilityChange={setHideModuleTabs}
-                  onDetailBreadcrumbChange={setModuleBreadcrumbSuffix}
-                  onUnitLayoutCommitted={setCommittedUnitLayoutSlots}
-                />
-              </CasLayout></AuthGuard>
-            }
-          />
-        ))}
-        <Route path="*" element={<Navigate to={HOME_PATH} replace />} />
+                  homePageTitle={homePageTitle}
+                  unsavedGuard={unsavedGuard}
+                  hideSecondaryNav={hideSecondaryNav}
+                  hideModuleTabs={hideModuleTabs}
+                  extraBreadcrumbLabel={moduleBreadcrumbSuffix}
+                >
+                  <ModulePage
+                    routeInfo={entry}
+                    onUnsavedGuardChange={setUnsavedGuard}
+                    onSecondaryNavVisibilityChange={setHideSecondaryNav}
+                    onModuleTabsVisibilityChange={setHideModuleTabs}
+                    onDetailBreadcrumbChange={setModuleBreadcrumbSuffix}
+                    onUnitLayoutCommitted={setCommittedUnitLayoutSlots}
+                  />
+                </CasLayout></AuthGuard>
+              }
+            />
+          ))}
+          <Route path="*" element={<Navigate to={HOME_PATH} replace />} />
+        </Route>
       </Routes>
     </>
   )
