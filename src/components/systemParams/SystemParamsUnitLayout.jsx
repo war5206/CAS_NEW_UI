@@ -425,19 +425,21 @@ const SystemParamsUnitLayout = forwardRef(function SystemParamsUnitLayout(
     setSavedUnitLayoutState(cloneUnitLayoutState(nextState))
   }, [heatPumpCount])
 
+  const queryArrangeFetchedRef = useRef(false)
+
   useEffect(() => {
     if (!queryArrangeOnMount) {
       return
     }
-    let cancelled = false
+    if (queryArrangeFetchedRef.current) {
+      return
+    }
+    queryArrangeFetchedRef.current = true
 
     const run = async () => {
       setIsOperating(true)
       try {
         const response = await queryDeviceArrange()
-        if (cancelled) {
-          return
-        }
         const { ok, msg, data } = parseAlgorithmProcessPayload(response)
         if (!ok) {
           openAlertDialog('提示', msg || '查询机组排布失败，请稍后重试。')
@@ -445,20 +447,13 @@ const SystemParamsUnitLayout = forwardRef(function SystemParamsUnitLayout(
         }
         applyQueryArrangeData(data ?? {})
       } catch (error) {
-        if (!cancelled) {
-          openAlertDialog('提示', error?.message || '查询机组排布失败，请稍后重试。')
-        }
+        openAlertDialog('提示', error?.message || '查询机组排布失败，请稍后重试。')
       } finally {
-        if (!cancelled) {
-          setIsOperating(false)
-        }
+        setIsOperating(false)
       }
     }
 
     run()
-    return () => {
-      cancelled = true
-    }
   }, [applyQueryArrangeData, openAlertDialog, queryArrangeOnMount])
 
   const resetUnitLayout = async () => {

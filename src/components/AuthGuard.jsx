@@ -14,13 +14,15 @@ export function markAuthGuardLockCheckComplete() {
   lockCheckDone = true
 }
 
-function AuthGuard({ children }) {
+function AuthGuard({ children, skipInitLockCheck = false }) {
   const navigate = useNavigate()
   const hasToken = Boolean(getStoredToken())
-  const [checking, setChecking] = useState(!lockCheckDone && hasToken)
+  const [checking, setChecking] = useState(
+    () => !skipInitLockCheck && !lockCheckDone && Boolean(getStoredToken()),
+  )
 
   useEffect(() => {
-    if (lockCheckDone || !hasToken) return
+    if (skipInitLockCheck || lockCheckDone || !hasToken) return
 
     let cancelled = false
 
@@ -41,7 +43,7 @@ function AuthGuard({ children }) {
       })
 
     return () => { cancelled = true }
-  }, [navigate, hasToken])
+  }, [navigate, hasToken, skipInitLockCheck])
 
   if (!hasToken) {
     return <Navigate to="/" replace />

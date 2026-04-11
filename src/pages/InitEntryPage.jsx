@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { queryInitState } from '@/api/modules/home'
 import { acquireSystemToken } from '@/api/modules/auth'
@@ -15,13 +15,16 @@ function normalizePathname(pathname) {
   return trimmed || '/'
 }
 
-export function resolveInitRoute(body, requestedPathname = '/') {
+/**
+ * @param {{ ignoreStaleLock?: boolean }} [options] - 超管解锁成功后 navigate 带上 deviceUnlockSucceeded 时，若后端尚未刷新 lockStatus，仍按 initState 路由而不退回登录页
+ */
+export function resolveInitRoute(body, requestedPathname = '/', options = {}) {
   if (!body?.success || body.code !== 200 || body.data == null) {
     return null
   }
 
   const lockStatus = String(body.data.lockStatus ?? '')
-  if (lockStatus === '1') {
+  if (lockStatus === '1' && !options.ignoreStaleLock) {
     return {
       path: '/auth/login',
       state: { deviceLocked: true },
@@ -42,8 +45,8 @@ export function resolveInitRoute(body, requestedPathname = '/') {
   return null
 }
 
-function getTargetFromInitBody(initBody, pathname) {
-  const route = resolveInitRoute(initBody, pathname)
+function getTargetFromInitBody(initBody, pathname, options = {}) {
+  const route = resolveInitRoute(initBody, pathname, options)
   return {
     path: route?.path ?? '/auth/set-password',
     state: route?.state,
@@ -59,8 +62,13 @@ function InitEntryLayout() {
   const [fetchVersion, setFetchVersion] = useState(0)
   const [aligned, setAligned] = useState(false)
 
+  const initFetchedRef = useRef(0)
+
   useEffect(() => {
-    let cancelled = false
+    if (initFetchedRef.current > fetchVersion) {
+      return
+    }
+    initFetchedRef.current = fetchVersion + 1
 
     async function fetchInit() {
       setError(null)
@@ -77,21 +85,14 @@ function InitEntryLayout() {
         }
 
         const res = await queryInitState()
-        if (!cancelled) {
-          setInitBody(res.data)
-        }
+        setInitBody(res.data)
       } catch (e) {
         console.error('System initialization failed:', e)
-        if (!cancelled) {
-          setError(e)
-        }
+        setError(e)
       }
     }
 
     fetchInit()
-    return () => {
-      cancelled = true
-    }
   }, [fetchVersion])
 
   useEffect(() => {
@@ -102,7 +103,10 @@ function InitEntryLayout() {
       return
     }
 
-    const { path: targetPath, state: navState } = getTargetFromInitBody(initBody, location.pathname)
+    const ignoreStaleLock = location.state?.deviceUnlockSucceeded === true
+    const { path: targetPath, state: navState } = getTargetFromInitBody(initBody, location.pathname, {
+      ignoreStaleLock,
+    })
     const here = normalizePathname(location.pathname)
     const target = normalizePathname(targetPath)
 
@@ -111,7 +115,7 @@ function InitEntryLayout() {
       return
     }
     navigate(targetPath, { replace: true, state: navState })
-  }, [error, initBody, navigate, location.pathname, aligned])
+  }, [error, initBody, navigate, location.pathname, aligned, location.state])
 
   const retry = useCallback(() => {
     setFetchVersion((v) => v + 1)

@@ -1,4 +1,4 @@
-import { useState, useRef, useLayoutEffect } from 'react'
+import { useState, useRef, useLayoutEffect, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import SystemParamsEnergyPrice from '@/components/systemParams/SystemParamsEnergyPrice'
 import { queryEnergyPrice, saveEnergyPrice } from '@/api/modules/home'
@@ -20,15 +20,20 @@ function EnergyPriceGuidePage() {
   const [submitting, setSubmitting] = useState(false)
   const [resetReady, setResetReady] = useState(false)
 
-  useLayoutEffect(() => {
-    let alive = true
+  const initFetchedRef = useRef(false)
+
+  useEffect(() => {
+    if (initFetchedRef.current) {
+      return
+    }
+    initFetchedRef.current = true
 
     const initEnergyPriceData = async () => {
       const hasEnteredBefore = window.sessionStorage.getItem(ENERGY_PRICE_GUIDE_ENTERED_FLAG) === '1'
       if (!hasEnteredBefore) {
         setStoredEnergyPriceStateForGuide(getDefaultEnergyPriceState())
         window.sessionStorage.setItem(ENERGY_PRICE_GUIDE_ENTERED_FLAG, '1')
-        if (alive) setResetReady(true)
+        setResetReady(true)
         return
       }
 
@@ -37,18 +42,14 @@ function EnergyPriceGuidePage() {
         const nextState = buildEnergyPriceStateFromQueryResponse(result?.data?.data ?? result?.data)
         setStoredEnergyPriceStateForGuide(nextState)
       } catch {
-        // 回查失败时保留当前向导缓存，若无缓存则兜底默认值
         const fallback = getStoredEnergyPriceStateForGuide()
         setStoredEnergyPriceStateForGuide(fallback?.waterFixed != null ? fallback : getDefaultEnergyPriceState())
       } finally {
-        if (alive) setResetReady(true)
+        setResetReady(true)
       }
     }
 
     void initEnergyPriceData()
-    return () => {
-      alive = false
-    }
   }, [])
 
   const handleBack = () => {
