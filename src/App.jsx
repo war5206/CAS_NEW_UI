@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { HomeRouteCacheContext } from './context/HomeRouteCacheContext'
 import { BrowserRouter, HashRouter, Navigate, Route, Routes, useLocation } from 'react-router-dom'
 import './App.css'
 import { createPageEntries, createRedirectEntries } from './config/navigation'
@@ -68,6 +69,13 @@ function AppRoutes({ homePageTitle, onHomePageTitleChange }) {
   const [committedUnitLayoutSlots, setCommittedUnitLayoutSlots] = useState(null)
   const isHomeRoute = location.pathname === HOME_PATH || location.pathname === `${HOME_PATH}/`
   const hasToken = Boolean(getStoredToken())
+  const [homeCacheAllowed, setHomeCacheAllowed] = useState(false)
+
+  useEffect(() => {
+    if (!hasToken) {
+      setHomeCacheAllowed(false)
+    }
+  }, [hasToken])
 
   useInactivityTimer()
   const previousPathRef = useRef(window.sessionStorage.getItem(GUIDE_PREVIOUS_PATH_KEY))
@@ -95,8 +103,9 @@ function AppRoutes({ homePageTitle, onHomePageTitleChange }) {
   }, [location.pathname])
 
   return (
-    <>
-      {homeEntry && hasToken ? (
+    <HomeRouteCacheContext.Provider value={{ setHomeCacheAllowed }}>
+      <>
+      {homeEntry && hasToken && homeCacheAllowed ? (
         <div className={`app-route-cache${isHomeRoute ? ' is-active' : ''}`} aria-hidden={!isHomeRoute}>
           <CasLayout
             routeInfo={homeEntry}
@@ -160,7 +169,8 @@ function AppRoutes({ homePageTitle, onHomePageTitleChange }) {
           <Route path="*" element={<Navigate to={HOME_PATH} replace />} />
         </Route>
       </Routes>
-    </>
+      </>
+    </HomeRouteCacheContext.Provider>
   )
 }
 
