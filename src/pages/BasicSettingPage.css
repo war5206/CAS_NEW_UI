@@ -83,6 +83,20 @@
   max-width: 100%;
 }
 
+.basic-setting-page__playground-link {
+  display: inline-block;
+  margin-top: 24px;
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 16px;
+  text-decoration: none;
+  transition: color 0.2s;
+}
+
+.basic-setting-page__playground-link:hover {
+  color: rgba(255, 255, 255, 0.7);
+  text-decoration: underline;
+}
+
 .basic-setting-page--operation-log {
   max-width: 1556px;
   display: flex;

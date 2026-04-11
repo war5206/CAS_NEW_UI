@@ -1,4 +1,4 @@
-﻿import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import * as echarts from 'echarts'
 import SelectDropdown from '../components/SelectDropdown'
 import TimePickerModal from '../components/TimePickerModal'
@@ -7,7 +7,7 @@ import dateIcon from '../assets/icons/date.svg'
 import { HEAT_PUMP_GRID_ITEMS } from '../config/homeHeatPumps'
 import { useActionConfirm } from '../hooks/useActionConfirm'
 import { useDeferredVisible } from '../hooks/useDeferredVisible'
-import { deleteHistoryAlarm, processLiveAlarm, useAlertsStore } from './alertsStore'
+import { deleteHistoryAlarm, processLiveAlarm, useAlertsStore } from '@/features/alerts/store/alertsStore'
 import './AlertsModulePage.css'
 
 const ALARM_NAME_OPTIONS = [

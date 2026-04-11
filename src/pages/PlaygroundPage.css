@@ -163,6 +163,114 @@
   line-height: 1.1;
 }
 
+.playground-api-section {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.playground-api-inputs {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.playground-api-input-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.playground-api-label {
+  color: rgba(190, 205, 228, 0.92);
+  font-size: 14px;
+}
+
+.playground-api-input {
+  padding: 10px 14px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 8px;
+  background: rgba(25, 32, 46, 0.95);
+  color: #ffffff;
+  font-size: 14px;
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+.playground-api-input:focus {
+  border-color: rgba(58, 123, 213, 0.8);
+}
+
+.playground-api-input::placeholder {
+  color: rgba(255, 255, 255, 0.4);
+}
+
+.playground-api-button {
+  padding: 14px 28px;
+  border: none;
+  border-radius: 12px;
+  background: linear-gradient(180deg, #3a7bd5, #2d5aa8);
+  color: #ffffff;
+  font-size: 16px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: opacity 0.2s;
+  width: max-content;
+}
+
+.playground-api-button:hover:not(:disabled) {
+  opacity: 0.9;
+}
+
+.playground-api-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.playground-api-response {
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: 12px;
+  background: linear-gradient(180deg, rgba(35, 44, 60, 0.95), rgba(25, 32, 46, 0.95));
+  padding: 16px;
+}
+
+.playground-api-response.success {
+  border-color: rgba(76, 175, 80, 0.5);
+}
+
+.playground-api-response.error {
+  border-color: rgba(244, 67, 54, 0.5);
+}
+
+.playground-api-response h3 {
+  margin: 0 0 8px 0;
+  font-size: 16px;
+  font-weight: 500;
+}
+
+.playground-api-response.success h3 {
+  color: #4caf50;
+}
+
+.playground-api-response.error h3 {
+  color: #f44336;
+}
+
+.playground-api-response p {
+  margin: 0 0 8px 0;
+  color: rgba(190, 205, 228, 0.92);
+}
+
+.playground-api-response pre {
+  margin: 0;
+  padding: 12px;
+  background: rgba(0, 0, 0, 0.3);
+  border-radius: 8px;
+  font-size: 13px;
+  overflow: auto;
+  max-height: 300px;
+}
+
 @media (max-width: 900px) {
   .playground-page {
     padding: 16px;

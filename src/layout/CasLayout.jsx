@@ -7,7 +7,7 @@ import iconPower from '../assets/layout/boot.svg'
 import iconHasAlert from '../assets/layout/hasAlert.svg'
 import iconNoAlert from '../assets/layout/no-alert.svg'
 import { buildTabPath, getModuleDefaultPath, getSectionDefaultPath, modules } from '../config/navigation'
-import { ignoreAllAlerts, useAlertsStore } from '../pages/alertsStore'
+import { ignoreAllAlerts, useAlertsStore } from '@/features/alerts/store/alertsStore'
 
 const WEEK_LABELS = ['周日', '周一', '周二', '周三', '周四', '周五', '周六']
 
