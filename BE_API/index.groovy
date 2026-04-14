@@ -609,53 +609,57 @@ if(dt.getRows().size() == 1){
 optionalMap.put("stateOnOff", stateOnOff);
 optionalMap.put("longNameOnOff", "Sys\\FinforWorx\\SystemStatus");
 
-// 冷热模式
+// 热泵总运行模式
 pointSql = "SELECT a.taglongname,a.times,a.realval,a.quality FROM psrealdata AS a WHERE a.taglongname IN ('Sys\\FinforWorx\\HPTotalRunMode')";
 dt = dataService.queryListDataBySql(pointSql);
-String modeColdHeat = "";
+String hpTotalRunMode = "";
 if(dt.getRows().size() == 1){
     for(int c = 0; c < dt.getColumns().size(); c++){
         if(dt.getColumns().get(c).getColumnName() == "realval"){
             try {
                 String value = dt.getValue(0,c).toString();
-                if (value.equals("0")) {
-                    modeColdHeat = "制冷模式";
-                } else if (value.equals("1")) {
-                    modeColdHeat = "制热模式";
+                if (value.equals("0") || value.equals("1")) {
+                    hpTotalRunMode = value;
                 } else {
-                    modeColdHeat = "";
+                    hpTotalRunMode = "";
                 }
             } catch (Exception e) {
-                modeColdHeat = "";
+                hpTotalRunMode = "";
             }
         }
     }
 }
-optionalMap.put("modeColdHeat", modeColdHeat);
+optionalMap.put("hpTotalRunMode", hpTotalRunMode);
+optionalMap.put("longNameHPTotalRunMode", "Sys\\FinforWorx\\HPTotalRunMode");
 
 // 气候补偿
 pointSql = "SELECT a.taglongname,a.times,a.realval,a.quality FROM psrealdata AS a WHERE a.taglongname IN ('Sys\\FinforWorx\\QHBC')";
 dt = dataService.queryListDataBySql(pointSql);
 String QHBC = "";
+String qhbcValue = "";
 if(dt.getRows().size() == 1){
     for(int c = 0; c < dt.getColumns().size(); c++){
         if(dt.getColumns().get(c).getColumnName() == "realval"){
             try {
                 String value = dt.getValue(0,c).toString();
+                qhbcValue = value;
                 if (value.equals("0")) {
                     QHBC = "关闭";
                 } else if (value.equals("1")) {
                     QHBC = "开启";
                 } else {
                     QHBC = "";
+                    qhbcValue = "";
                 }
             } catch (Exception e) {
                 QHBC = "";
+                qhbcValue = "";
             }
         }
     }
 }
 optionalMap.put("QHBC", QHBC);
+optionalMap.put("qhbcValue", qhbcValue);
 
 // 智能定时
 pointSql = "SELECT a.taglongname,a.times,a.realval,a.quality FROM psrealdata AS a WHERE a.taglongname IN ('Sys\\FinforWorx\\ZNDS')";

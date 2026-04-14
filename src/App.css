@@ -913,6 +913,12 @@
   top: 8%;
 }
 
+.home-system-node--heat-pump .home-system-value {
+  min-width: 2ch;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
 .home-system-node--outdoor-temperature {
   left: 52.5%;
   top: 14%;
@@ -1008,9 +1014,7 @@
 
 .home-system-node--water-tank {
   left: 66%;
-  top: 79.5%;
-  display: inline-flex;
-  gap: var(--home-system-gap-wide);
+  top: 79%;
 }
 
 .home-system-node--soft-water {
@@ -1927,10 +1931,16 @@
   flex: 0 0 auto;
 }
 
-.home-mode-avatar img {
+.home-mode-avatar img,
+.home-mode-avatar-image {
   width: 69px;
   height: 69px;
   display: block;
+}
+
+.home-mode-avatar-image.is-manual {
+  opacity: 0.8;
+  filter: brightness(1.05);
 }
 
 .home-mode-body {
@@ -1971,8 +1981,18 @@
   display: block;
 }
 
+.home-mode-state-icon.is-blue {
+  filter: brightness(0) saturate(100%) invert(52%) sepia(95%) saturate(1623%) hue-rotate(176deg) brightness(103%) contrast(101%);
+}
+
 .home-mode-name {
   font-size: 17px;
+  font-weight: 600;
+}
+
+.home-widget-temp .home-widget-title-right {
+  font-size: 18px;
+  color: #f5f8ff;
   font-weight: 600;
 }
 
