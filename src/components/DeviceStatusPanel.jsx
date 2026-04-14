@@ -70,7 +70,7 @@ function HeatPumpStatusChart({ chartData }) {
         axisLabel: {
           color: '#909DA2',
           fontSize: 12,
-          formatter: (value) => String(value).padStart(2, '0'),
+          formatter: (value) => String(value),
         },
         splitLine: {
           show: true,
@@ -99,7 +99,7 @@ function HeatPumpStatusChart({ chartData }) {
               color: '#FFFFFF',
               fontSize: 22,
               fontFamily: 'Alibaba PuHuiTi 2.0, sans-serif',
-              formatter: ({ value }) => String(value).padStart(2, '0'),
+              formatter: ({ value }) => String(value),
             },
           })),
         },

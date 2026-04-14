@@ -6,10 +6,12 @@ import costAnalysisIcon from '../assets/home/costAnalysis.svg'
 import temperatureIcon from '../assets/home/temperature.svg'
 import deviceStatusIcon from '../assets/home/deviceStatus.svg'
 import avatarA from '../assets/home/A.png'
+import avatarH from '../assets/home/H.png'
 import rmbIcon from '../assets/home/rmb.svg'
 import modeArrowRight from '../assets/home/modeStatusArrowRight.svg'
 import modeDivider from '../assets/home/modeStatusDivider.svg'
 import heatingIcon from '../assets/device/heating-active.svg'
+import coolingIcon from '../assets/device/cooling-active.svg'
 import weatherCompensationIcon from '../assets/home/weather-compensation.svg'
 import backIcon from '../assets/layout/back.svg'
 import HomeWidget from '../components/HomeWidget'
@@ -129,7 +131,10 @@ function HomePage({ onActivePageChange, committedUnitLayoutSlots }) {
   const statusSummary = homeOverview.system.heatPumpSummary
   const indoorTemperatures = homeOverview.system.indoorTemperatures
   const terminalCirculationPumps = homeOverview.system.terminalCirculationPumps
-  const formatStatusCount = (value) => String(Number(value) || 0).padStart(2, '0')
+  const formatStatusCount = (value) => String(Number(value) || 0)
+  const isManualModeAvatar = homeOverview.mode.avatarType === 'H'
+  const modeAvatar = isManualModeAvatar ? avatarH : avatarA
+  const modeAIcon = homeOverview.mode.iconASrc === 'cooling' ? coolingIcon : heatingIcon
   return (
     <div className="home-pager">
       <div className="home-pager-track">
@@ -307,12 +312,10 @@ function HomePage({ onActivePageChange, committedUnitLayoutSlots }) {
                   ))}
                 </div>
 
-                <div className="home-system-node home-system-node--water-tank">
-                  <div className="home-system-caption">{HOME_TEXT.WATER_TANK}</div>
-                  <div className="home-system-inline">
-                    <span className="home-system-value">{homeOverview.system.waterTankLevel}</span>
-                    <span className="home-system-unit">%</span>
-                  </div>
+                <div className="home-system-node home-system-node--water-tank home-system-inline">
+                  <span className="home-system-caption">{HOME_TEXT.WATER_TANK}</span>
+                  <span className="home-system-value">{homeOverview.system.waterTankLevel}</span>
+                  <span className="home-system-unit">%</span>
                 </div>
 
                 <div className="home-system-node home-system-node--soft-water">{HOME_TEXT.SOFT_WATER}</div>
@@ -340,7 +343,12 @@ function HomePage({ onActivePageChange, committedUnitLayoutSlots }) {
             <HomeWidget title={HOME_TEXT.MODE_STATUS} icon={modeStatusIcon} className="home-widget-mode">
               <div className="home-mode-card">
                 <div className="home-mode-avatar">
-                  <img src={avatarA} alt="" aria-hidden="true" />
+                  <img
+                    src={modeAvatar}
+                    alt=""
+                    aria-hidden="true"
+                    className={isManualModeAvatar ? 'home-mode-avatar-image is-manual' : 'home-mode-avatar-image'}
+                  />
                 </div>
                 <div className="home-mode-body">
                   <div className="home-mode-row">
@@ -351,8 +359,15 @@ function HomePage({ onActivePageChange, committedUnitLayoutSlots }) {
                   <div className="home-mode-row">
                     <img src={modeArrowRight} alt="" aria-hidden="true" className="home-mode-row-icon" />
                     <div className="home-mode-icon-group">
-                      <img src={heatingIcon} alt="" aria-hidden="true" className="home-mode-state-icon" />
-                      <img src={weatherCompensationIcon} alt="" aria-hidden="true" className="home-mode-state-icon" />
+                      {homeOverview.mode.iconAVisible ? <img src={modeAIcon} alt="" aria-hidden="true" className="home-mode-state-icon" /> : null}
+                      {homeOverview.mode.iconBVisible ? (
+                        <img
+                          src={weatherCompensationIcon}
+                          alt=""
+                          aria-hidden="true"
+                          className={homeOverview.mode.iconBBlue ? 'home-mode-state-icon is-blue' : 'home-mode-state-icon'}
+                        />
+                      ) : null}
                     </div>
                   </div>
                 </div>
@@ -391,7 +406,12 @@ function HomePage({ onActivePageChange, committedUnitLayoutSlots }) {
               </div>
             </HomeWidget>
 
-            <HomeWidget title={HOME_TEXT.REAL_TIME_TEMP} icon={temperatureIcon} titleRight={homeOverview.mode.ambientTempText}>
+            <HomeWidget
+              title={HOME_TEXT.REAL_TIME_TEMP}
+              icon={temperatureIcon}
+              className="home-widget-temp"
+              titleRight={homeOverview.system.targetBackwaterTemperature}
+            >
               <RealTimeTemperatureChart
                 labels={homeOverview.temperature.labels}
                 supplySeries={homeOverview.temperature.supplyData}

@@ -9,6 +9,39 @@ const DEFAULT_SUPPLY_DATA = [42, 43, 44, 38, 37, 42, 43, 40, 36, 35]
 const DEFAULT_RETURN_DATA = [31, 32, 33, 31, 30.5, 30.8, 31, 30.7, 30.2, 28]
 const DEFAULT_TARGET_DATA = [31, 31.4, 31.8, 30.8, 30.9, 31, 30.8, 31, 31.2, 32]
 
+function normalizeRunModeValue(value) {
+  if (value === null || value === undefined) return ''
+  const text = String(value).trim()
+  if (text === '0' || text === '1') return text
+  try {
+    const numeric = Number(text)
+    if (!Number.isFinite(numeric)) return ''
+    if (numeric === 1) return '1'
+    if (numeric === 0) return '0'
+    return ''
+  } catch (error) {
+    return ''
+  }
+}
+
+function buildModePresentationFromRunMode(runModeValue, fallbackModeName) {
+  if (runModeValue === '1') {
+    return { name: '智能模式运行中', avatarType: 'A' }
+  }
+  if (runModeValue === '0') {
+    return { name: '手动模式运行中', avatarType: 'H' }
+  }
+  return { name: fallbackModeName, avatarType: 'A' }
+}
+
+function buildModeIconsPresentation(runModeValue, qhbcValue) {
+  const iconAVisible = runModeValue === '0' || runModeValue === '1'
+  const iconASrc = runModeValue === '0' ? 'cooling' : 'heating'
+  const iconBVisible = qhbcValue === '0' || qhbcValue === '1'
+  const iconBBlue = qhbcValue === '1'
+  return { iconAVisible, iconASrc, iconBVisible, iconBBlue }
+}
+
 function toNumberOrFallback(value, fallback) {
   const parsed = Number(value)
   return Number.isFinite(parsed) ? parsed : fallback
@@ -130,6 +163,11 @@ export function createDefaultHomeOverview() {
       name: '智能模式运行中',
       savedCost: '222.7',
       ambientTempText: '-2.1C',
+      avatarType: 'A',
+      iconAVisible: true,
+      iconASrc: 'heating',
+      iconBVisible: true,
+      iconBBlue: false,
     },
     cost: {
       note: '注：费用结算自 2026-01-15 至今',
@@ -214,6 +252,11 @@ export function adaptHomeOverview(rawData) {
       name: toText(modeSource.name, fallback.mode.name),
       savedCost: toText(modeSource.savedCost, fallback.mode.savedCost),
       ambientTempText: toText(modeSource.ambientTempText, fallback.mode.ambientTempText),
+      avatarType: toText(modeSource.avatarType, fallback.mode.avatarType),
+      iconAVisible: modeSource.iconAVisible ?? fallback.mode.iconAVisible,
+      iconASrc: toText(modeSource.iconASrc, fallback.mode.iconASrc),
+      iconBVisible: modeSource.iconBVisible ?? fallback.mode.iconBVisible,
+      iconBBlue: modeSource.iconBBlue ?? fallback.mode.iconBBlue,
     },
     cost: {
       note: toText(costSource.note, fallback.cost.note),
@@ -288,15 +331,24 @@ function adaptNewApiResponse(source, fallback) {
   const optional = source.optional ?? {}
   const ambientTemp = toText(source.ambientTemperature, fallback.system.outdoorTemp)
   const ambientTempText = `环境温度：${ambientTemp}℃`
+  const runModeValue = normalizeRunModeValue(optional.hpTotalRunMode)
+  const qhbcValue = normalizeRunModeValue(optional.qhbcValue)
+  const modePresentation = buildModePresentationFromRunMode(runModeValue, fallback.mode.name)
+  const modeIconsPresentation = buildModeIconsPresentation(runModeValue, qhbcValue)
 
   const loopPumpItems = circulationPumps.length > 0 ? circulationPumps : fallback.deviceStatus.loopPumpItems
 
   return {
     fetchedAt: Date.now(),
     mode: {
-      name: toText(optional.modeColdHeat, fallback.mode.name),
+      name: modePresentation.name,
       savedCost: toText(fallback.mode.savedCost, '0'),
       ambientTempText,
+      avatarType: modePresentation.avatarType,
+      iconAVisible: modeIconsPresentation.iconAVisible,
+      iconASrc: modeIconsPresentation.iconASrc,
+      iconBVisible: modeIconsPresentation.iconBVisible,
+      iconBBlue: modeIconsPresentation.iconBBlue,
     },
     cost: fallback.cost,
     system: {
