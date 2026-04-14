@@ -46,6 +46,23 @@ function buildFallbackLoopPumpItems() {
   ]
 }
 
+function pumpStateToPumpItem(name, stateText) {
+  const normalized = String(stateText || '').trim()
+  let tone = 'off'
+  let status = '待机'
+  if (normalized === '运行' || normalized === '开启') {
+    tone = 'running'
+    status = '运行中'
+  } else if (normalized === '报警' || normalized === '故障') {
+    tone = 'fault'
+    status = '有故障'
+  } else {
+    tone = 'off'
+    status = '待机'
+  }
+  return { name, status, tone }
+}
+
 function buildHeatPumpChartData(summary) {
   return [
     { name: '运行', value: summary.running, color: ['#3B9EFF', '#1F5FB8'] },
@@ -83,6 +100,23 @@ function adaptHeatPumpItems(items, fallbackItems) {
     name: toText(item?.name, `热泵${index + 1}`),
     details: Array.isArray(item?.details) ? item.details : fallbackItems[index % fallbackItems.length]?.details ?? [],
   }))
+}
+
+export function createDefaultSystemConfig() {
+  return {
+    systemTypeUuid: '1',
+    terminalTypeUuid: '5',
+  }
+}
+
+export function adaptSystemConfig(rawData) {
+  const responseData = rawData?.data ?? rawData
+  const projectData = responseData?.data?.projectData ?? responseData?.projectData ?? {}
+
+  return {
+    systemTypeUuid: String(projectData.system_type_uuid ?? '1'),
+    terminalTypeUuid: String(projectData.terminal_type_uuid ?? '5'),
+  }
 }
 
 export function createDefaultHomeOverview() {
@@ -123,6 +157,16 @@ export function createDefaultHomeOverview() {
         { name: '水泵二', status: '待机', tone: 'off' },
       ],
       waterTankLevel: '50',
+      primarySupplyMainTemp: '',
+      indoorTemperatures: [
+        { name: '室内温度1', value: '0.0' },
+        { name: '室内温度2', value: '0.0' },
+        { name: '室内温度3', value: '0.0' },
+        { name: '室内温度4', value: '0.0' },
+        { name: '室内温度5', value: '0.0' },
+      ],
+      terminalCirculationPumps: [],
+      targetBackwaterTemperature: '0.0℃',
     },
     temperature: {
       labels: DEFAULT_TEMPERATURE_LABELS,
@@ -140,9 +184,15 @@ export function createDefaultHomeOverview() {
 
 export function adaptHomeOverview(rawData) {
   const fallback = createDefaultHomeOverview()
-  // 处理统一返回结构 { code, data, msg, success }
   const responseData = rawData?.data ?? rawData
   const source = responseData?.data ?? responseData ?? {}
+
+  const isNewApiFormat = source.onlineHeatPump !== undefined || source.offlineHeatPump !== undefined
+
+  if (isNewApiFormat) {
+    return adaptNewApiResponse(source, fallback)
+  }
+
   const systemSource = source.system ?? {}
   const modeSource = source.mode ?? {}
   const costSource = source.cost ?? {}
@@ -183,11 +233,15 @@ export function adaptHomeOverview(rawData) {
       returnPressure: toText(systemSource.returnPressure, fallback.system.returnPressure),
       returnTemp: toText(systemSource.returnTemp, fallback.system.returnTemp),
       circulationPumps: loopPumpItems,
+      terminalCirculationPumps: adaptLoopPumpItems(systemSource.terminalCirculationPumps, []),
       drainValveOpen: toBoolean(systemSource.drainValveOpen, fallback.system.drainValveOpen),
       pressureTankOpen: toBoolean(systemSource.pressureTankOpen, fallback.system.pressureTankOpen),
       pressureValveOpen: toBoolean(systemSource.pressureValveOpen, fallback.system.pressureValveOpen),
       makeupPumps: adaptLoopPumpItems(systemSource.makeupPumps, fallback.system.makeupPumps),
       waterTankLevel: toText(systemSource.waterTankLevel, fallback.system.waterTankLevel),
+      primarySupplyMainTemp: toText(systemSource.primarySupplyMainTemp, ''),
+      indoorTemperatures: Array.isArray(systemSource.indoorTemperatures) ? systemSource.indoorTemperatures : fallback.system.indoorTemperatures,
+      targetBackwaterTemperature: toText(systemSource.targetBackwaterTemperature, fallback.system.targetBackwaterTemperature),
     },
     temperature: {
       labels: Array.isArray(temperatureSource.labels) && temperatureSource.labels.length > 0 ? temperatureSource.labels : fallback.temperature.labels,
@@ -200,5 +254,79 @@ export function adaptHomeOverview(rawData) {
       loopPumpItems,
     },
     heatPumpItems,
+  }
+}
+
+function adaptNewApiResponse(source, fallback) {
+  const heatPumpSummary = {
+    running: toNumberOrFallback(source.onlineHeatPump, 0),
+    shutdown: toNumberOrFallback(source.offlineHeatPump, 0),
+    defrosting: toNumberOrFallback(source.defrostHeatPump, 0),
+    malfunction: toNumberOrFallback(source.alarmHeatPump, 0),
+  }
+
+  const circulationPumps = Array.isArray(source.heatCirculationPump)
+    ? source.heatCirculationPump.map((p) => pumpStateToPumpItem(p.name, p.state))
+    : fallback.system.circulationPumps
+
+  const terminalCirculationPumps = Array.isArray(source.terminalCirculationPump)
+    ? source.terminalCirculationPump.map((p) => pumpStateToPumpItem(p.name, p.state))
+    : []
+
+  const makeupPumps = [
+    pumpStateToPumpItem('水泵一', source.replenishWaterPump1),
+    pumpStateToPumpItem('水泵二', source.replenishWaterPump2),
+  ]
+
+  const indoorTemperatures = Array.isArray(source.terminalTemperature)
+    ? source.terminalTemperature.map((t) => ({
+        name: t.name,
+        value: toText(t.value, '0.0'),
+      }))
+    : []
+
+  const optional = source.optional ?? {}
+  const ambientTemp = toText(source.ambientTemperature, fallback.system.outdoorTemp)
+  const ambientTempText = `环境温度：${ambientTemp}℃`
+
+  const loopPumpItems = circulationPumps.length > 0 ? circulationPumps : fallback.deviceStatus.loopPumpItems
+
+  return {
+    fetchedAt: Date.now(),
+    mode: {
+      name: toText(optional.modeColdHeat, fallback.mode.name),
+      savedCost: toText(fallback.mode.savedCost, '0'),
+      ambientTempText,
+    },
+    cost: fallback.cost,
+    system: {
+      heatPumpSummary,
+      outdoorTemp: ambientTemp,
+      condensatePipeTemp: toText(source.condensateWaterTemperature, '0'),
+      heatTracingEnabled: toBoolean(source.tropicalCompanion, false),
+      couplingEnergyEnabled: toBoolean(source.coupleEnergy, false),
+      couplingEnergyName: toText(source.coupleEnergyName, ''),
+      waterPumpEnabled: fallback.system.waterPumpEnabled,
+      supplyTemp: toText(source.userSupplyWaterTemperature, '0'),
+      supplyPressure: toText(source.supplyWaterPressure, '0'),
+      returnPressure: toText(source.backWaterPressure, '0'),
+      returnTemp: toText(source.userBackWaterTemperature, '0'),
+      circulationPumps,
+      terminalCirculationPumps,
+      drainValveOpen: toBoolean(source.dirtSeparator, false),
+      pressureTankOpen: fallback.system.pressureTankOpen,
+      pressureValveOpen: toBoolean(source.pressureReliefValve, false),
+      makeupPumps,
+      waterTankLevel: toText(source.softenWaterTank, '0'),
+      primarySupplyMainTemp: toText(source.onceSupplyWaterTemperature, ''),
+      indoorTemperatures,
+      targetBackwaterTemperature: toText(optional.targetBackwaterTemperature, '0.0℃'),
+    },
+    temperature: fallback.temperature,
+    deviceStatus: {
+      heatPumpData: buildHeatPumpChartData(heatPumpSummary),
+      loopPumpItems,
+    },
+    heatPumpItems: fallback.heatPumpItems,
   }
 }

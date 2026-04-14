@@ -90,85 +90,69 @@ if(onlinedt.getRows().size() == 1){
     }
 }
 
-// int onlineHeatPump = 0;
-int offlineHeatPump = 0;
-for (Map<String,Object> selectHeatPumpMap : selectHeatPumpList) {
-    String heatPumpCode = selectHeatPumpMap.get("device_uuid");
-
-    // 查询热泵在线
-    String pointSql = "SELECT a.taglongname,a.times,a.realval,a.quality FROM psrealdata AS a " + 
-    "WHERE a.taglongname IN ('HeatPump\\SJMG\\" + heatPumpCode + "\\RunState2_10')";
-    DataTable dt = dataService.queryListDataBySql(pointSql);
-    if(dt.getRows().size() == 1){
-        for(int c = 0; c < dt.getColumns().size(); c++){
-            if(dt.getColumns().get(c).getColumnName() == "realval"){
-                if (dt.getValue(0,c).equals("1")) {
-                    // 正在运行台数用PLC计算的点位
-                } else {
-                    offlineHeatPump++;
+def getPointRealVal = { String taglongname ->
+    String realVal = "";
+    String querySql = "SELECT a.taglongname,a.times,a.realval,a.quality FROM psrealdata AS a WHERE a.taglongname IN ('" + taglongname + "')";
+    DataTable pointDt = dataService.queryListDataBySql(querySql);
+    if(pointDt.getRows().size() == 1){
+        for(int c = 0; c < pointDt.getColumns().size(); c++){
+            if(pointDt.getColumns().get(c).getColumnName() == "realval"){
+                try {
+                    realVal = pointDt.getValue(0,c).toString().trim();
+                } catch (Exception e) {
+                    realVal = "";
                 }
             }
         }
-    } else {
+    }
+    return realVal;
+};
+
+def isPointValue = { String pointValue, int targetValue ->
+    if (pointValue == null || pointValue == "") {
+        return false;
+    }
+    if (pointValue == targetValue.toString()) {
+        return true;
+    }
+    try {
+        return new BigDecimal(pointValue).compareTo(new BigDecimal(targetValue.toString())) == 0;
+    } catch (Exception e) {
+        return false;
+    }
+};
+
+int offlineHeatPump = 0;
+int alarmHeatPump = 0;
+int defrostHeatPump = 0;
+for (Map<String,Object> selectHeatPumpMap : selectHeatPumpList) {
+    String heatPumpCode = selectHeatPumpMap.get("device_uuid");
+    String compCur1 = getPointRealVal("HeatPump\\SJMG\\" + heatPumpCode + "\\CompreCur1");
+    String compCur2 = getPointRealVal("HeatPump\\SJMG\\" + heatPumpCode + "\\CompreCur2");
+    String faultState = getPointRealVal("HeatPump\\SJMG\\" + heatPumpCode + "\\RunState1_3");
+    String deviceStatus = getPointRealVal("HeatPump\\SJMG\\" + heatPumpCode + "\\DeviceStatus");
+    String defrostState = getPointRealVal("HeatPump\\SJMG\\" + heatPumpCode + "\\RunState1_8");
+
+    // 待机: 电流1=0 且 电流2=0 且 故障=0 且 通讯=1
+    if (isPointValue(compCur1, 0) && isPointValue(compCur2, 0) && isPointValue(faultState, 0) && isPointValue(deviceStatus, 1)) {
         offlineHeatPump++;
     }
-}
 
-// int onlineHeatPump = 0;
-int defrostingHeatPump = 0;
-for (Map<String,Object> selectHeatPumpMap : selectHeatPumpList) {
-    String heatPumpCode = selectHeatPumpMap.get("device_uuid");
+    // 故障: 故障=1 或 通讯=0
+    if (isPointValue(faultState, 1) || isPointValue(deviceStatus, 0)) {
+        alarmHeatPump++;
+    }
 
-    // 查询热泵在线
-    String pointSql = "SELECT a.taglongname,a.times,a.realval,a.quality FROM psrealdata AS a " + 
-    "WHERE a.taglongname IN ('HeatPump\\SJMG\\" + heatPumpCode + "\\RunState2_10')";
-    DataTable dt = dataService.queryListDataBySql(pointSql);
-    if(dt.getRows().size() == 1){
-        for(int c = 0; c < dt.getColumns().size(); c++){
-            if(dt.getColumns().get(c).getColumnName() == "realval"){
-                if (dt.getValue(0,c).equals("1")) {
-                    // 正在运行台数用PLC计算的点位
-                } else {
-                    defrostingHeatPump++;
-                }
-            }
-        }
-    } else {
-        defrostingHeatPump++;
+    // 化霜: 化霜点位=1
+    if (isPointValue(defrostState, 1)) {
+        defrostHeatPump++;
     }
 }
-
-// 查询热泵实时报警
-String selectHeatPumpAlarmSql = "SELECT `点描述` AS 'alarm_description' FROM sjmg_alarm WHERE `点描述` NOT LIKE '%预留%' AND `报警状态` = '未确认' AND `报警组` = '1' " + 
-"AND handle_status = ''";
-List<Map<String,Object>> selectHeatPumpAlarmList;
-try {
-    selectHeatPumpAlarmList = dynamicDataSource.excuteTenantSqlQuery(selectHeatPumpAlarmSql, dbCode);
-} catch (Exception e) {
-    selectHeatPumpAlarmList = new ArrayList();
-}
-
-int alarmHeatPump = 0;
-List<String> alarmHeatPumpList = new ArrayList<>();
-for (Map<String,Object> selectHeatPumpAlarmMap : selectHeatPumpAlarmList) {
-    String alarmDescription = selectHeatPumpAlarmMap.get("alarm_description").toString();
-
-    if (alarmDescription.contains("@")) {
-        String code = alarmDescription.split("@")[0];
-        code = code.replace("HP", "No");
-
-        if (!alarmHeatPumpList.contains(code)) {
-            alarmHeatPump++;
-            alarmHeatPumpList.add(code);
-        }
-    }
-}
-
-offlineHeatPump = totalHPCount - Integer.parseInt(onlineHeatPump) - alarmHeatPump;
 
 data.put("onlineHeatPump", onlineHeatPump);
 data.put("offlineHeatPump", offlineHeatPump);
 data.put("alarmHeatPump", alarmHeatPump);
+data.put("defrostHeatPump", defrostHeatPump);
 
 String pointSql;
 DataTable dt;
@@ -176,38 +160,38 @@ DataTable dt;
 // 查询泄压阀
 pointSql = "SELECT a.taglongname,a.times,a.realval,a.quality FROM psrealdata AS a WHERE a.taglongname IN ('PressureReliefValvePump\\SJMG\\No1\\Status')";
 dt = dataService.queryListDataBySql(pointSql);
-String pressureReliefValve;
+int pressureReliefValve = 0;
 if(dt.getRows().size() == 1){
     for(int c = 0; c < dt.getColumns().size(); c++){
         if(dt.getColumns().get(c).getColumnName() == "realval"){
             if (dt.getValue(0,c).equals("1")) {
-                pressureReliefValve = "开启";
+                pressureReliefValve = 1;
             } else {
-                pressureReliefValve = "关闭";
+                pressureReliefValve = 0;
             }
         }
     }
 } else {
-    pressureReliefValve = "关闭";
+    pressureReliefValve = 0;
 }
 data.put("pressureReliefValve", pressureReliefValve);
 
 // 查询伴热带
 pointSql = "SELECT a.taglongname,a.times,a.realval,a.quality FROM psrealdata AS a WHERE a.taglongname IN ('TropicalPump\\SJMG\\No1\\Status')";
 dt = dataService.queryListDataBySql(pointSql);
-String tropicalCompanion;
+int tropicalCompanion = 0;
 if(dt.getRows().size() == 1){
     for(int c = 0; c < dt.getColumns().size(); c++){
         if(dt.getColumns().get(c).getColumnName() == "realval"){
             if (dt.getValue(0,c).equals("1")) {
-                tropicalCompanion = "开启";
+                tropicalCompanion = 1;
             } else {
-                tropicalCompanion = "关闭";
+                tropicalCompanion = 0;
             }
         }
     }
 } else {
-    tropicalCompanion = "关闭";
+    tropicalCompanion = 0;
 }
 data.put("tropicalCompanion", tropicalCompanion);
 
@@ -360,14 +344,14 @@ if (backWaterPressure.compareTo(new BigDecimal("-100")) == 0) {
 // 查询除污器
 pointSql = "SELECT a.taglongname,a.times,a.realval,a.quality FROM psrealdata AS a WHERE a.taglongname IN ('SewageValvePump\\SJMG\\No1\\Status')";
 dt = dataService.queryListDataBySql(pointSql);
-String dirtSeparator;
+int dirtSeparator = 0;
 if(dt.getRows().size() == 1){
     for(int c = 0; c < dt.getColumns().size(); c++){
         if(dt.getColumns().get(c).getColumnName() == "realval"){
             if (dt.getValue(0,c).equals("1")) {
-                dirtSeparator = "开启";
+                dirtSeparator = 1;
             } else {
-                dirtSeparator = "关闭";
+                dirtSeparator = 0;
             }
         }
     }
@@ -435,19 +419,19 @@ data.put("coupleEnergyName", coupleEnergyName);
 
 pointSql = "SELECT a.taglongname,a.times,a.realval,a.quality FROM psrealdata AS a WHERE a.taglongname IN ('Sys\\FinforWorx\\OHNY')";
 dt = dataService.queryListDataBySql(pointSql);
-String coupleEnergy;
+int coupleEnergy = 0;
 if(dt.getRows().size() == 1){
     for(int c = 0; c < dt.getColumns().size(); c++){
         if(dt.getColumns().get(c).getColumnName() == "realval"){
             if (dt.getValue(0,c).equals("1")) {
-                coupleEnergy = "开启";
+                coupleEnergy = 1;
             } else {
-                coupleEnergy = "关闭";
+                coupleEnergy = 0;
             }
         }
     }
 } else {
-    coupleEnergy = "关闭";
+    coupleEnergy = 0;
 }
 data.put("coupleEnergy", coupleEnergy);
 

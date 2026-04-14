@@ -1,6 +1,5 @@
 import { post } from '../client/http'
 import { getApiBaseUrl, getAlgorithmProcessPath, ALGORITHM_PROCESS_IDS } from '../client/config'
-import { adaptHomeOverview } from '../adapters/home'
 import { adaptScreenData } from '../adapters/screen'
 import { adaptSetOperationPasswordResponse, adaptLoginVerificationResponse } from '../adapters/auth'
 import { adaptGuideResponse } from '../adapters/guide'
@@ -18,11 +17,7 @@ async function callAlgorithmProcess(algorithmProcessId, paramData = {}) {
 }
 
 export async function getHomeOverview() {
-  const response = await callAlgorithmProcess(ALGORITHM_PROCESS_IDS.HOME_OVERVIEW, {})
-  return {
-    ...response,
-    data: adaptHomeOverview(response.data)
-  }
+  return callAlgorithmProcess(ALGORITHM_PROCESS_IDS.HOME_OVERVIEW, {})
 }
 
 export async function queryScreenData() {
@@ -166,6 +161,10 @@ export async function writeLockStatus(status = '1') {
       'Sys\\FinforWorx\\LockStatus': status,
     }
   })
+}
+
+export async function querySystemConfig() {
+  return callAlgorithmProcess(ALGORITHM_PROCESS_IDS.QUERY_SYSTEM_CONFIG, {})
 }
 
 export async function saveEnergyPrice(energyPrice = []) {

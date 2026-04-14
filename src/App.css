@@ -710,6 +710,34 @@
   align-self: stretch;
 }
 
+.home-terminal-device-banner {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px 0;
+}
+
+.home-terminal-device-image {
+  max-height: 80px;
+  object-fit: contain;
+}
+
+.home-terminal-device-placeholder {
+  font-size: 18px;
+  font-weight: 600;
+  color: #00cbff;
+  letter-spacing: 2px;
+  padding: 8px 20px;
+  border-radius: 8px;
+  background: rgba(0, 203, 255, 0.08);
+  border: 1px dashed rgba(0, 203, 255, 0.3);
+}
+
 .home-system-image {
   width: 100%;
   height: 100%;
@@ -882,7 +910,7 @@
 
 .home-system-node--heat-pump {
   left: 18%;
-  top: 12%;
+  top: 8%;
 }
 
 .home-system-node--outdoor-temperature {
@@ -909,15 +937,14 @@
   top: 33%;
 }
 
-.home-system-node--pump-status {
-  left: 62.5%;
-  top: 41.5%;
+.home-system-node--indoor-temperature-list {
+  left: 87.5%;
+  top: 27.5%;
 }
 
 .home-system-node--supply-temperature {
-  left: 34%;
-  top: 48%;
-  transform: translateX(-50%);
+  left: 68%;
+  top: 45%;
 }
 
 .home-system-node--supply-pressure {
@@ -941,6 +968,16 @@
   top: 70%;
 }
 
+.home-system-node--terminal-loop-pump {
+  left: 44%;
+  top: 38%;
+}
+
+.home-system-node--primary-supply-main-temp {
+  left: 19%;
+  top: 48%;
+}
+
 .home-system-node--bypass-valve {
   left: 38.5%;
   top: 54%;
@@ -955,7 +992,7 @@
 }
 
 .home-system-node--pressure-tank {
-  left: 37.5%;
+  left: 39.5%;
   top: 71%;
 }
 
@@ -2203,7 +2240,7 @@
   border: none;
   background: transparent;
   color: #707c90;
-  font-size: 16px;
+  font-size: 14px;
   line-height: 1;
   display: inline-flex;
   align-items: center;
@@ -2215,21 +2252,6 @@
 
 .home-device-tab.is-active {
   color: #ffffff;
-}
-
-.home-device-tab-arrow {
-  width: 10px;
-  height: 10px;
-  display: block;
-  flex: 0 0 auto;
-}
-
-.home-device-tab-arrow-left {
-  margin-right: 2px;
-}
-
-.home-device-tab-arrow-right {
-  margin-left: 2px;
 }
 
 .home-device-body {

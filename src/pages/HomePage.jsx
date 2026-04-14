@@ -19,6 +19,7 @@ import SavedCostDisplay from '../components/SavedCostDisplay'
 import RealTimeTemperatureChart from '../components/RealTimeTemperatureChart'
 import DeviceStatusPanel from '../components/DeviceStatusPanel'
 import { useHomeOverviewQuery } from '../features/home/hooks/useHomeOverviewQuery'
+import { useSystemConfigQuery } from '../features/home/hooks/useSystemConfigQuery'
 
 const HOME_PAGE_VIEW = {
   DASHBOARD: 'dashboard',
@@ -36,10 +37,9 @@ const HOME_TEXT = {
   SYSTEM_IMAGE_ALT: '系统原理图',
   HEAT_PUMP_GROUP: '热泵机组',
   RUNNING_COUNT: '运行台数',
-  DEFROST: '化霜',
-  UNIT: '台',
   STANDBY_COUNT: '待机台数',
-  FAULT: '故障',
+  DEFROST_COUNT: '化霜台数',
+  FAULT_COUNT: '故障台数',
   OUTDOOR_TEMP: '室外温度',
   CELSIUS: '℃',
   CONDENSATE_WATER: '冷凝水',
@@ -48,12 +48,13 @@ const HOME_TEXT = {
   CONDENSATE_PIPE: '冷凝水管',
   COUPLING_ENERGY: '耦合能源',
   ON: '已开启',
-  WATER_PUMP: '水泵',
   SUPPLY_TEMP: '供水温度',
+  PRIMARY_SUPPLY_MAIN_TEMP: '一次侧供水总管温度',
   SUPPLY_PRESSURE: '供水压力',
   RETURN_PRESSURE: '回水压力',
   RETURN_TEMP: '回水温度',
   HEAT_PUMP_LOOP_PUMP: '热泵循环泵',
+  TERMINAL_LOOP_PUMP: '末端循环泵',
   PUMP_1: '水泵一',
   PUMP_2: '水泵二',
   PUMP_3: '水泵三',
@@ -80,11 +81,25 @@ const HOME_TEXT = {
   TODAY: '今日',
   YESTERDAY: '昨日',
   YUAN: '元',
-  REAL_TIME_TEMP: '实时温度',
+  REAL_TIME_TEMP: '目标回水温度',
   AMBIENT_TEMP: '环境温度：-2.1℃',
   DEVICE_STATUS: '设备状态',
   BACK_HOME: '返回主页',
+  TERMINAL_DEVICE_ELECTRIC_BOILER: '电锅炉',
+  TERMINAL_DEVICE_GAS_BOILER: '燃气锅炉',
+  TERMINAL_DEVICE_WATER_SOURCE_HEAT_PUMP: '水源热泵',
+  TERMINAL_DEVICE_AIR_COOLED_MODULE: '风冷模块',
+  TERMINAL_LOOP_PUMP_TAB: '末端循环水泵',
 }
+
+const TERMINAL_DEVICE_IMAGE_MAP = {
+  '1': { src: null, alt: HOME_TEXT.TERMINAL_DEVICE_ELECTRIC_BOILER },
+  '2': { src: null, alt: HOME_TEXT.TERMINAL_DEVICE_GAS_BOILER },
+  '3': { src: null, alt: HOME_TEXT.TERMINAL_DEVICE_WATER_SOURCE_HEAT_PUMP },
+  '4': { src: null, alt: HOME_TEXT.TERMINAL_DEVICE_AIR_COOLED_MODULE },
+}
+
+const SYSTEM_IMAGE_TYPE2 = null
 
 function HomePage({ onActivePageChange, committedUnitLayoutSlots }) {
   const location = useLocation()
@@ -92,6 +107,11 @@ function HomePage({ onActivePageChange, committedUnitLayoutSlots }) {
   const [isSystemImageLoaded, setIsSystemImageLoaded] = useState(false)
   const isHomeRoute = location.pathname === '/home' || location.pathname === '/home/'
   const { data: homeOverview } = useHomeOverviewQuery({ enabled: isHomeRoute })
+  const { data: systemConfig } = useSystemConfigQuery({ enabled: isHomeRoute })
+
+  const isSystemType2 = systemConfig.systemTypeUuid === '2'
+  const resolvedSystemImage = isSystemType2 && SYSTEM_IMAGE_TYPE2 ? SYSTEM_IMAGE_TYPE2 : systemMap
+  const terminalDevice = TERMINAL_DEVICE_IMAGE_MAP[systemConfig.terminalTypeUuid] ?? null
 
   useEffect(() => {
     onActivePageChange?.(HOME_PAGE_TITLE_MAP[activePage] ?? HOME_PAGE_TITLE_MAP[HOME_PAGE_VIEW.DASHBOARD])
@@ -107,14 +127,26 @@ function HomePage({ onActivePageChange, committedUnitLayoutSlots }) {
   const goToHeatPumpOverview = () => setActivePage(HOME_PAGE_VIEW.HEAT_PUMP_OVERVIEW)
   const goToTerminalBuilding = () => setActivePage(HOME_PAGE_VIEW.TERMINAL_BUILDING)
   const statusSummary = homeOverview.system.heatPumpSummary
+  const indoorTemperatures = homeOverview.system.indoorTemperatures
+  const terminalCirculationPumps = homeOverview.system.terminalCirculationPumps
+  const formatStatusCount = (value) => String(Number(value) || 0).padStart(2, '0')
   return (
     <div className="home-pager">
       <div className="home-pager-track">
         <div className={`home-page home-screen${activePage === HOME_PAGE_VIEW.DASHBOARD ? ' is-active' : ''}`}>
           <section className="home-system-panel">
             <div className="home-system-canvas">
+              {terminalDevice && (
+                <div className="home-terminal-device-banner">
+                  {terminalDevice.src ? (
+                    <img src={terminalDevice.src} alt={terminalDevice.alt} className="home-terminal-device-image" />
+                  ) : (
+                    <span className="home-terminal-device-placeholder">{terminalDevice.alt}</span>
+                  )}
+                </div>
+              )}
               <img
-                src={systemMap}
+                src={resolvedSystemImage}
                 alt={HOME_TEXT.SYSTEM_IMAGE_ALT}
                 className="home-system-image"
                 onLoad={() => setIsSystemImageLoaded(true)}
@@ -125,19 +157,19 @@ function HomePage({ onActivePageChange, committedUnitLayoutSlots }) {
                   <div className="home-system-caption home-system-caption--title">{HOME_TEXT.HEAT_PUMP_GROUP}</div>
                   <div className="home-system-row">
                     <span className="home-system-caption">{HOME_TEXT.RUNNING_COUNT}</span>
-                    <span className="home-system-value">{statusSummary.running}</span>
-                    <span className="home-system-extra">
-                      ({HOME_TEXT.DEFROST} <span className="home-system-value is-defrost">{statusSummary.defrosting}</span>
-                      {HOME_TEXT.UNIT})
-                    </span>
+                    <span className="home-system-value">{formatStatusCount(statusSummary.running)}</span>
                   </div>
                   <div className="home-system-row">
                     <span className="home-system-caption">{HOME_TEXT.STANDBY_COUNT}</span>
-                    <span className="home-system-value">{statusSummary.shutdown}</span>
-                    <span className="home-system-extra">
-                      ({HOME_TEXT.FAULT} <span className="home-system-value is-fault">{statusSummary.malfunction}</span>
-                      {HOME_TEXT.UNIT})
-                    </span>
+                    <span className="home-system-value">{formatStatusCount(statusSummary.shutdown)}</span>
+                  </div>
+                  <div className="home-system-row">
+                    <span className="home-system-caption">{HOME_TEXT.DEFROST_COUNT}</span>
+                    <span className="home-system-value is-defrost">{formatStatusCount(statusSummary.defrosting)}</span>
+                  </div>
+                  <div className="home-system-row">
+                    <span className="home-system-caption">{HOME_TEXT.FAULT_COUNT}</span>
+                    <span className="home-system-value is-fault">{formatStatusCount(statusSummary.malfunction)}</span>
                   </div>
                 </div>
 
@@ -166,11 +198,14 @@ function HomePage({ onActivePageChange, committedUnitLayoutSlots }) {
                   </span>
                 </div>
 
-                <div className="home-system-node home-system-node--pump-status home-system-inline">
-                  <span className="home-system-caption">{HOME_TEXT.WATER_PUMP}</span>
-                  <span className={`home-system-state ${homeOverview.system.waterPumpEnabled ? 'is-on' : 'is-off'}`}>
-                    {homeOverview.system.waterPumpEnabled ? HOME_TEXT.ON : HOME_TEXT.OFF}
-                  </span>
+                <div className="home-system-node home-system-node--indoor-temperature-list">
+                  {indoorTemperatures.map((item, index) => (
+                    <div key={`indoor-temperature-${index}`} className="home-system-row">
+                      <span className="home-system-caption">{item.name}</span>
+                      <span className="home-system-value">{item.value}</span>
+                      <span className="home-system-unit">{HOME_TEXT.CELSIUS}</span>
+                    </div>
+                  ))}
                 </div>
 
                 <div className="home-system-node home-system-node--supply-temperature home-system-inline">
@@ -178,6 +213,39 @@ function HomePage({ onActivePageChange, committedUnitLayoutSlots }) {
                   <span className="home-system-value">{homeOverview.system.supplyTemp}</span>
                   <span className="home-system-unit">{HOME_TEXT.CELSIUS}</span>
                 </div>
+
+                {isSystemType2 && (
+                  <div className="home-system-node home-system-node--terminal-loop-pump">
+                    <div className="home-system-caption home-system-caption--title">{HOME_TEXT.TERMINAL_LOOP_PUMP}</div>
+                    {terminalCirculationPumps.length > 0 ? (
+                      terminalCirculationPumps.map((pump) => (
+                        <div key={pump.name} className="home-system-row">
+                          <span className={`home-system-caption${pump.tone === 'fault' ? ' is-fault' : ''}`}>{pump.name}</span>
+                          <span className={`home-system-state ${pump.tone === 'running' ? 'is-on' : pump.tone === 'fault' ? 'is-fault' : 'is-off'}`}>
+                            {pump.status}
+                          </span>
+                        </div>
+                      ))
+                    ) : (
+                      homeOverview.system.circulationPumps.slice(0, 3).map((pump) => (
+                        <div key={`terminal-${pump.name}`} className="home-system-row">
+                          <span className={`home-system-caption${pump.tone === 'fault' ? ' is-fault' : ''}`}>{pump.name}</span>
+                          <span className={`home-system-state ${pump.tone === 'running' ? 'is-on' : pump.tone === 'fault' ? 'is-fault' : 'is-off'}`}>
+                            {pump.status}
+                          </span>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                )}
+
+                {isSystemType2 && homeOverview.system.primarySupplyMainTemp !== '' && (
+                  <div className="home-system-node home-system-node--primary-supply-main-temp home-system-inline">
+                    <span className="home-system-caption">{HOME_TEXT.PRIMARY_SUPPLY_MAIN_TEMP}</span>
+                    <span className="home-system-value">{homeOverview.system.primarySupplyMainTemp}</span>
+                    <span className="home-system-unit">{HOME_TEXT.CELSIUS}</span>
+                  </div>
+                )}
 
                 <div className="home-system-node home-system-node--supply-pressure home-system-inline">
                   <span className="home-system-caption">{HOME_TEXT.SUPPLY_PRESSURE}</span>
@@ -218,12 +286,7 @@ function HomePage({ onActivePageChange, committedUnitLayoutSlots }) {
                   </span>
                 </div>
 
-                <div className="home-system-node home-system-node--pressure-tank home-system-inline">
-                  <span className="home-system-caption">{HOME_TEXT.PRESSURE_TANK}</span>
-                  <span className={`home-system-state ${homeOverview.system.pressureTankOpen ? 'is-on' : 'is-off'}`}>
-                    {homeOverview.system.pressureTankOpen ? HOME_TEXT.ON : HOME_TEXT.OFF}
-                  </span>
-                </div>
+                <div className="home-system-node home-system-node--pressure-tank">{HOME_TEXT.PRESSURE_TANK}</div>
 
                 <div className="home-system-node home-system-node--pressure-valve home-system-inline">
                   <span className="home-system-caption">{HOME_TEXT.PRESSURE_VALVE}</span>
@@ -341,6 +404,12 @@ function HomePage({ onActivePageChange, committedUnitLayoutSlots }) {
               <DeviceStatusPanel
                 heatPumpData={homeOverview.deviceStatus.heatPumpData}
                 loopPumpData={homeOverview.deviceStatus.loopPumpItems}
+                showTerminalLoopPump={isSystemType2}
+                terminalLoopPumpData={
+                  terminalCirculationPumps.length > 0
+                    ? terminalCirculationPumps
+                    : homeOverview.system.circulationPumps.slice(0, 3)
+                }
               />
             </HomeWidget>
           </aside>
