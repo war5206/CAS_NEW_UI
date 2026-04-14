@@ -37,7 +37,7 @@ export function getAlgorithmProcessPath() {
 
 // 算法过程 ID 常量
 export const ALGORITHM_PROCESS_IDS = {
-  HOME_OVERVIEW: 'queryHomePageData',
+  HOME_OVERVIEW: 'queryHomePageDataNew',
   SCREEN_DATA: 'queryScreenData',
   SET_OPERATION_PASSWORD: 'setOperationPassword',
   LOGIN_VERIFICATION: 'loginVerification',
@@ -59,4 +59,5 @@ export const ALGORITHM_PROCESS_IDS = {
   QUERY_INIT_STATE: 'queryInitState',
   DEVICE_UNLOCK: 'deviceUnlock',
   WRITE_REALVAL_BY_LONG_NAMES: 'writeRealvalByLongNames',
+  QUERY_SYSTEM_CONFIG: 'querySystemConfig',
 }

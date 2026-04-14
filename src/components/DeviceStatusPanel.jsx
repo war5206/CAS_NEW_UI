@@ -1,14 +1,14 @@
 ﻿import { useEffect, useRef, useState } from 'react'
 import * as echarts from 'echarts'
-import arrowRightSelected from '../assets/device/arrow-right-selected.svg'
-import arrowLeftSelected from '../assets/device/arrow-left-selected.svg'
 import { HEAT_PUMP_STATUS_SUMMARY } from '../config/homeHeatPumps'
 import { useDeferredVisible } from '../hooks/useDeferredVisible'
 
-const DEVICE_TABS = [
+const DEVICE_TABS_BASE = [
   { id: 'heat-pump', label: '热泵机组' },
   { id: 'loop-pump', label: '热泵循环水泵' },
 ]
+
+const DEVICE_TAB_TERMINAL = { id: 'terminal-loop-pump', label: '末端循环水泵' }
 
 const DEFAULT_HEAT_PUMP_DATA = [
   { name: '运行', value: HEAT_PUMP_STATUS_SUMMARY.running, color: ['#3B9EFF', '#1F5FB8'] },
@@ -120,13 +120,33 @@ function HeatPumpStatusChart({ chartData }) {
   return <div ref={chartRef} className="home-heat-pump-chart" />
 }
 
-function DeviceStatusPanel({ heatPumpData = DEFAULT_HEAT_PUMP_DATA, loopPumpData = DEFAULT_LOOP_PUMP_DATA }) {
+function PumpGrid({ items }) {
+  return (
+    <div className="home-device-pump-grid">
+      {items.map((item) => (
+        <div key={item.name} className="home-device-pump-card">
+          <span className={`home-device-pump-name is-${item.tone}`}>{item.name}</span>
+          <span className={`home-device-pump-state is-${item.tone}`}>{item.status}</span>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+function DeviceStatusPanel({
+  heatPumpData = DEFAULT_HEAT_PUMP_DATA,
+  loopPumpData = DEFAULT_LOOP_PUMP_DATA,
+  showTerminalLoopPump = false,
+  terminalLoopPumpData = [],
+}) {
   const [activeTab, setActiveTab] = useState('heat-pump')
+  const tabs = showTerminalLoopPump ? [...DEVICE_TABS_BASE, DEVICE_TAB_TERMINAL] : DEVICE_TABS_BASE
+  const gridCols = tabs.length
 
   return (
     <div className="home-device-status-panel">
-      <div className="home-device-tab-list">
-        {DEVICE_TABS.map((tab) => {
+      <div className="home-device-tab-list" style={{ gridTemplateColumns: `repeat(${gridCols}, minmax(0, 1fr))` }}>
+        {tabs.map((tab) => {
           const isActive = activeTab === tab.id
 
           return (
@@ -136,41 +156,16 @@ function DeviceStatusPanel({ heatPumpData = DEFAULT_HEAT_PUMP_DATA, loopPumpData
               className={isActive ? 'home-device-tab is-active' : 'home-device-tab'}
               onClick={() => setActiveTab(tab.id)}
             >
-              {isActive ? (
-                <img
-                  src={arrowRightSelected}
-                  alt=""
-                  aria-hidden="true"
-                  className="home-device-tab-arrow home-device-tab-arrow-left"
-                />
-              ) : null}
               <span>{tab.label}</span>
-              {isActive ? (
-                <img
-                  src={arrowLeftSelected}
-                  alt=""
-                  aria-hidden="true"
-                  className="home-device-tab-arrow home-device-tab-arrow-right"
-                />
-              ) : null}
             </button>
           )
         })}
       </div>
 
       <div className="home-device-body">
-        {activeTab === 'heat-pump' ? (
-          <HeatPumpStatusChart chartData={heatPumpData} />
-        ) : (
-          <div className="home-device-pump-grid">
-            {loopPumpData.map((item) => (
-              <div key={item.name} className="home-device-pump-card">
-                <span className={`home-device-pump-name is-${item.tone}`}>{item.name}</span>
-                <span className={`home-device-pump-state is-${item.tone}`}>{item.status}</span>
-              </div>
-            ))}
-          </div>
-        )}
+        {activeTab === 'heat-pump' && <HeatPumpStatusChart chartData={heatPumpData} />}
+        {activeTab === 'loop-pump' && <PumpGrid items={loopPumpData} />}
+        {activeTab === 'terminal-loop-pump' && <PumpGrid items={terminalLoopPumpData} />}
       </div>
     </div>
   )
