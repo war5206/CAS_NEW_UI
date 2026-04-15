@@ -39,6 +39,7 @@ export const HEAT_PUMP_DETAIL_LABEL = {
   ANTI_FREEZE_STATUS: '防冻状态',
   MODE_STATUS: '模式状态',
   DEFROST_STATUS: '化霜状态',
+  MAINBOARD_POWER_SIGNAL_STATUS: '主板开机信号状态',
   FAULT_STATUS: '故障状态',
 }
 
@@ -53,6 +54,7 @@ const BASE_DETAILS = [
   {label: HEAT_PUMP_DETAIL_LABEL.ANTI_FREEZE_STATUS, value: '开'},
   {label: HEAT_PUMP_DETAIL_LABEL.MODE_STATUS, value: '制热'},
   {label: HEAT_PUMP_DETAIL_LABEL.DEFROST_STATUS, value: '关'},
+  {label: HEAT_PUMP_DETAIL_LABEL.MAINBOARD_POWER_SIGNAL_STATUS, value: '关'},
   {label: HEAT_PUMP_DETAIL_LABEL.FAULT_STATUS, value: '关'},
 ]
 

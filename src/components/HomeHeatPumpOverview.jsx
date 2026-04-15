@@ -13,13 +13,15 @@ import closeIcon from '../assets/icons/close.svg'
 import micoeInfiniteLogo from '../assets/brand/micoe-infinite.png'
 import backIcon from '../assets/layout/back.svg'
 import {
-  HEAT_PUMP_DETAIL_LABEL,
   HEAT_PUMP_GRID_COLS,
   HEAT_PUMP_GRID_ITEMS,
   HEAT_PUMP_GRID_ROWS,
   HEAT_PUMP_STATUS,
   HEAT_PUMP_STATUS_LABEL,
 } from '../config/homeHeatPumps'
+import { useHeatPumpArrangeQuery } from '../features/home/hooks/useHeatPumpArrangeQuery'
+import { useHeatPumpOverviewQuery } from '../features/home/hooks/useHeatPumpOverviewQuery'
+import { useHeatPumpParamQuery } from '../features/home/hooks/useHeatPumpParamQuery'
 
 const HEAT_PUMP_ICON_MAP = {
   [HEAT_PUMP_STATUS.RUNNING]: hpRunningIcon,
@@ -41,6 +43,33 @@ const stopPointerEvent = (event) => {
 }
 
 const HEAT_PUMP_OVERVIEW_PAGE_SIZE = 10
+const OVERVIEW_TABLE_METRIC_LABELS = [
+  '进水温度',
+  '出水温度',
+  '环境温度',
+  '累积运行时长(H)',
+  '持续运行时长(H)',
+  '压缩机1电流(A)',
+  '压缩机2电流(A)',
+  '防冻状态',
+  '化霜状态',
+  '主板开机信号状态',
+  '故障状态',
+]
+const EMPTY_GRID_ITEMS = Array.from({ length: HEAT_PUMP_GRID_ROWS * HEAT_PUMP_GRID_COLS }, (_, index) => {
+  const row = Math.floor(index / HEAT_PUMP_GRID_COLS) + 1
+  const col = (index % HEAT_PUMP_GRID_COLS) + 1
+  return {
+    key: `hp-empty-${row}-${col}`,
+    id: null,
+    row,
+    col,
+    status: HEAT_PUMP_STATUS.EMPTY,
+    label: null,
+    name: null,
+    details: [],
+  }
+})
 
 const HEAT_PUMP_OVERVIEW_TEXT = {
   BUTTON: '热泵总览',
@@ -59,8 +88,35 @@ const HEAT_PUMP_OVERVIEW_TEXT = {
 
 function HomeHeatPumpOverview({ onBack, committedUnitLayoutSlots, heatPumpItems: externalHeatPumpItems = null }) {
   const [activePump, setActivePump] = useState(null)
+  const [pendingPump, setPendingPump] = useState(null)
   const [isOverviewModalOpen, setIsOverviewModalOpen] = useState(false)
   const [overviewPage, setOverviewPage] = useState(1)
+  const { data: arrangedHeatPumpItems } = useHeatPumpArrangeQuery()
+  const { data: pendingPumpWithParam, isError: isPumpParamError } = useHeatPumpParamQuery({
+    pump: pendingPump,
+    enabled: Boolean(pendingPump),
+  })
+  const { data: overviewPageData } = useHeatPumpOverviewQuery({
+    pageNum: overviewPage,
+    enabled: isOverviewModalOpen,
+  })
+
+  useEffect(() => {
+    if (!pendingPump) {
+      return
+    }
+
+    if (pendingPumpWithParam) {
+      setActivePump(pendingPumpWithParam)
+      setPendingPump(null)
+      return
+    }
+
+    if (isPumpParamError) {
+      setActivePump(pendingPump)
+      setPendingPump(null)
+    }
+  }, [isPumpParamError, pendingPump, pendingPumpWithParam])
 
   useEffect(() => {
     if (!activePump && !isOverviewModalOpen) {
@@ -101,12 +157,12 @@ function HomeHeatPumpOverview({ onBack, committedUnitLayoutSlots, heatPumpItems:
   )
 
   const boardHeatPumpItems = useMemo(() => {
-    if (Array.isArray(externalHeatPumpItems) && externalHeatPumpItems.length > 0 && (!Array.isArray(committedUnitLayoutSlots) || committedUnitLayoutSlots.length === 0)) {
-      return externalHeatPumpItems
+    if (Array.isArray(arrangedHeatPumpItems) && arrangedHeatPumpItems.length > 0) {
+      return arrangedHeatPumpItems
     }
 
     if (!Array.isArray(committedUnitLayoutSlots) || committedUnitLayoutSlots.length === 0) {
-      return HEAT_PUMP_GRID_ITEMS
+      return EMPTY_GRID_ITEMS
     }
 
     const baseById = new Map(
@@ -139,32 +195,10 @@ function HomeHeatPumpOverview({ onBack, committedUnitLayoutSlots, heatPumpItems:
         details: [],
       }
     })
-  }, [committedUnitLayoutSlots, externalHeatPumpItems])
+  }, [arrangedHeatPumpItems, committedUnitLayoutSlots, externalHeatPumpItems])
 
-  const allHeatPumps = useMemo(() => boardHeatPumpItems.filter((item) => item.id !== null), [boardHeatPumpItems])
-
-  const metricLabels = useMemo(() => {
-    const labels = new Set()
-    allHeatPumps.forEach((pump) => {
-      pump.details.forEach((metric) => {
-        if (metric.label !== HEAT_PUMP_DETAIL_LABEL.MODE_STATUS) {
-          labels.add(metric.label)
-        }
-      })
-    })
-    return Array.from(labels)
-  }, [allHeatPumps])
-
-  const totalOverviewPages = useMemo(
-    () => Math.max(1, Math.ceil(allHeatPumps.length / HEAT_PUMP_OVERVIEW_PAGE_SIZE)),
-    [allHeatPumps.length],
-  )
-
-  const pagedHeatPumps = useMemo(() => {
-    const startIndex = (overviewPage - 1) * HEAT_PUMP_OVERVIEW_PAGE_SIZE
-    return allHeatPumps.slice(startIndex, startIndex + HEAT_PUMP_OVERVIEW_PAGE_SIZE)
-  }, [allHeatPumps, overviewPage])
-
+  const totalOverviewPages = Math.max(1, overviewPageData.totalPages || 1)
+  const pagedHeatPumps = overviewPageData.list
   const emptyRowCount = Math.max(0, HEAT_PUMP_OVERVIEW_PAGE_SIZE - pagedHeatPumps.length)
 
   useEffect(() => {
@@ -244,7 +278,7 @@ function HomeHeatPumpOverview({ onBack, committedUnitLayoutSlots, heatPumpItems:
                   disabled={isEmpty}
                   onClick={() => {
                     if (!isEmpty) {
-                      setActivePump(item)
+                      setPendingPump(item)
                     }
                   }}
                   aria-label={isEmpty ? HEAT_PUMP_OVERVIEW_TEXT.EMPTY_PUMP : item.name}
@@ -349,25 +383,22 @@ function HomeHeatPumpOverview({ onBack, committedUnitLayoutSlots, heatPumpItems:
                       <tr>
                         <th>{HEAT_PUMP_OVERVIEW_TEXT.PUMP_NAME}</th>
                         <th>{HEAT_PUMP_OVERVIEW_TEXT.MODE_STATUS}</th>
-                        {metricLabels.map((label) => (
+                        {OVERVIEW_TABLE_METRIC_LABELS.map((label) => (
                           <th key={`summary-head-${label}`}>{label}</th>
                         ))}
                       </tr>
                     </thead>
                     <tbody>
                       {pagedHeatPumps.map((pump) => {
-                        const detailValueMap = new Map(
-                          pump.details.map((detail) => [detail.label, detail.value]),
-                        )
-                        const modeStatusValue =
-                          detailValueMap.get(HEAT_PUMP_DETAIL_LABEL.MODE_STATUS) ?? HEAT_PUMP_STATUS_LABEL[pump.status]
+                        const modeStatusValue = pump?.模式状态 ?? '--'
+                        const heatPumpName = pump?.heatPumpNo ?? pump?.热泵序号 ?? '--'
 
                         return (
-                          <tr key={`summary-row-${pump.key}`}>
-                            <td>{pump.name}</td>
+                          <tr key={`summary-row-${pump?.heatPumpCode ?? heatPumpName}`}>
+                            <td>{heatPumpName}</td>
                             <td>{modeStatusValue}</td>
-                            {metricLabels.map((label) => (
-                              <td key={`summary-cell-${pump.key}-${label}`}>{detailValueMap.get(label) ?? '--'}</td>
+                            {OVERVIEW_TABLE_METRIC_LABELS.map((label) => (
+                              <td key={`summary-cell-${pump?.heatPumpCode ?? heatPumpName}-${label}`}>{pump?.[label] ?? '--'}</td>
                             ))}
                           </tr>
                         )
@@ -377,7 +408,7 @@ function HomeHeatPumpOverview({ onBack, committedUnitLayoutSlots, heatPumpItems:
                         <tr key={`summary-empty-row-${index}`} className="is-empty">
                           <td>&nbsp;</td>
                           <td>&nbsp;</td>
-                          {metricLabels.map((label) => (
+                          {OVERVIEW_TABLE_METRIC_LABELS.map((label) => (
                             <td key={`summary-empty-cell-${index}-${label}`}>&nbsp;</td>
                           ))}
                         </tr>

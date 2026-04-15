@@ -22,6 +22,7 @@ import RealTimeTemperatureChart from '../components/RealTimeTemperatureChart'
 import DeviceStatusPanel from '../components/DeviceStatusPanel'
 import { useHomeOverviewQuery } from '../features/home/hooks/useHomeOverviewQuery'
 import { useSystemConfigQuery } from '../features/home/hooks/useSystemConfigQuery'
+import { useTemp24HourQuery } from '../features/home/hooks/useTemp24HourQuery'
 
 const HOME_PAGE_VIEW = {
   DASHBOARD: 'dashboard',
@@ -110,6 +111,7 @@ function HomePage({ onActivePageChange, committedUnitLayoutSlots }) {
   const isHomeRoute = location.pathname === '/home' || location.pathname === '/home/'
   const { data: homeOverview } = useHomeOverviewQuery({ enabled: isHomeRoute })
   const { data: systemConfig } = useSystemConfigQuery({ enabled: isHomeRoute })
+  const { data: temp24HourTrend } = useTemp24HourQuery({ enabled: isHomeRoute })
 
   const isSystemType2 = systemConfig.systemTypeUuid === '2'
   const resolvedSystemImage = isSystemType2 && SYSTEM_IMAGE_TYPE2 ? SYSTEM_IMAGE_TYPE2 : systemMap
@@ -413,10 +415,10 @@ function HomePage({ onActivePageChange, committedUnitLayoutSlots }) {
               titleRight={homeOverview.system.targetBackwaterTemperature}
             >
               <RealTimeTemperatureChart
-                labels={homeOverview.temperature.labels}
-                supplySeries={homeOverview.temperature.supplyData}
-                returnSeries={homeOverview.temperature.returnData}
-                targetSeries={homeOverview.temperature.targetData}
+                labels={temp24HourTrend.labels}
+                supplySeries={temp24HourTrend.supplyData}
+                returnSeries={temp24HourTrend.returnData}
+                targetSeries={temp24HourTrend.targetData}
               />
             </HomeWidget>
 

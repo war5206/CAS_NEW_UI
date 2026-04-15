@@ -60,4 +60,8 @@ export const ALGORITHM_PROCESS_IDS = {
   DEVICE_UNLOCK: 'deviceUnlock',
   WRITE_REALVAL_BY_LONG_NAMES: 'writeRealvalByLongNames',
   QUERY_SYSTEM_CONFIG: 'querySystemConfig',
+  QUERY_TEMP_24_HOUR: 'queryTemp24hour',
+  QUERY_HEAT_PUMP_ARRANGE: 'queryHeatPumpArrange',
+  QUERY_HEAT_PUMP_PARAM: 'queryHeatPumpParam',
+  QUERY_ALL_HEAT_PUMP_PARAM: 'queryAllHeatPumpParam',
 }
