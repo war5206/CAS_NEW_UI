@@ -20,6 +20,22 @@ export async function getHomeOverview() {
   return callAlgorithmProcess(ALGORITHM_PROCESS_IDS.HOME_OVERVIEW, {})
 }
 
+export async function queryTemp24Hour() {
+  return callAlgorithmProcess(ALGORITHM_PROCESS_IDS.QUERY_TEMP_24_HOUR, {})
+}
+
+export async function queryHeatPumpArrange() {
+  return callAlgorithmProcess(ALGORITHM_PROCESS_IDS.QUERY_HEAT_PUMP_ARRANGE, {})
+}
+
+export async function queryHeatPumpParam(paramData) {
+  return callAlgorithmProcess(ALGORITHM_PROCESS_IDS.QUERY_HEAT_PUMP_PARAM, paramData)
+}
+
+export async function queryAllHeatPumpParam(paramData) {
+  return callAlgorithmProcess(ALGORITHM_PROCESS_IDS.QUERY_ALL_HEAT_PUMP_PARAM, paramData)
+}
+
 export async function queryScreenData() {
   const response = await callAlgorithmProcess(ALGORITHM_PROCESS_IDS.SCREEN_DATA, {})
   return {

@@ -1,5 +1,8 @@
 import {
   HEAT_PUMP_GRID_ITEMS,
+  HEAT_PUMP_GRID_COLS,
+  HEAT_PUMP_GRID_ROWS,
+  HEAT_PUMP_DETAIL_LABEL,
   HEAT_PUMP_STATUS,
   getHeatPumpStatusSummary,
 } from '@/config/homeHeatPumps'
@@ -8,6 +11,28 @@ const DEFAULT_TEMPERATURE_LABELS = ['0', '1', '2', '3', '4', '5', '6', '7', '8',
 const DEFAULT_SUPPLY_DATA = [42, 43, 44, 38, 37, 42, 43, 40, 36, 35]
 const DEFAULT_RETURN_DATA = [31, 32, 33, 31, 30.5, 30.8, 31, 30.7, 30.2, 28]
 const DEFAULT_TARGET_DATA = [31, 31.4, 31.8, 30.8, 30.9, 31, 30.8, 31, 31.2, 32]
+
+function normalizeTempSeries(rawList, fallback) {
+  if (!Array.isArray(rawList) || rawList.length === 0) {
+    return fallback
+  }
+  return rawList.map((value) => {
+    const parsed = Number(value)
+    return Number.isFinite(parsed) ? parsed : 0
+  })
+}
+
+function normalizeHourLabels(rawList, fallback) {
+  if (!Array.isArray(rawList) || rawList.length === 0) {
+    return fallback
+  }
+  return rawList.map((item) => {
+    const text = String(item ?? '')
+    const hourPart = text.includes(':') ? text.split(':')[0] : text
+    const parsed = Number(hourPart)
+    return Number.isFinite(parsed) ? String(parsed) : text
+  })
+}
 
 function normalizeRunModeValue(value) {
   if (value === null || value === undefined) return ''
@@ -69,6 +94,48 @@ function normalizeHeatPumpStatus(value) {
   if (['malfunction', 'fault', 'error', '3'].includes(normalizedValue)) return HEAT_PUMP_STATUS.MALFUNCTION
   if (['defrosting', 'defrost', '2'].includes(normalizedValue)) return HEAT_PUMP_STATUS.DEFROSTING
   return HEAT_PUMP_STATUS.SHUTDOWN
+}
+
+function resolveHeatPumpStatusFromRuntime({ alarm, run, state }) {
+  if (toBoolean(alarm, false)) {
+    return HEAT_PUMP_STATUS.MALFUNCTION
+  }
+
+  const stateText = String(state ?? '').trim()
+  if (stateText.includes('化霜')) {
+    return HEAT_PUMP_STATUS.DEFROSTING
+  }
+
+  if (toBoolean(run, false)) {
+    return HEAT_PUMP_STATUS.RUNNING
+  }
+
+  return HEAT_PUMP_STATUS.SHUTDOWN
+}
+
+function toHeatPumpLabelFromName(name, fallbackIndex) {
+  const match = String(name ?? '').match(/\d+/)
+  if (match) {
+    return String(match[0]).padStart(2, '0')
+  }
+  return String(fallbackIndex).padStart(2, '0')
+}
+
+function createHeatPumpDetailsFromParam(heatPumpData = {}, stateFallback = '') {
+  return [
+    { label: HEAT_PUMP_DETAIL_LABEL.INLET_TEMP, value: toText(heatPumpData['进水温度'], '--') },
+    { label: HEAT_PUMP_DETAIL_LABEL.OUTLET_TEMP, value: toText(heatPumpData['出水温度'], '--') },
+    { label: HEAT_PUMP_DETAIL_LABEL.AMBIENT_TEMP, value: toText(heatPumpData['环境温度'], '--') },
+    { label: HEAT_PUMP_DETAIL_LABEL.CUMULATIVE_RUNTIME, value: toText(heatPumpData['累积运行时长(H)'], '--') },
+    { label: HEAT_PUMP_DETAIL_LABEL.CONTINUOUS_RUNTIME, value: toText(heatPumpData['持续运行时长(H)'], '--') },
+    { label: HEAT_PUMP_DETAIL_LABEL.COMPRESSOR_1_CURRENT, value: toText(heatPumpData['压缩机1电流(A)'], '--') },
+    { label: HEAT_PUMP_DETAIL_LABEL.COMPRESSOR_2_CURRENT, value: toText(heatPumpData['压缩机2电流(A)'], '--') },
+    { label: HEAT_PUMP_DETAIL_LABEL.ANTI_FREEZE_STATUS, value: toText(heatPumpData['防冻状态'], '--') },
+    { label: HEAT_PUMP_DETAIL_LABEL.MODE_STATUS, value: toText(heatPumpData['模式状态'], toText(stateFallback, '--')) },
+    { label: HEAT_PUMP_DETAIL_LABEL.DEFROST_STATUS, value: toText(heatPumpData['化霜状态'], '--') },
+    { label: HEAT_PUMP_DETAIL_LABEL.MAINBOARD_POWER_SIGNAL_STATUS, value: toText(heatPumpData['主板开机信号状态'], '--') },
+    { label: HEAT_PUMP_DETAIL_LABEL.FAULT_STATUS, value: toText(heatPumpData['故障状态'], '--') },
+  ]
 }
 
 function buildFallbackLoopPumpItems() {
@@ -217,6 +284,150 @@ export function createDefaultHomeOverview() {
       loopPumpItems,
     },
     heatPumpItems,
+  }
+}
+
+export function createDefaultHomeTemperatureTrend() {
+  return {
+    labels: DEFAULT_TEMPERATURE_LABELS,
+    supplyData: DEFAULT_SUPPLY_DATA,
+    returnData: DEFAULT_RETURN_DATA,
+    targetData: DEFAULT_TARGET_DATA,
+  }
+}
+
+export function createDefaultHeatPumpArrange() {
+  return Array.from({ length: HEAT_PUMP_GRID_ROWS * HEAT_PUMP_GRID_COLS }, (_, index) => {
+    const row = Math.floor(index / HEAT_PUMP_GRID_COLS) + 1
+    const col = (index % HEAT_PUMP_GRID_COLS) + 1
+    return {
+      key: `hp-empty-${row}-${col}`,
+      id: null,
+      row,
+      col,
+      status: HEAT_PUMP_STATUS.EMPTY,
+      label: null,
+      name: null,
+      details: [],
+    }
+  })
+}
+
+export function adaptHeatPumpArrange(rawData) {
+  const fallback = createDefaultHeatPumpArrange()
+  const responseData = rawData?.data ?? rawData
+  const source = responseData?.data ?? responseData ?? {}
+  const heatPumpList = Array.isArray(source?.heatPump) ? source.heatPump : []
+
+  if (heatPumpList.length === 0) {
+    return fallback
+  }
+
+  const arrangedMap = new Map()
+
+  heatPumpList.forEach((item, index) => {
+    const row = toNumberOrFallback(item?.row, 1)
+    const col = toNumberOrFallback(item?.column, 1)
+    const safeRow = Math.min(Math.max(row, 1), HEAT_PUMP_GRID_ROWS)
+    const safeCol = Math.min(Math.max(col, 1), HEAT_PUMP_GRID_COLS)
+    const status = resolveHeatPumpStatusFromRuntime(item ?? {})
+
+    arrangedMap.set(`${safeRow}-${safeCol}`, {
+      key: `hp-${toText(item?.code, index + 1)}-${safeRow}-${safeCol}`,
+      id: index + 1,
+      row: safeRow,
+      col: safeCol,
+      status,
+      label: toHeatPumpLabelFromName(item?.name, index + 1),
+      name: toText(item?.name, `热泵${index + 1}`),
+      code: toText(item?.code, ''),
+      alarm: toBoolean(item?.alarm, false),
+      run: toBoolean(item?.run, false),
+      state: toText(item?.state, ''),
+      details: [
+        {
+          label: HEAT_PUMP_DETAIL_LABEL.MODE_STATUS,
+          value: toText(item?.state, '--'),
+        },
+      ],
+    })
+  })
+
+  return Array.from({ length: HEAT_PUMP_GRID_ROWS * HEAT_PUMP_GRID_COLS }, (_, index) => {
+    const row = Math.floor(index / HEAT_PUMP_GRID_COLS) + 1
+    const col = (index % HEAT_PUMP_GRID_COLS) + 1
+    return arrangedMap.get(`${row}-${col}`) ?? {
+      key: `hp-empty-${row}-${col}`,
+      id: null,
+      row,
+      col,
+      status: HEAT_PUMP_STATUS.EMPTY,
+      label: null,
+      name: null,
+      details: [],
+    }
+  })
+}
+
+export function adaptHeatPumpParam(rawData, fallbackPump = {}) {
+  const responseData = rawData?.data ?? rawData
+  const source = responseData?.data ?? responseData ?? {}
+  const heatPumpData = source?.heatPumpData ?? {}
+
+  const alarm = toBoolean(source?.alarm, fallbackPump?.alarm ?? false)
+  const run = toBoolean(source?.run, fallbackPump?.run ?? false)
+  const state = toText(source?.state, fallbackPump?.state ?? '')
+
+  return {
+    ...fallbackPump,
+    alarm,
+    run,
+    state,
+    status: resolveHeatPumpStatusFromRuntime({ alarm, run, state }),
+    details: createHeatPumpDetailsFromParam(heatPumpData, state),
+  }
+}
+
+export function createDefaultHeatPumpOverviewPage() {
+  return {
+    list: [],
+    pageNum: 1,
+    pageSize: 10,
+    total: 0,
+    totalPages: 1,
+  }
+}
+
+export function adaptHeatPumpOverviewPage(rawData) {
+  const fallback = createDefaultHeatPumpOverviewPage()
+  const responseData = rawData?.data ?? rawData
+  const source = responseData?.data ?? responseData ?? {}
+  const list = Array.isArray(source?.list) ? source.list : []
+
+  return {
+    list,
+    pageNum: toNumberOrFallback(source?.pageNum, fallback.pageNum),
+    pageSize: toNumberOrFallback(source?.pageSize, fallback.pageSize),
+    total: toNumberOrFallback(source?.total, fallback.total),
+    totalPages: Math.max(1, toNumberOrFallback(source?.totalPages, fallback.totalPages)),
+  }
+}
+
+export function adaptHomeTemperatureTrend(rawData) {
+  const fallback = createDefaultHomeTemperatureTrend()
+  const responseData = rawData?.data ?? rawData
+  const result = responseData?.data?.result ?? responseData?.result ?? {}
+
+  const labels = normalizeHourLabels(result?.xList, fallback.labels)
+  const supplyData = normalizeTempSeries(result?.supplyTempData?.yList, fallback.supplyData)
+  const returnData = normalizeTempSeries(result?.backwaterTempData?.yList, fallback.returnData)
+  const targetData = normalizeTempSeries(result?.targetBackwaterTempData?.yList, fallback.targetData)
+
+  return {
+    labels,
+    supplyData,
+    returnData,
+    targetData,
   }
 }
 
