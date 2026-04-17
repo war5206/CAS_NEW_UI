@@ -192,3 +192,119 @@ export async function saveEnergyPrice(energyPrice = []) {
     data: adaptGuideResponse(response.data),
   }
 }
+
+export async function queryRealAlarm({ current = 1, grade = '', name = '' } = {}) {
+  return callAlgorithmProcess(ALGORITHM_PROCESS_IDS.QUERY_REAL_ALARM, {
+    current,
+    grade,
+    name,
+  })
+}
+
+export async function handleRealAlarm(id) {
+  return callAlgorithmProcess(ALGORITHM_PROCESS_IDS.HANDLE_REAL_ALARM, { id })
+}
+
+export async function querySingleRealAlarm(id) {
+  return callAlgorithmProcess(ALGORITHM_PROCESS_IDS.SINGLE_REAL_ALARM, { id })
+}
+
+export async function queryHisAlarm({ current = 1, grade = '', name = '', startTime = '', endTime = '' } = {}) {
+  return callAlgorithmProcess(ALGORITHM_PROCESS_IDS.QUERY_HIS_ALARM, {
+    current,
+    grade,
+    name,
+    startTime,
+    endTime,
+  })
+}
+
+export async function deleteHisAlarm(id) {
+  return callAlgorithmProcess(ALGORITHM_PROCESS_IDS.DELETE_HIS_ALARM, { id })
+}
+
+export async function deleteCurrentPageHisAlarm({ current = 1, grade = '', name = '', startTime = '', endTime = '' } = {}) {
+  return callAlgorithmProcess(ALGORITHM_PROCESS_IDS.DELETE_CURRENT_PAGE_HIS_ALARM, {
+    current,
+    grade,
+    name,
+    startTime,
+    endTime,
+  })
+}
+
+export async function queryFaultCodeSelect() {
+  return callAlgorithmProcess(ALGORITHM_PROCESS_IDS.FAULT_CODE_SELECT, {})
+}
+
+export async function queryFaultNameSelect() {
+  return callAlgorithmProcess(ALGORITHM_PROCESS_IDS.FAULT_NAME_SELECT, {})
+}
+
+export async function queryFaultTree({ code = '', name = '' } = {}) {
+  return callAlgorithmProcess(ALGORITHM_PROCESS_IDS.QUERY_FAULT_TREE, {
+    code,
+    name,
+  })
+}
+
+export async function giveAlarmOverview({ startDateTime = '', endDateTime = '', timeInterval = 'day' } = {}) {
+  return callAlgorithmProcess(ALGORITHM_PROCESS_IDS.GIVE_ALARM_OVERVIEW, {
+    startDateTime,
+    endDateTime,
+    timeInterval,
+  })
+}
+
+export async function giveAlarmTrend({ startDateTime = '', endDateTime = '', timeInterval = 'day', type = '' } = {}) {
+  return callAlgorithmProcess(ALGORITHM_PROCESS_IDS.GIVE_ALARM_TREND, {
+    startDateTime,
+    endDateTime,
+    timeInterval,
+    type,
+  })
+}
+
+export async function giveAlarmHeatPumpNumber({ startDateTime = '', endDateTime = '', timeInterval = 'day', type = '热泵' } = {}) {
+  return callAlgorithmProcess(ALGORITHM_PROCESS_IDS.GIVE_ALARM_HEAT_PUMP_NUMBER, {
+    startDateTime,
+    endDateTime,
+    timeInterval,
+    type,
+  })
+}
+
+export async function queryHeatPumpSelect() {
+  return callAlgorithmProcess(ALGORITHM_PROCESS_IDS.QUERY_HEAT_PUMP_SELECT, {})
+}
+
+export async function giveAlarmHeatPumpDistribution({
+  startDateTime = '',
+  endDateTime = '',
+  timeInterval = 'day',
+  heatPump = '',
+} = {}) {
+  return callAlgorithmProcess(ALGORITHM_PROCESS_IDS.GIVE_ALARM_HEAT_PUMP_DISTRIBUTION, {
+    startDateTime,
+    endDateTime,
+    timeInterval,
+    heatPump,
+  })
+}
+
+export async function giveAlarmSystemDistribution({ startDateTime = '', endDateTime = '', timeInterval = 'day' } = {}) {
+  return callAlgorithmProcess(ALGORITHM_PROCESS_IDS.GIVE_ALARM_SYSTEM_DISTRIBUTION, {
+    startDateTime,
+    endDateTime,
+    timeInterval,
+  })
+}
+
+export async function giveAlarmDeviceDistribution({ startDateTime = '', endDateTime = '', timeInterval = 'day', device = '' } = {}) {
+  return callAlgorithmProcess(ALGORITHM_PROCESS_IDS.GIVE_ALARM_DEVICE_DISTRIBUTION, {
+    startDateTime,
+    endDateTime,
+    timeInterval,
+    device,
+  })
+}

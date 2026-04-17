@@ -113,6 +113,8 @@
   display: flex;
   align-items: center;
   justify-content: center;
+  white-space: nowrap;
+  word-break: keep-all;
   transition: color 120ms ease;
   user-select: none;
 }
