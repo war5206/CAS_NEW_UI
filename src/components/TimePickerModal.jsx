@@ -80,6 +80,7 @@ function TimePickerModal({
   confirmText = '确定',
   showBackdrop = true,
   zIndex,
+  className = '',
   onClose,
   onConfirm,
   confirmConfig,
@@ -325,11 +326,13 @@ function TimePickerModal({
     .join(' ')
   const backdropStyle = Number.isFinite(zIndex) ? { zIndex } : undefined
 
+  const modalClassName = ['time-picker-modal', className].filter(Boolean).join(' ')
+
   return (
     <>
       <div className={backdropClassName} style={backdropStyle} role="presentation" onClick={onClose}>
         <section
-          className="time-picker-modal"
+          className={modalClassName}
           role="dialog"
           aria-modal="true"
           aria-label={title}

@@ -109,9 +109,10 @@ function HomePage({ onActivePageChange, committedUnitLayoutSlots }) {
   const [activePage, setActivePage] = useState(HOME_PAGE_VIEW.DASHBOARD)
   const [isSystemImageLoaded, setIsSystemImageLoaded] = useState(false)
   const isHomeRoute = location.pathname === '/home' || location.pathname === '/home/'
-  const { data: homeOverview } = useHomeOverviewQuery({ enabled: isHomeRoute })
+  const isHomeDashboard = activePage === HOME_PAGE_VIEW.DASHBOARD
+  const { data: homeOverview } = useHomeOverviewQuery({ enabled: isHomeRoute && isHomeDashboard })
   const { data: systemConfig } = useSystemConfigQuery({ enabled: isHomeRoute })
-  const { data: temp24HourTrend } = useTemp24HourQuery({ enabled: isHomeRoute })
+  const { data: temp24HourTrend } = useTemp24HourQuery({ enabled: isHomeRoute && isHomeDashboard })
 
   const isSystemType2 = systemConfig.systemTypeUuid === '2'
   const resolvedSystemImage = isSystemType2 && SYSTEM_IMAGE_TYPE2 ? SYSTEM_IMAGE_TYPE2 : systemMap

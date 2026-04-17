@@ -1,39 +1,64 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, memo, useRef, useState } from 'react'
 import * as echarts from 'echarts'
 import SelectDropdown from '../components/SelectDropdown'
 import TimePickerModal from '../components/TimePickerModal'
 import backIcon from '../assets/layout/back.svg'
 import dateIcon from '../assets/icons/date.svg'
-import { HEAT_PUMP_GRID_ITEMS } from '../config/homeHeatPumps'
 import { useActionConfirm } from '../hooks/useActionConfirm'
 import { useDeferredVisible } from '../hooks/useDeferredVisible'
-import { deleteHistoryAlarm, processLiveAlarm, useAlertsStore } from '@/features/alerts/store/alertsStore'
+import {
+  deleteCurrentPageHisAlarm,
+  deleteHisAlarm,
+  handleRealAlarm,
+  queryFaultCodeSelect,
+  queryFaultNameSelect,
+  queryFaultTree,
+  queryHisAlarm,
+  queryRealAlarm,
+  querySingleRealAlarm,
+} from '@/api/modules/home'
+import {
+  useAlarmCategoryQuery,
+  useAlarmDistributionQuery,
+  useAlarmOverviewQuery,
+  useAlarmTrendQuery,
+  useHeatPumpSelectOptionsQuery,
+} from '@/features/alerts/hooks/useAlarmAnalysisQueries'
 import './AlertsModulePage.css'
 
-const ALARM_NAME_OPTIONS = [
-  { value: 'all', label: '全部' },
-  { value: 'high-pressure-protection', label: '高压保护报警' },
-  { value: 'low-pressure-protection', label: '低压保护报警' },
-  { value: 'compressor-overload', label: '压缩机过载保护报警' },
-  { value: 'outlet-sensor', label: '出水温度传感器故障' },
-  { value: 'pump-running', label: '循环泵运行故障' },
-  { value: 'insufficient-flow', label: '流量不足报警' },
+const LIVE_ALARM_TYPE_OPTIONS = [
+  { value: '', label: '全部' },
+  { value: '1', label: '热泵' },
+  { value: '2', label: '系统' },
+  { value: '3', label: '设备' },
 ]
 
-const ALARM_LEVEL_OPTIONS = [
-  { value: 'all', label: '全部' },
+const LIVE_ALARM_LEVEL_OPTIONS = [
+  { value: '', label: '全部' },
   { value: '1', label: '一级' },
   { value: '2', label: '二级' },
   { value: '3', label: '三级' },
   { value: '4', label: '四级' },
 ]
 
-const FAULT_CODE_OPTIONS = [
-  { value: 'all', label: '全部' },
-  { value: 'E01', label: 'E01' },
-  { value: 'E02', label: 'E02' },
-  { value: 'E03', label: 'E03' },
+const ALARM_NAME_OPTIONS = [
+  { value: '', label: '全部' },
+  { value: '1', label: '热泵' },
+  { value: '2', label: '系统' },
+  { value: '3', label: '设备' },
 ]
+
+const ALARM_LEVEL_OPTIONS = [
+  { value: '', label: '全部' },
+  { value: '1', label: '一级' },
+  { value: '2', label: '二级' },
+  { value: '3', label: '三级' },
+  { value: '4', label: '四级' },
+]
+
+const FAULT_CODE_OPTIONS = [{ value: '', label: '全部' }]
+
+const FAULT_NAME_OPTIONS = [{ value: '', label: '全部' }]
 
 const TREND_TYPE_OPTIONS = [
   { value: 'trend', label: '告警趋势' },
@@ -46,18 +71,12 @@ const ANALYSIS_SCOPE_OPTIONS = [
   { value: 'device', label: '设备' },
 ]
 
-const HEAT_PUMP_FILTER_OPTIONS = [
-  { value: 'all', label: '全部' },
-  ...HEAT_PUMP_GRID_ITEMS.filter((item) => item.id).map((item) => ({
-    value: `hp-${item.id}`,
-    label: `热泵${item.id}`,
-  })),
-]
-
-const ROWS_PER_PAGE = 8
 const DATE_PICKER_YEARS = Array.from({ length: 11 }, (_, index) => 2021 + index)
 const DATE_PICKER_MONTHS = Array.from({ length: 12 }, (_, index) => index + 1)
 const DATE_PICKER_DAYS = Array.from({ length: 31 }, (_, index) => index + 1)
+const DATE_PICKER_HOURS = Array.from({ length: 24 }, (_, index) => index)
+const DATE_PICKER_MINUTES = Array.from({ length: 60 }, (_, index) => index)
+const DATE_PICKER_SECONDS = Array.from({ length: 60 }, (_, index) => index)
 
 const ANALYSIS_TREND_OPTIONS = [
   { value: 'trend', label: '告警趋势' },
@@ -70,64 +89,174 @@ const ANALYSIS_SCOPE_LABEL_OPTIONS = [
   { value: 'device', label: '设备' },
 ]
 
-const FAULT_TREE_ROWS = [
-  {
-    code: 'E01',
-    name: '错相保护',
-    level: '4',
-    levelText: '四级',
-    reasons: ['380V 主电源相序错误', '相序检测板接线错误', '相序检测板故障'],
-    plans: ['调整三相电源接线', '复核相序检测板接线', '更换相序检测板'],
-  },
-  {
-    code: 'E02',
-    name: '缺相保护',
-    level: '3',
-    levelText: '三级',
-    reasons: ['主供电 380V 三相缺相', '主供电空气开关损坏'],
-    plans: ['检查供电电缆及开关触点', '更换损坏的空气开关'],
-  },
-  {
-    code: 'E03',
-    name: '水流开关保护',
-    level: '2',
-    levelText: '二级',
-    reasons: ['循环水泵流量不足', '循环水泵发生气堵'],
-    plans: ['清洗过滤器并检查阀门开度', '排气并恢复系统循环'],
-  },
+/** 告警分类统计：与后端 giveAlarmHeatPumpNumber 的 type 对应 */
+const CATEGORY_STATS_OPTIONS = [
+  { value: 'heat-pump', label: '热泵' },
+  { value: 'water-pump', label: '水泵' },
+  { value: 'liquid-pump', label: '补液泵' },
 ]
 
-function formatDateTime(value) {
-  if (!value) {
-    return '--'
+const CATEGORY_STATS_SCOPE_SET = new Set(['heat-pump', 'water-pump', 'liquid-pump'])
+
+/** 类目较多时稀疏 X 轴标签，避免内联函数导致 BarChart 每次重绘都重挂载 */
+function categoryBarDenseLabelInterval(index) {
+  return index === 0 || (index + 1) % 5 === 0
+}
+
+const ANALYSIS_SCOPE_SWITCH_OPTIONS = [
+  { value: 'all', label: '全部' },
+  { value: 'heat-pump', label: '热泵' },
+  { value: 'system', label: '系统' },
+  { value: 'device', label: '设备' },
+]
+
+const faultTreeCacheMap = new Map()
+const FAULT_TREE_CACHE_KEYS = {
+  codeOptions: 'fault-tree-code-options',
+  nameOptions: 'fault-tree-name-options',
+  rows: 'fault-tree-rows',
+}
+
+function adaptFaultSelectOptions(response, fallbackOptions = []) {
+  const list = Array.isArray(response?.data?.data?.select) ? response.data.data.select : []
+  if (list.length === 0) {
+    return fallbackOptions
   }
+  return list.map((item) => ({
+    value: item?.value == null ? '' : String(item.value),
+    label: item?.title == null ? '--' : String(item.title),
+  }))
+}
 
-  const date = value instanceof Date ? value : new Date(value)
-  if (Number.isNaN(date.getTime())) {
-    return String(value)
+function adaptFaultTreeGroups(response) {
+  const list = Array.isArray(response?.data?.data?.faultTree) ? response.data.data.faultTree : []
+  const groupedMap = new Map()
+  list.forEach((item, index) => {
+    const code = item?.fault_code ? String(item.fault_code) : '--'
+    const name = item?.fault_name ? String(item.fault_name) : '--'
+    const reason = item?.reason ? String(item.reason) : '--'
+    const solution = item?.solution ? String(item.solution) : '--'
+    const key = `${code}@@${name}`
+    if (!groupedMap.has(key)) {
+      groupedMap.set(key, {
+        id: item?.id ? String(item.id) : `${key}-${index}`,
+        code,
+        name,
+        reasons: [],
+        plans: [],
+      })
+    }
+    const group = groupedMap.get(key)
+    group.reasons.push(reason)
+    group.plans.push(solution)
+  })
+  return Array.from(groupedMap.values())
+}
+
+function getLiveAlarmLevelText(level) {
+  const textMap = {
+    1: '一级',
+    2: '二级',
+    3: '三级',
+    4: '四级',
   }
+  return textMap[level] ?? textMap[String(level)] ?? '--'
+}
 
-  const year = date.getFullYear()
-  const month = String(date.getMonth() + 1).padStart(2, '0')
-  const day = String(date.getDate()).padStart(2, '0')
-  const hours = String(date.getHours()).padStart(2, '0')
-  const minutes = String(date.getMinutes()).padStart(2, '0')
-  const seconds = String(date.getSeconds()).padStart(2, '0')
+function getLiveAlarmTypeText(type) {
+  const textMap = {
+    1: '热泵',
+    2: '系统',
+    3: '设备',
+  }
+  return textMap[type] ?? textMap[String(type)] ?? '--'
+}
 
-  return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`
+function stringifyAlarmMessage(message) {
+  if (Array.isArray(message)) {
+    return message
+      .map((item) => {
+        if (!item || typeof item !== 'object') {
+          return ''
+        }
+        const reasonText = item.reason ? `原因：${item.reason}` : ''
+        const solutionText = item.solution ? `处理建议：${item.solution}` : ''
+        return [reasonText, solutionText].filter(Boolean).join('；')
+      })
+      .filter(Boolean)
+      .join('；')
+  }
+  return message ? String(message) : '--'
+}
+
+function stringifyAlarmMessageForDetail(message) {
+  if (Array.isArray(message)) {
+    const lines = message.flatMap((item) => {
+      if (!item || typeof item !== 'object') {
+        return []
+      }
+      const currentLines = []
+      if (item.reason) {
+        currentLines.push(`原因：${item.reason}`)
+      }
+      if (item.solution) {
+        currentLines.push(`处理建议：${item.solution}`)
+      }
+      return currentLines
+    })
+    return lines.length > 0 ? lines.join('\n') : '--'
+  }
+  return message ? String(message) : '--'
+}
+
+function adaptLiveAlarmRow(item = {}) {
+  return {
+    id: String(item.alarmid ?? ''),
+    deviceName: getLiveAlarmTypeText(item.alarm_type),
+    alarmName: item.alarm_description || '--',
+    levelText: getLiveAlarmLevelText(item.alarm_grade),
+    happenedAt: item.alarm_time || '--',
+    suggestion: stringifyAlarmMessage(item.alarm_message),
+  }
+}
+
+function adaptHistoryAlarmRow(item = {}) {
+  return {
+    id: String(item.alarmid ?? ''),
+    deviceName: getLiveAlarmTypeText(item.alarm_type),
+    alarmName: item.alarm_description || '--',
+    levelText: getLiveAlarmLevelText(item.alarm_grade),
+    happenedAt: item.alarm_time || '--',
+    processedAt: item.handle_status || '--',
+    suggestion: stringifyAlarmMessage(item.alarm_message),
+  }
 }
 
 function parseDateValue(value) {
   if (!value || !/^\d{4}-\d{2}-\d{2}$/.test(value)) {
     return [2026, 3, 10]
   }
-
   const [year, month, day] = value.split('-').map(Number)
   return [year, month, day]
 }
 
 function formatDateValue(year, month, day) {
   return `${String(year).padStart(4, '0')}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`
+}
+
+function parseDateTimeValue(value) {
+  if (!value || !/^\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}:\d{2}$/.test(value)) {
+    return [2026, 3, 10, 0, 0, 0]
+  }
+
+  const [datePart, timePart] = value.split(' ')
+  const [year, month, day] = datePart.split('-').map(Number)
+  const [hour, minute, second] = timePart.split(':').map(Number)
+  return [year, month, day, hour, minute, second]
+}
+
+function formatDateTimeValue(year, month, day, hour, minute, second) {
+  return `${formatDateValue(year, month, day)} ${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}:${String(second).padStart(2, '0')}`
 }
 
 function parseMonthValue(value) {
@@ -156,6 +285,18 @@ function formatDateTriggerLabel(value, type = 'date') {
     return `${year}.${month}`
   }
 
+  if (type === 'datetime') {
+    const [datePart, timePart] = String(value).split(' ')
+    if (!datePart || !timePart) {
+      return String(value)
+    }
+    const [year, month, day] = datePart.split('-')
+    if (!year || !month || !day) {
+      return String(value)
+    }
+    return `${year}.${month}.${day} ${timePart}`
+  }
+
   const [year, month, day] = value.split('-')
   if (!year || !month || !day) {
     return value
@@ -163,16 +304,8 @@ function formatDateTriggerLabel(value, type = 'date') {
   return `${year}.${month}.${day}`
 }
 
-function buildAppliedFilters(name = 'all', level = 'all', startDate = '', endDate = '') {
-  return { name, level, startDate, endDate }
-}
-
-function matchAlarmRow(row, filters) {
-  const matchesName = filters.name === 'all' || row.alarmNameKey === filters.name
-  const matchesLevel = filters.level === 'all' || row.level === filters.level
-  const matchesStartDate = !filters.startDate || row.heatingSeason >= filters.startDate
-  const matchesEndDate = !filters.endDate || row.heatingSeason <= filters.endDate
-  return matchesName && matchesLevel && matchesStartDate && matchesEndDate
+function buildAppliedFilters(name = '', grade = '', startTime = '2025-06-01 00:00:00', endTime = '2026-11-31 00:00:00') {
+  return { name, grade, startTime, endTime }
 }
 
 function buildAnalysisSeed(value) {
@@ -252,6 +385,107 @@ function getCurrentDateInfo() {
   }
 }
 
+function formatCurrentMonthValue(currentDateInfo) {
+  return formatMonthValue(currentDateInfo.year, currentDateInfo.month)
+}
+
+function buildDefaultAnalysisQuery(currentDateInfo) {
+  const currentMonth = formatCurrentMonthValue(currentDateInfo)
+  return {
+    dayMonth: currentMonth,
+    monthStart: formatMonthValue(currentDateInfo.year, 1),
+    monthEnd: currentMonth,
+  }
+}
+
+/** 点击「月」：今年 1 月至今年的 12 月 */
+function buildDefaultMonthRangeQuery(currentDateInfo) {
+  const year = currentDateInfo.year
+  return {
+    dayMonth: formatCurrentMonthValue(currentDateInfo),
+    monthStart: formatMonthValue(year, 1),
+    monthEnd: formatMonthValue(year, 12),
+  }
+}
+
+function getTrendTypeValue(scope) {
+  const typeMap = {
+    all: '',
+    'heat-pump': '1',
+    system: '2',
+    device: '3',
+  }
+  return typeMap[scope] ?? ''
+}
+
+function getCategoryScopeValue(scope) {
+  const scopeMap = {
+    'heat-pump': '热泵',
+    'water-pump': '水泵',
+    'liquid-pump': '补液泵',
+  }
+  return scopeMap[scope] ?? '热泵'
+}
+
+function buildOverviewParams(period, query) {
+  if (period === 'month') {
+    return {
+      startDateTime: query.monthStart,
+      endDateTime: query.monthEnd,
+      timeInterval: 'month',
+    }
+  }
+
+  return {
+    startDateTime: query.dayMonth,
+    endDateTime: query.dayMonth,
+    timeInterval: 'day',
+  }
+}
+
+function buildTrendParams(period, query, analysisScope) {
+  return {
+    ...buildOverviewParams(period, query),
+    type: getTrendTypeValue(analysisScope),
+  }
+}
+
+function buildCategoryParams(period, query, categoryScope) {
+  return {
+    ...buildOverviewParams(period, query),
+    type: getCategoryScopeValue(categoryScope),
+  }
+}
+
+function buildDistributionParams(period, query, pieScope, selectedHeatPump) {
+  const baseParams = buildOverviewParams(period, query)
+
+  if (pieScope === 'heat-pump') {
+    return {
+      ...baseParams,
+      heatPump: selectedHeatPump,
+    }
+  }
+
+  if (pieScope === 'device') {
+    return {
+      ...baseParams,
+      device: '',
+    }
+  }
+
+  return baseParams
+}
+
+function getChartMax(values, fallback = 5) {
+  const numericValues = values.filter((value) => Number.isFinite(Number(value))).map((value) => Number(value))
+  const maxValue = Math.max(0, ...numericValues)
+  if (maxValue <= 0) {
+    return fallback
+  }
+  return Math.max(fallback, Math.ceil(maxValue * 1.2))
+}
+
 function buildDayTrendData(monthValue, currentDateInfo) {
   const seed = buildAnalysisSeed(monthValue)
   const { year, month } = parseMonthParts(monthValue)
@@ -272,6 +506,28 @@ function buildMonthTrendData(startMonth, endMonth) {
   const endSeed = buildAnalysisSeed(endMonth)
   return monthRange.map((_, index) =>
     clampToMax100(((startSeed + endSeed + index * 11) % 40) + (index % 3) * 6 + 12),
+  )
+}
+
+function buildScopedTrendData(period, query, currentDateInfo, scope) {
+  const baseData =
+    period === 'day'
+      ? buildDayTrendData(query.dayMonth, currentDateInfo)
+      : buildMonthTrendData(query.monthStart, query.monthEnd)
+
+  if (scope === 'all') {
+    return baseData
+  }
+
+  const offsetMap = {
+    'heat-pump': 4,
+    system: 8,
+    device: 12,
+  }
+  const offset = offsetMap[scope] ?? 0
+
+  return baseData.map((value, index) =>
+    typeof value === 'number' ? clampToMax100(value + ((index + offset) % 6) + Math.floor(offset / 4)) : value,
   )
 }
 
@@ -408,13 +664,14 @@ function DatePickerTrigger({
   onChange,
   type = 'date',
   className = '',
+  modalClassName = '',
   placeholder = '请选择时间',
   title,
   confirmConfig,
 }) {
   const [isOpen, setIsOpen] = useState(false)
   const isEmpty = !value
-  const pickerValue = type === 'month' ? parseMonthValue(value) : parseDateValue(value)
+  const pickerValue = type === 'month' ? parseMonthValue(value) : type === 'datetime' ? parseDateTimeValue(value) : parseDateValue(value)
   const displayValue = isEmpty ? placeholder : formatDateTriggerLabel(value, type)
   const columns =
     type === 'month'
@@ -426,6 +683,13 @@ function DatePickerTrigger({
           { key: 'year', options: DATE_PICKER_YEARS, formatter: (next) => `${next}年` },
           { key: 'month', options: DATE_PICKER_MONTHS, formatter: (next) => `${String(next).padStart(2, '0')}月` },
           { key: 'day', options: DATE_PICKER_DAYS, formatter: (next) => `${String(next).padStart(2, '0')}日` },
+          ...(type === 'datetime'
+            ? [
+                { key: 'hour', options: DATE_PICKER_HOURS, formatter: (next) => `${String(next).padStart(2, '0')}时` },
+                { key: 'minute', options: DATE_PICKER_MINUTES, formatter: (next) => `${String(next).padStart(2, '0')}分` },
+                { key: 'second', options: DATE_PICKER_SECONDS, formatter: (next) => `${String(next).padStart(2, '0')}秒` },
+              ]
+            : []),
         ]
 
   return (
@@ -440,7 +704,8 @@ function DatePickerTrigger({
       </button>
       <TimePickerModal
         isOpen={isOpen}
-        title={title ?? (type === 'month' ? '月份选择' : '日期选择')}
+        className={modalClassName}
+        title={title ?? (type === 'month' ? '月份选择' : type === 'datetime' ? '日期时间选择' : '日期选择')}
         columns={columns}
         value={pickerValue}
         onClose={() => setIsOpen(false)}
@@ -449,6 +714,9 @@ function DatePickerTrigger({
           if (type === 'month') {
             const [year, month] = nextValue
             onChange?.(formatMonthValue(year, month))
+          } else if (type === 'datetime') {
+            const [year, month, day, hour, minute, second] = nextValue
+            onChange?.(formatDateTimeValue(year, month, day, hour, minute, second))
           } else {
             const [year, month, day] = nextValue
             onChange?.(formatDateValue(year, month, day))
@@ -460,7 +728,7 @@ function DatePickerTrigger({
   )
 }
 
-function DetailModal({ row, extraFields = [], onClose }) {
+function DetailModal({ row, extraFields = [], hideDeviceField = false, hideLevelField = false, onClose }) {
   if (!row) {
     return null
   }
@@ -481,18 +749,22 @@ function DetailModal({ row, extraFields = [], onClose }) {
           </button>
         </div>
         <div className="alerts-detail-modal__grid">
-          <div>
-            <span>设备名称</span>
-            <strong>{row.deviceName ?? row.code ?? '--'}</strong>
-          </div>
+          {hideDeviceField ? null : (
+            <div>
+              <span>设备名称</span>
+              <strong>{row.deviceName ?? row.code ?? '--'}</strong>
+            </div>
+          )}
           <div>
             <span>{row.code ? '故障代码' : '告警名称'}</span>
             <strong>{row.code ?? row.alarmName ?? '--'}</strong>
           </div>
-          <div>
-            <span>告警等级</span>
-            <strong>{row.levelText ?? '--'}</strong>
-          </div>
+          {hideLevelField ? null : (
+            <div>
+              <span>告警等级</span>
+              <strong>{row.levelText ?? '--'}</strong>
+            </div>
+          )}
           <div>
             <span>{row.code ? '故障名称' : '发生时间'}</span>
             <strong>{row.code ? row.name : row.happenedAt}</strong>
@@ -509,16 +781,44 @@ function DetailModal({ row, extraFields = [], onClose }) {
               <strong>{row.processedAt}</strong>
             </div>
           ) : null}
-          {extraFields.map((field) => (
-            <div key={field.label} className={field.fullWidth ? 'is-full' : ''}>
-              <span>{field.label}</span>
-              <strong>{field.value}</strong>
-            </div>
-          ))}
+          {extraFields.map((field) => {
+            const fieldKey = field.key ?? field.label ?? 'extra'
+            if (Array.isArray(field.pairTableRows) && field.pairTableRows.length > 0) {
+              return (
+                <div key={fieldKey} className="is-full alerts-detail-modal__pair-block">
+                  {field.label ? <span>{field.label}</span> : null}
+                  <div className="alerts-detail-modal__pair-table-scroll">
+                    <table className="alerts-detail-modal__pair-table">
+                      <thead>
+                        <tr>
+                          <th scope="col">原因分析</th>
+                          <th scope="col">解决方案</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {field.pairTableRows.map((pair, index) => (
+                          <tr key={`${fieldKey}-${index}`}>
+                            <td>{pair.reason ?? '--'}</td>
+                            <td>{pair.solution ?? '--'}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )
+            }
+            return (
+              <div key={fieldKey} className={field.fullWidth ? 'is-full' : ''}>
+                {field.label ? <span>{field.label}</span> : null}
+                <strong>{field.value}</strong>
+              </div>
+            )
+          })}
           {row.suggestion ? (
             <div className="is-full">
               <span>处理建议</span>
-              <strong>{row.suggestion}</strong>
+              <strong className="alerts-detail-modal__multiline">{row.suggestion}</strong>
             </div>
           ) : null}
         </div>
@@ -542,7 +842,42 @@ function EmptyRow({ colSpan = 1, text = '暂无数据' }) {
   )
 }
 
-function BarChart({
+function barChartPropsAreEqual(prev, next) {
+  if (prev.max !== next.max || prev.className !== next.className) {
+    return false
+  }
+  if (prev.xAxisLabelFontSize !== next.xAxisLabelFontSize) {
+    return false
+  }
+  if (prev.xAxisLabelRotate !== next.xAxisLabelRotate) {
+    return false
+  }
+  if (prev.xAxisLabelInterval !== next.xAxisLabelInterval) {
+    return false
+  }
+  if (prev.xData === next.xData && prev.seriesData === next.seriesData) {
+    return true
+  }
+  if (!prev.xData || !next.xData || prev.xData.length !== next.xData.length) {
+    return false
+  }
+  if (!prev.seriesData || !next.seriesData || prev.seriesData.length !== next.seriesData.length) {
+    return false
+  }
+  for (let i = 0; i < prev.xData.length; i += 1) {
+    if (prev.xData[i] !== next.xData[i]) {
+      return false
+    }
+  }
+  for (let i = 0; i < prev.seriesData.length; i += 1) {
+    if (prev.seriesData[i] !== next.seriesData[i]) {
+      return false
+    }
+  }
+  return true
+}
+
+function BarChartInner({
   xData,
   seriesData,
   max = 100,
@@ -622,6 +957,8 @@ function BarChart({
   return <div ref={chartRef} className={`alerts-analysis__chart ${className}`.trim()} />
 }
 
+const BarChart = memo(BarChartInner, barChartPropsAreEqual)
+
 function PieChart({ data }) {
   const chartRef = useRef(null)
   const shouldInitChart = useDeferredVisible(chartRef)
@@ -691,12 +1028,20 @@ function PieChart({ data }) {
 
 function SystemAlarmPage({ onDetailBreadcrumbChange }) {
   const { requestConfirm, confirmModal } = useActionConfirm()
-  const { liveRows, historyRows } = useAlertsStore()
+  const hasInitializedLiveRowsRef = useRef(false)
+  const hasInitializedHistoryRowsRef = useRef(false)
   const [isHistoryView, setIsHistoryView] = useState(false)
-  const [detailRow, setDetailRow] = useState(null)
-  const [liveFilters, setLiveFilters] = useState(() => buildAppliedFilters())
-  const [historyFilters, setHistoryFilters] = useState(() => buildAppliedFilters())
-  const [liveDraft, setLiveDraft] = useState(() => buildAppliedFilters())
+  const [detailModalState, setDetailModalState] = useState(null)
+  const [liveRows, setLiveRows] = useState([])
+  const [historyRows, setHistoryRows] = useState([])
+  const [isLiveLoading, setIsLiveLoading] = useState(false)
+  const [isHistoryLoading, setIsHistoryLoading] = useState(false)
+  const [isDetailLoading, setIsDetailLoading] = useState(false)
+  const [liveTotalPages, setLiveTotalPages] = useState(1)
+  const [historyTotalPages, setHistoryTotalPages] = useState(1)
+  const [liveQuery, setLiveQuery] = useState(() => ({ name: '', grade: '' }))
+  const [historyQuery, setHistoryQuery] = useState(() => buildAppliedFilters())
+  const [liveDraft, setLiveDraft] = useState(() => ({ name: '', grade: '' }))
   const [historyDraft, setHistoryDraft] = useState(() => buildAppliedFilters())
   const [livePage, setLivePage] = useState(1)
   const [historyPage, setHistoryPage] = useState(1)
@@ -706,32 +1051,189 @@ function SystemAlarmPage({ onDetailBreadcrumbChange }) {
     return () => onDetailBreadcrumbChange?.(null)
   }, [isHistoryView, onDetailBreadcrumbChange])
 
-  const filteredLiveRows = useMemo(() => liveRows.filter((row) => matchAlarmRow(row, liveFilters)), [liveFilters, liveRows])
-  const filteredHistoryRows = useMemo(
-    () => historyRows.filter((row) => matchAlarmRow(row, historyFilters)),
-    [historyFilters, historyRows],
-  )
-
-  const liveTotalPages = Math.max(1, Math.ceil(filteredLiveRows.length / ROWS_PER_PAGE))
-  const historyTotalPages = Math.max(1, Math.ceil(filteredHistoryRows.length / ROWS_PER_PAGE))
-  const currentLivePage = Math.min(livePage, liveTotalPages)
   const currentHistoryPage = Math.min(historyPage, historyTotalPages)
 
-  const livePageRows = useMemo(
-    () => filteredLiveRows.slice((currentLivePage - 1) * ROWS_PER_PAGE, currentLivePage * ROWS_PER_PAGE),
-    [currentLivePage, filteredLiveRows],
-  )
-  const historyPageRows = useMemo(
-    () => filteredHistoryRows.slice((currentHistoryPage - 1) * ROWS_PER_PAGE, currentHistoryPage * ROWS_PER_PAGE),
-    [currentHistoryPage, filteredHistoryRows],
-  )
+  const fetchLiveRows = async ({ current, name, grade }) => {
+    setIsLiveLoading(true)
+    try {
+      const response = await queryRealAlarm({ current, name, grade })
+      const list = Array.isArray(response?.data?.data?.realAlarm) ? response.data.data.realAlarm : []
+      const nextTotalPages = Number(response?.data?.data?.totalPage) || 1
+      setLiveRows(list.map(adaptLiveAlarmRow))
+      setLivePage(current)
+      setLiveQuery({ name, grade })
+      setLiveTotalPages(Math.max(1, nextTotalPages))
+    } catch (_error) {
+      requestConfirm(
+        {
+          title: '提示',
+          message: '实时报警数据查询失败，请稍后重试。',
+          confirmText: '知道了',
+          showCancel: false,
+        },
+        undefined,
+      )
+    } finally {
+      setIsLiveLoading(false)
+    }
+  }
 
-  const handleProcess = (row) => {
-    processLiveAlarm({
-      ...row,
-      processedAt: formatDateTime(new Date()),
-      suggestion: row.suggestion + ' 已执行处理并归档到历史告警。',
-    })
+  useEffect(() => {
+    if (hasInitializedLiveRowsRef.current) {
+      return
+    }
+    hasInitializedLiveRowsRef.current = true
+
+    const initializeLiveRows = async () => {
+      setIsLiveLoading(true)
+      try {
+        const response = await queryRealAlarm({ current: 1, name: '', grade: '' })
+        const list = Array.isArray(response?.data?.data?.realAlarm) ? response.data.data.realAlarm : []
+        const nextTotalPages = Number(response?.data?.data?.totalPage) || 1
+        setLiveRows(list.map(adaptLiveAlarmRow))
+        setLivePage(1)
+        setLiveQuery({ name: '', grade: '' })
+        setLiveTotalPages(Math.max(1, nextTotalPages))
+      } catch (_error) {
+        requestConfirm(
+          {
+            title: '提示',
+            message: '实时报警数据查询失败，请稍后重试。',
+            confirmText: '知道了',
+            showCancel: false,
+          },
+          undefined,
+        )
+      } finally {
+        setIsLiveLoading(false)
+      }
+    }
+
+    initializeLiveRows()
+  }, [requestConfirm])
+
+  const fetchHistoryRows = async ({ current, name, grade, startTime, endTime }) => {
+    setIsHistoryLoading(true)
+    try {
+      const response = await queryHisAlarm({ current, name, grade, startTime, endTime })
+      const payload = response?.data?.data ?? response?.data ?? {}
+      const list = Array.isArray(payload?.realAlarm) ? payload.realAlarm : []
+      const nextTotalPages = Number(payload?.totalPage) || 1
+      setHistoryRows(list.map(adaptHistoryAlarmRow))
+      setHistoryPage(current)
+      setHistoryQuery({ name, grade, startTime, endTime })
+      setHistoryTotalPages(Math.max(1, nextTotalPages))
+    } catch (_error) {
+      requestConfirm(
+        {
+          title: '提示',
+          message: '历史告警数据查询失败，请稍后重试。',
+          confirmText: '知道了',
+          showCancel: false,
+        },
+        undefined,
+      )
+    } finally {
+      setIsHistoryLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    if (!isHistoryView || hasInitializedHistoryRowsRef.current) {
+      return
+    }
+    hasInitializedHistoryRowsRef.current = true
+    fetchHistoryRows({ current: 1, ...historyQuery })
+  }, [historyQuery, isHistoryView])
+
+  const handleProcess = async (row) => {
+    if (!row?.id) {
+      return
+    }
+    try {
+      await handleRealAlarm(row.id)
+      await fetchLiveRows({ current: livePage, name: liveQuery.name, grade: liveQuery.grade })
+    } catch (_error) {
+      requestConfirm(
+        {
+          title: '提示',
+          message: '处理失败，请稍后重试。',
+          confirmText: '知道了',
+          showCancel: false,
+        },
+        undefined,
+      )
+    }
+  }
+
+  const handleViewLiveAlarm = async (row) => {
+    if (!row?.id || isDetailLoading) {
+      return
+    }
+    setIsDetailLoading(true)
+    try {
+      const response = await querySingleRealAlarm(row.id)
+      const detail = response?.data?.data?.realAlarm ?? {}
+      const detailRow = {
+        id: String(detail.alarmid ?? row.id),
+        alarmName: detail.alarm_description || '--',
+        levelText: getLiveAlarmLevelText(detail.alarm_grade),
+        happenedAt: detail.alarm_time || '--',
+        suggestion: stringifyAlarmMessageForDetail(detail.alarm_message),
+      }
+      setDetailModalState({
+        row: detailRow,
+        extraFields: [
+          { label: '告警内容', value: detail.alarm_content || '--', fullWidth: true },
+        ],
+      })
+    } catch (_error) {
+      requestConfirm(
+        {
+          title: '提示',
+          message: '告警详情查询失败，请稍后重试。',
+          confirmText: '知道了',
+          showCancel: false,
+        },
+        undefined,
+      )
+    } finally {
+      setIsDetailLoading(false)
+    }
+  }
+
+  const handleDeleteCurrentHistoryPage = () => {
+    if (historyRows.length === 0 || isHistoryLoading) {
+      return
+    }
+
+    const confirmMessage = `确认删除当前页全部历史告警吗？\n\n页码：第 ${historyPage} 页\n条数：${historyRows.length} 条\n\n删除后将无法恢复，请确认操作。`
+
+    requestConfirm(
+      {
+        title: '删除确认',
+        message: confirmMessage,
+        confirmText: '确认删除',
+        cancelText: '取消',
+        showCancel: true,
+      },
+      async () => {
+        try {
+          await deleteCurrentPageHisAlarm({ current: historyPage, ...historyQuery })
+          await fetchHistoryRows({ current: historyPage, ...historyQuery })
+        } catch (_error) {
+          requestConfirm(
+            {
+              title: '提示',
+              message: '当前页历史告警删除失败，请稍后重试。',
+              confirmText: '知道了',
+              showCancel: false,
+            },
+            undefined,
+          )
+        }
+      },
+    )
   }
 
   return (
@@ -742,13 +1244,21 @@ function SystemAlarmPage({ onDetailBreadcrumbChange }) {
             <img src={backIcon} alt="返回" />
           </button>
           <h3>历史告警</h3>
+          <button
+            type="button"
+            className="alerts-page__delete-all-btn"
+            onClick={handleDeleteCurrentHistoryPage}
+            disabled={isHistoryLoading || historyRows.length === 0}
+          >
+            全部删除
+          </button>
         </div>
       ) : null}
 
       {isHistoryView ? (
         <div className="alerts-filter-panel">
           <div className="alerts-filter-panel__row">
-            <LabeledFilterField label="名称" className="alerts-filter-field--history-select">
+            <LabeledFilterField label="类型" className="alerts-filter-field--history-select">
               <SelectDropdown
                 options={ALARM_NAME_OPTIONS}
                 value={historyDraft.name}
@@ -763,8 +1273,8 @@ function SystemAlarmPage({ onDetailBreadcrumbChange }) {
             <LabeledFilterField label="告警等级" className="alerts-filter-field--history-select">
               <SelectDropdown
                 options={ALARM_LEVEL_OPTIONS}
-                value={historyDraft.level}
-                onChange={(value) => setHistoryDraft((previous) => ({ ...previous, level: value }))}
+                value={historyDraft.grade}
+                onChange={(value) => setHistoryDraft((previous) => ({ ...previous, grade: value }))}
 
                 triggerClassName="alerts-filter-field__trigger"
                 dropdownClassName="alerts-filter-field__dropdown"
@@ -778,17 +1288,21 @@ function SystemAlarmPage({ onDetailBreadcrumbChange }) {
               <span className="alerts-filter-range-field__label">时间范围</span>
               <div className="alerts-filter-panel__range-group">
                 <DatePickerTrigger
-                  value={historyDraft.startDate}
-                  onChange={(value) => setHistoryDraft((previous) => ({ ...previous, startDate: value }))}
+                  value={historyDraft.startTime}
+                  onChange={(value) => setHistoryDraft((previous) => ({ ...previous, startTime: value }))}
+                  type="datetime"
                   className="alerts-filter-field__trigger alerts-filter-field--history-date"
-                  title="开始日期选择"
+                  modalClassName="alerts-history-time-picker-modal"
+                  title="开始时间选择"
                 />
                 <span className="alerts-filter-panel__range-sep">-</span>
                 <DatePickerTrigger
-                  value={historyDraft.endDate}
-                  onChange={(value) => setHistoryDraft((previous) => ({ ...previous, endDate: value }))}
+                  value={historyDraft.endTime}
+                  onChange={(value) => setHistoryDraft((previous) => ({ ...previous, endTime: value }))}
+                  type="datetime"
                   className="alerts-filter-field__trigger alerts-filter-field--history-date"
-                  title="结束日期选择"
+                  modalClassName="alerts-history-time-picker-modal"
+                  title="结束时间选择"
                 />
               </div>
             </div>
@@ -796,9 +1310,9 @@ function SystemAlarmPage({ onDetailBreadcrumbChange }) {
               type="button"
               className="alerts-primary-btn alerts-filter-panel__query-btn"
               onClick={() => {
-                setHistoryFilters(historyDraft)
-                setHistoryPage(1)
+                fetchHistoryRows({ current: 1, ...historyDraft })
               }}
+              disabled={isHistoryLoading}
 
 
             >
@@ -808,9 +1322,9 @@ function SystemAlarmPage({ onDetailBreadcrumbChange }) {
         </div>
       ) : (
         <div className="alerts-filter-bar">
-          <LabeledFilterField label="名称">
+          <LabeledFilterField label="类型">
             <SelectDropdown
-              options={ALARM_NAME_OPTIONS}
+              options={LIVE_ALARM_TYPE_OPTIONS}
               value={liveDraft.name}
               onChange={(value) => setLiveDraft((previous) => ({ ...previous, name: value }))}
 
@@ -822,7 +1336,7 @@ function SystemAlarmPage({ onDetailBreadcrumbChange }) {
           </LabeledFilterField>
           <LabeledFilterField label="告警等级">
             <SelectDropdown
-              options={ALARM_LEVEL_OPTIONS}
+              options={LIVE_ALARM_LEVEL_OPTIONS}
               value={liveDraft.level}
               onChange={(value) => setLiveDraft((previous) => ({ ...previous, level: value }))}
 
@@ -835,10 +1349,8 @@ function SystemAlarmPage({ onDetailBreadcrumbChange }) {
           <button
             type="button"
             className="alerts-primary-btn"
-            onClick={() => {
-              setLiveFilters(liveDraft)
-              setLivePage(1)
-            }}
+            onClick={() => fetchLiveRows({ current: 1, name: liveDraft.name, grade: liveDraft.level })}
+            disabled={isLiveLoading}
 
 
           >
@@ -850,49 +1362,63 @@ function SystemAlarmPage({ onDetailBreadcrumbChange }) {
         </div>
       )}
 
-      <div className="alerts-table-wrap">
+      <div className={`alerts-table-wrap ${isHistoryView ? 'alerts-table-wrap--history' : ''}`.trim()}>
         <table className="alerts-table">
           <thead>
             <tr>
-              <th>设备名称</th>
-              <th>告警名称</th>
-              <th>告警等级</th>
-              <th>发生时间</th>
-              {isHistoryView ? <th>处理时间</th> : null}
-              <th>处理建议</th>
-              <th>操作</th>
+              <th className="alerts-table__col-name">告警名称</th>
+              <th className="alerts-table__col-level">告警等级</th>
+              <th className="alerts-table__col-happened">发生时间</th>
+              <th className="alerts-table__col-suggestion">处理建议</th>
+              <th className="alerts-table__col-actions">操作</th>
             </tr>
           </thead>
           <tbody>
-            {(isHistoryView ? historyPageRows : livePageRows).length === 0 ? (
-              <EmptyRow colSpan={isHistoryView ? 7 : 6} />
+            {(isHistoryView ? historyRows : liveRows).length === 0 ? (
+              <EmptyRow colSpan={5} />
             ) : (
-              (isHistoryView ? historyPageRows : livePageRows).map((row) => (
+              (isHistoryView ? historyRows : liveRows).map((row) => (
                 <tr key={row.id}>
-                  <td>{row.deviceName}</td>
-                  <td>{row.alarmName}</td>
-                  <td>{row.levelText}</td>
-                  <td>{row.happenedAt}</td>
-                  {isHistoryView ? <td>{row.processedAt ?? '--'}</td> : null}
-                  <td className="alerts-table__multiline">{row.suggestion}</td>
-                  <td>
+                  <td className="alerts-table__col-name">{row.alarmName}</td>
+                  <td className="alerts-table__col-level">{row.levelText}</td>
+                  <td className="alerts-table__col-happened">{row.happenedAt}</td>
+                  <td className="alerts-table__col-suggestion alerts-table__multiline">{row.suggestion}</td>
+                  <td className="alerts-table__col-actions">
                     <div className="alerts-actions">
                       {isHistoryView ? (
                         <button
                           type="button"
                           className="alerts-primary-btn is-mini is-danger"
-                          onClick={() => requestConfirm({ message: '确认删除告警 ' + row.alarmName + ' 吗？' }, () => deleteHistoryAlarm(row.id))}
+                          onClick={() =>
+                            requestConfirm({ message: '确认删除告警 ' + row.alarmName + ' 吗？' }, async () => {
+                              await deleteHisAlarm(row.id)
+                              await fetchHistoryRows({ current: historyPage, ...historyQuery })
+                            })
+                          }
+                          disabled={isHistoryLoading}
                         >
                           删除
                         </button>
                       ) : (
-                        <button type="button" className="alerts-primary-btn is-mini" onClick={() => requestConfirm({ message: '确认处理告警 ' + row.alarmName + ' 吗？' }, () => handleProcess(row))}>
+                        <button
+                          type="button"
+                          className="alerts-primary-btn is-mini"
+                          onClick={() => requestConfirm({ message: '确认处理告警 ' + row.alarmName + ' 吗？' }, () => handleProcess(row))}
+                          disabled={isLiveLoading}
+                        >
                           处理
                         </button>
                       )}
-                      <button type="button" className="alerts-dark-btn" onClick={() => setDetailRow(row)}>
-                        查看
-                      </button>
+                      {isHistoryView ? null : (
+                        <button
+                          type="button"
+                          className="alerts-dark-btn"
+                          onClick={() => handleViewLiveAlarm(row)}
+                          disabled={isDetailLoading}
+                        >
+                          查看
+                        </button>
+                      )}
                     </div>
                   </td>
                 </tr>
@@ -906,41 +1432,54 @@ function SystemAlarmPage({ onDetailBreadcrumbChange }) {
         <button
           type="button"
           className="alerts-pagination__btn"
-          disabled={(isHistoryView ? currentHistoryPage : currentLivePage) <= 1}
+          disabled={(isHistoryView ? currentHistoryPage : livePage) <= 1 || isLiveLoading || isHistoryLoading}
           onClick={() =>
             isHistoryView
-              ? setHistoryPage(Math.max(1, currentHistoryPage - 1))
-              : setLivePage(Math.max(1, currentLivePage - 1))
+              ? fetchHistoryRows({ current: Math.max(1, historyPage - 1), ...historyQuery })
+              : fetchLiveRows({ current: Math.max(1, livePage - 1), name: liveQuery.name, grade: liveQuery.grade })
           }
         >
           上一页
         </button>
         <span className="alerts-pagination__info">
-          {isHistoryView ? currentHistoryPage : currentLivePage} / {isHistoryView ? historyTotalPages : liveTotalPages}
+          {isHistoryView ? currentHistoryPage : livePage} / {isHistoryView ? historyTotalPages : liveTotalPages}
         </span>
         <button
           type="button"
           className="alerts-pagination__btn"
-          disabled={(isHistoryView ? currentHistoryPage : currentLivePage) >= (isHistoryView ? historyTotalPages : liveTotalPages)}
+          disabled={
+            isHistoryView ? currentHistoryPage >= historyTotalPages || isHistoryLoading : livePage >= liveTotalPages || isLiveLoading
+          }
           onClick={() =>
             isHistoryView
-              ? setHistoryPage(Math.min(historyTotalPages, currentHistoryPage + 1))
-              : setLivePage(Math.min(liveTotalPages, currentLivePage + 1))
+              ? fetchHistoryRows({ current: Math.min(historyTotalPages, historyPage + 1), ...historyQuery })
+              : fetchLiveRows({ current: livePage + 1, name: liveQuery.name, grade: liveQuery.grade })
           }
         >
           下一页
         </button>
       </div>
 
-      <DetailModal row={detailRow} onClose={() => setDetailRow(null)} />
+      <DetailModal
+        row={detailModalState?.row}
+        extraFields={detailModalState?.extraFields ?? []}
+        hideDeviceField={!isHistoryView}
+        onClose={() => setDetailModalState(null)}
+      />
       {confirmModal}
     </div>
   )
 }
 
 function FaultTreePage({ onDetailBreadcrumbChange }) {
-  const [filters, setFilters] = useState({ code: 'all', level: 'all' })
-  const [draftFilters, setDraftFilters] = useState({ code: 'all', level: 'all' })
+  const { requestConfirm, confirmModal } = useActionConfirm()
+  const hasInitializedFaultTreeRef = useRef(false)
+  const [filters, setFilters] = useState({ code: '', name: '' })
+  const [draftFilters, setDraftFilters] = useState({ code: '', name: '' })
+  const [codeOptions, setCodeOptions] = useState(() => faultTreeCacheMap.get(FAULT_TREE_CACHE_KEYS.codeOptions) ?? FAULT_CODE_OPTIONS)
+  const [nameOptions, setNameOptions] = useState(() => faultTreeCacheMap.get(FAULT_TREE_CACHE_KEYS.nameOptions) ?? FAULT_NAME_OPTIONS)
+  const [faultTreeRows, setFaultTreeRows] = useState(() => faultTreeCacheMap.get(FAULT_TREE_CACHE_KEYS.rows) ?? [])
+  const [isFaultTreeLoading, setIsFaultTreeLoading] = useState(false)
   const [detailRow, setDetailRow] = useState(null)
 
   useEffect(() => {
@@ -948,22 +1487,92 @@ function FaultTreePage({ onDetailBreadcrumbChange }) {
     return () => onDetailBreadcrumbChange?.(null)
   }, [onDetailBreadcrumbChange])
 
+  useEffect(() => {
+    if (hasInitializedFaultTreeRef.current) {
+      return
+    }
+    hasInitializedFaultTreeRef.current = true
+
+    const initializeFaultTreeData = async () => {
+      const cachedCodeOptions = faultTreeCacheMap.get(FAULT_TREE_CACHE_KEYS.codeOptions)
+      const cachedNameOptions = faultTreeCacheMap.get(FAULT_TREE_CACHE_KEYS.nameOptions)
+      const cachedRows = faultTreeCacheMap.get(FAULT_TREE_CACHE_KEYS.rows)
+      if (cachedCodeOptions && cachedNameOptions && cachedRows) {
+        setCodeOptions(cachedCodeOptions)
+        setNameOptions(cachedNameOptions)
+        setFaultTreeRows(cachedRows)
+        return
+      }
+
+      setIsFaultTreeLoading(true)
+      try {
+        const [codeResponse, nameResponse, treeResponse] = await Promise.all([
+          cachedCodeOptions ? Promise.resolve(null) : queryFaultCodeSelect(),
+          cachedNameOptions ? Promise.resolve(null) : queryFaultNameSelect(),
+          cachedRows ? Promise.resolve(null) : queryFaultTree({ code: '', name: '' }),
+        ])
+
+        const nextCodeOptions = cachedCodeOptions ?? adaptFaultSelectOptions(codeResponse, FAULT_CODE_OPTIONS)
+        const nextNameOptions = cachedNameOptions ?? adaptFaultSelectOptions(nameResponse, FAULT_NAME_OPTIONS)
+        const nextRows = cachedRows ?? adaptFaultTreeGroups(treeResponse)
+
+        faultTreeCacheMap.set(FAULT_TREE_CACHE_KEYS.codeOptions, nextCodeOptions)
+        faultTreeCacheMap.set(FAULT_TREE_CACHE_KEYS.nameOptions, nextNameOptions)
+        faultTreeCacheMap.set(FAULT_TREE_CACHE_KEYS.rows, nextRows)
+
+        setCodeOptions(nextCodeOptions)
+        setNameOptions(nextNameOptions)
+        setFaultTreeRows(nextRows)
+      } catch (_error) {
+        requestConfirm(
+          {
+            title: '提示',
+            message: '故障树数据查询失败，请稍后重试。',
+            confirmText: '知道了',
+            showCancel: false,
+          },
+          undefined,
+        )
+      } finally {
+        setIsFaultTreeLoading(false)
+      }
+    }
+
+    initializeFaultTreeData()
+  }, [requestConfirm])
+
   const filteredGroups = useMemo(
     () =>
-      FAULT_TREE_ROWS.filter((row) => {
-        const matchesCode = filters.code === 'all' || row.code === filters.code
-        const matchesLevel = filters.level === 'all' || row.level === filters.level
-        return matchesCode && matchesLevel
+      faultTreeRows.filter((row) => {
+        const matchesCode = !filters.code || row.code === filters.code
+        const matchesName = !filters.name || row.name === filters.name
+        return matchesCode && matchesName
       }),
-    [filters],
+    [faultTreeRows, filters],
   )
 
+  const buildFaultTreePairRows = (group) => {
+    if (!group) {
+      return [{ reason: '--', solution: '--' }]
+    }
+    const reasons = Array.isArray(group.reasons) ? group.reasons : []
+    const plans = Array.isArray(group.plans) ? group.plans : []
+    const count = Math.max(reasons.length, plans.length)
+    if (count === 0) {
+      return [{ reason: '--', solution: '--' }]
+    }
+    return Array.from({ length: count }, (_, index) => ({
+      reason: reasons[index] != null && String(reasons[index]).trim() !== '' ? String(reasons[index]) : '--',
+      solution: String(plans[index] ?? plans[plans.length - 1] ?? '--'),
+    }))
+  }
+
   return (
-    <div className="alerts-page">
+    <div className="alerts-page alerts-page--fault-tree">
       <div className="alerts-filter-bar">
         <LabeledFilterField label="故障代码">
           <SelectDropdown
-            options={FAULT_CODE_OPTIONS}
+            options={codeOptions}
             value={draftFilters.code}
             onChange={(value) => setDraftFilters((previous) => ({ ...previous, code: value }))}
 
@@ -973,26 +1582,23 @@ function FaultTreePage({ onDetailBreadcrumbChange }) {
             triggerAriaLabel="选择故障代码"
           />
         </LabeledFilterField>
-        <LabeledFilterField label="告警等级">
+        <LabeledFilterField label="故障名称">
           <SelectDropdown
-            options={ALARM_LEVEL_OPTIONS}
-            value={draftFilters.level}
-            onChange={(value) => setDraftFilters((previous) => ({ ...previous, level: value }))}
+            options={nameOptions}
+            value={draftFilters.name}
+            onChange={(value) => setDraftFilters((previous) => ({ ...previous, name: value }))}
 
             triggerClassName="alerts-filter-field__trigger"
             dropdownClassName="alerts-filter-field__dropdown"
             optionClassName="alerts-filter-field__option"
-            triggerAriaLabel="选择告警等级"
+            triggerAriaLabel="选择故障名称"
           />
         </LabeledFilterField>
         <button
           type="button"
           className="alerts-primary-btn"
           onClick={() => setFilters(draftFilters)}
-
-
-
-
+          disabled={isFaultTreeLoading}
         >
           查询
         </button>
@@ -1000,11 +1606,17 @@ function FaultTreePage({ onDetailBreadcrumbChange }) {
 
       <div className="alerts-table-wrap">
         <table className="alerts-table alerts-table--fault-tree">
+          <colgroup>
+            <col className="alerts-table--fault-tree__col-code" />
+            <col className="alerts-table--fault-tree__col-name" />
+            <col className="alerts-table--fault-tree__col-reason" />
+            <col className="alerts-table--fault-tree__col-solution" />
+            <col className="alerts-table--fault-tree__col-actions" />
+          </colgroup>
           <thead>
             <tr>
               <th>故障代码</th>
               <th>故障名称</th>
-              <th>告警等级</th>
               <th>原因分析</th>
               <th>解决方案</th>
               <th>操作</th>
@@ -1012,14 +1624,13 @@ function FaultTreePage({ onDetailBreadcrumbChange }) {
           </thead>
           <tbody>
             {filteredGroups.length === 0 ? (
-              <EmptyRow colSpan={6} />
+              <EmptyRow colSpan={5} text={isFaultTreeLoading ? '加载中...' : '暂无数据'} />
             ) : (
               filteredGroups.map((group) =>
                 group.reasons.map((reason, index) => (
                   <tr key={group.code + '-' + index}>
                     {index === 0 ? <td rowSpan={group.reasons.length}>{group.code}</td> : null}
                     {index === 0 ? <td rowSpan={group.reasons.length}>{group.name}</td> : null}
-                    {index === 0 ? <td rowSpan={group.reasons.length}>{group.levelText}</td> : null}
                     <td>{reason}</td>
                     <td>{group.plans[index] ?? group.plans[group.plans.length - 1] ?? '--'}</td>
                     {index === 0 ? (
@@ -1041,13 +1652,11 @@ function FaultTreePage({ onDetailBreadcrumbChange }) {
 
       <DetailModal
         row={detailRow}
-        extraFields={[
-          { label: '原因分析', value: detailRow?.reasons?.join('；') ?? '--', fullWidth: true },
-          { label: '解决方案', value: detailRow?.plans?.join('；') ?? '--', fullWidth: true },
-        ]}
+        extraFields={[{ key: 'fault-tree-reason-solution', pairTableRows: buildFaultTreePairRows(detailRow), fullWidth: true }]}
+        hideLevelField
         onClose={() => setDetailRow(null)}
       />
-
+      {confirmModal}
     </div>
   )
 }
@@ -1056,20 +1665,12 @@ function AlarmAnalysisPage({ onDetailBreadcrumbChange }) {
   const { requestConfirm, confirmModal } = useActionConfirm()
   const [period, setPeriod] = useState('day')
   const [mode, setMode] = useState('trend')
-  const [categoryScope, setCategoryScope] = useState('system')
-  const [pieScope, setPieScope] = useState('device')
-  const [selectedHeatPump, setSelectedHeatPump] = useState('all')
-  const [currentDateInfo, setCurrentDateInfo] = useState(() => getCurrentDateInfo())
-  const [query, setQuery] = useState({
-    dayMonth: '2026-03',
-    monthStart: '2026-01',
-    monthEnd: '2026-03',
-  })
-  const [draftQuery, setDraftQuery] = useState({
-    dayMonth: '2026-03',
-    monthStart: '2026-01',
-    monthEnd: '2026-03',
-  })
+  const [analysisScope, setAnalysisScope] = useState('all')
+  const [categoryScope, setCategoryScope] = useState('heat-pump')
+  const [pieScope, setPieScope] = useState('heat-pump')
+  const [selectedHeatPump, setSelectedHeatPump] = useState('')
+  const [query, setQuery] = useState(() => buildDefaultAnalysisQuery(getCurrentDateInfo()))
+  const [draftQuery, setDraftQuery] = useState(() => buildDefaultAnalysisQuery(getCurrentDateInfo()))
 
   useEffect(() => {
     onDetailBreadcrumbChange?.(null)
@@ -1077,39 +1678,32 @@ function AlarmAnalysisPage({ onDetailBreadcrumbChange }) {
   }, [onDetailBreadcrumbChange])
 
   useEffect(() => {
-    const timer = window.setInterval(() => setCurrentDateInfo(getCurrentDateInfo()), 60_000)
-    return () => window.clearInterval(timer)
-  }, [])
+    if (pieScope !== 'heat-pump' && selectedHeatPump !== '') {
+      setSelectedHeatPump('')
+    }
+  }, [pieScope, selectedHeatPump])
 
-  const dayXAxis = useMemo(() => {
-    const { year, month } = parseMonthParts(query.dayMonth)
-    const daysInMonth = getMonthDayCount(year, month)
-    return Array.from({ length: daysInMonth }, (_, index) => `${index + 1}号`)
-  }, [query.dayMonth])
-
-  const monthXAxis = useMemo(
-    () => enumerateMonthRange(query.monthStart, query.monthEnd).map((value) => formatMonthAxisLabel(value)),
-    [query.monthEnd, query.monthStart],
+  const overviewParams = useMemo(() => buildOverviewParams(period, query), [period, query])
+  const trendParams = useMemo(() => buildTrendParams(period, query, analysisScope), [analysisScope, period, query])
+  const categoryParams = useMemo(() => buildCategoryParams(period, query, categoryScope), [categoryScope, period, query])
+  const distributionParams = useMemo(
+    () => buildDistributionParams(period, query, pieScope, selectedHeatPump),
+    [period, pieScope, query, selectedHeatPump],
   )
 
-  const trendData = useMemo(
-    () =>
-      period === 'day'
-        ? buildDayTrendData(query.dayMonth, currentDateInfo)
-        : buildMonthTrendData(query.monthStart, query.monthEnd),
-    [currentDateInfo, period, query],
-  )
-  const trendXAxis = useMemo(
-    () => (period === 'day' ? dayXAxis : monthXAxis),
-    [dayXAxis, monthXAxis, period],
-  )
-  const categoryData = useMemo(() => buildScopedCategoryData(period, query, categoryScope), [categoryScope, period, query])
-  const activeHeatPump = pieScope === 'heat-pump' ? selectedHeatPump : 'all'
-  const pieData = useMemo(
-    () => buildScopedPieData(period, query, pieScope, activeHeatPump),
-    [activeHeatPump, period, pieScope, query],
-  )
-  const summary = useMemo(() => buildSummary(period, query, currentDateInfo), [currentDateInfo, period, query])
+  const { data: summary } = useAlarmOverviewQuery({ params: overviewParams })
+  const { data: trendData } = useAlarmTrendQuery({ params: trendParams, enabled: mode === 'trend' })
+  const { data: categoryData } = useAlarmCategoryQuery({ params: categoryParams, enabled: mode === 'category' })
+  const { data: distributionData } = useAlarmDistributionQuery({
+    scope: pieScope,
+    params: distributionParams,
+    enabled: mode === 'category',
+  })
+  const { data: heatPumpOptions } = useHeatPumpSelectOptionsQuery({ enabled: mode === 'category' })
+
+  const trendMax = useMemo(() => getChartMax(trendData.series, 5), [trendData.series])
+  const categoryMax = useMemo(() => getChartMax(categoryData.series, 5), [categoryData.series])
+  const shouldShowHeatPumpSelect = pieScope === 'heat-pump'
 
   const handleAnalysisQuery = () => {
     if (period === 'month' && compareMonthValue(draftQuery.monthStart, draftQuery.monthEnd) > 0) {
@@ -1128,11 +1722,76 @@ function AlarmAnalysisPage({ onDetailBreadcrumbChange }) {
     setQuery(draftQuery)
   }
 
+  const handlePeriodChange = (nextPeriod) => {
+    const info = getCurrentDateInfo()
+    const nextQuery = nextPeriod === 'month' ? buildDefaultMonthRangeQuery(info) : buildDefaultAnalysisQuery(info)
+    setPeriod(nextPeriod)
+    setDraftQuery(nextQuery)
+    setQuery(nextQuery)
+  }
+
+  const handleModeChange = (nextMode) => {
+    setMode(nextMode)
+    if (nextMode === 'category') {
+      setCategoryScope('heat-pump')
+      setPieScope('heat-pump')
+      setSelectedHeatPump('')
+    }
+  }
+
+  const distributionLegendRef = useRef(null)
+  const distributionLegendDragRef = useRef({
+    activePointerId: null,
+    startY: 0,
+    startScroll: 0,
+  })
+
+  const onDistributionLegendPointerDown = useCallback((e) => {
+    if (e.button !== 0) return
+    const el = distributionLegendRef.current
+    if (!el || el.scrollHeight <= el.clientHeight) return
+    distributionLegendDragRef.current = {
+      activePointerId: e.pointerId,
+      startY: e.clientY,
+      startScroll: el.scrollTop,
+    }
+    el.setPointerCapture(e.pointerId)
+    el.classList.add('is-dragging')
+  }, [])
+
+  const onDistributionLegendPointerMove = useCallback((e) => {
+    const { activePointerId, startY, startScroll } = distributionLegendDragRef.current
+    if (activePointerId == null || e.pointerId !== activePointerId) return
+    const el = distributionLegendRef.current
+    if (!el) return
+    el.scrollTop = startScroll - (e.clientY - startY)
+  }, [])
+
+  const endDistributionLegendDrag = useCallback((e) => {
+    const { activePointerId } = distributionLegendDragRef.current
+    if (activePointerId == null || e.pointerId !== activePointerId) return
+    const el = distributionLegendRef.current
+    if (el) {
+      if (e.type !== 'lostpointercapture') {
+        try {
+          el.releasePointerCapture(e.pointerId)
+        } catch {
+          /* already released */
+        }
+      }
+      el.classList.remove('is-dragging')
+    }
+    distributionLegendDragRef.current = {
+      activePointerId: null,
+      startY: 0,
+      startScroll: 0,
+    }
+  }, [])
+
   return (
     <div className="alerts-analysis">
       <div className="alerts-analysis__toolbar">
         <div className="alerts-analysis__range-field">
-          <span className="alerts-analysis__range-label">{period === 'day' ? '年月' : '时间范围'}</span>
           <div className="alerts-analysis__range-group">
             {period === 'day' ? (
               <DatePickerTrigger
@@ -1175,10 +1834,10 @@ function AlarmAnalysisPage({ onDetailBreadcrumbChange }) {
         </div>
 
         <div className="alerts-analysis__period-switch">
-          <button type="button" className={period === 'day' ? 'is-active' : ''} onClick={() => setPeriod('day')}>
+          <button type="button" className={period === 'day' ? 'is-active' : ''} onClick={() => handlePeriodChange('day')}>
             日
           </button>
-          <button type="button" className={period === 'month' ? 'is-active' : ''} onClick={() => setPeriod('month')}>
+          <button type="button" className={period === 'month' ? 'is-active' : ''} onClick={() => handlePeriodChange('month')}>
             月
           </button>
         </div>
@@ -1187,19 +1846,19 @@ function AlarmAnalysisPage({ onDetailBreadcrumbChange }) {
       <div className="alerts-analysis__summary">
         <article>
           <span>系统故障数量</span>
-          <strong>{summary.total} 条</strong>
+          <strong>{summary.alarmsNumber} 条</strong>
         </article>
         <article>
           <span>未处理告警数量</span>
-          <strong>{summary.pending} 条</strong>
+          <strong>{summary.unhandleAlarmsNumber} 条</strong>
         </article>
         <article>
-          <span>高故障率设备</span>
-          <strong>{summary.hottestDevice}</strong>
+          <span>高故障率热泵</span>
+          <strong>{summary.mostHeatPump}</strong>
         </article>
         <article>
           <span>常见故障</span>
-          <strong>{summary.commonAlarm}</strong>
+          <strong>{summary.mostAlarmType}</strong>
         </article>
       </div>
 
@@ -1207,24 +1866,40 @@ function AlarmAnalysisPage({ onDetailBreadcrumbChange }) {
         <SelectDropdown
           options={ANALYSIS_TREND_OPTIONS}
           value={mode}
-          onChange={setMode}
+          onChange={handleModeChange}
 
           className="alerts-analysis__mode-select"
           triggerClassName="alerts-analysis__mode-trigger"
           dropdownClassName="alerts-analysis__mode-dropdown"
           optionClassName="alerts-analysis__mode-option"
         />
+        {mode === 'trend' ? (
+          <div className="alerts-analysis__scope-switch" role="radiogroup" aria-label="告警范围筛选">
+            {ANALYSIS_SCOPE_SWITCH_OPTIONS.map((option) => (
+              <button
+                key={option.value}
+                type="button"
+                role="radio"
+                aria-checked={analysisScope === option.value}
+                className={analysisScope === option.value ? 'is-active' : ''}
+                onClick={() => setAnalysisScope(option.value)}
+              >
+                {option.label}
+              </button>
+            ))}
+          </div>
+        ) : null}
       </div>
 
       {mode === 'trend' ? (
-        <BarChart xData={trendXAxis} seriesData={trendData} max={60} />
+        <BarChart xData={trendData.xAxis} seriesData={trendData.series} max={trendMax} />
       ) : (
         <div className="alerts-analysis__category-grid">
           <div className="alerts-analysis__category-card">
             <div className="alerts-analysis__card-head">
               <div className="alerts-analysis__card-title">告警分类统计</div>
               <SelectDropdown
-                options={ANALYSIS_SCOPE_LABEL_OPTIONS}
+                options={CATEGORY_STATS_OPTIONS}
                 value={categoryScope}
                 onChange={setCategoryScope}
 
@@ -1236,13 +1911,13 @@ function AlarmAnalysisPage({ onDetailBreadcrumbChange }) {
               />
             </div>
             <BarChart
-              xData={categoryData.map((item) => item.name)}
-              seriesData={categoryData.map((item) => item.value)}
-              max={40}
+              xData={categoryData.xAxis}
+              seriesData={categoryData.series}
+              max={categoryMax}
               className="alerts-analysis__chart--compact"
-              xAxisLabelInterval={categoryScope === 'heat-pump' ? (index) => index === 0 || (index + 1) % 5 === 0 : 0}
-              xAxisLabelRotate={categoryScope === 'heat-pump' ? 0 : undefined}
-              xAxisLabelFontSize={categoryScope === 'heat-pump' ? 14 : undefined}
+              xAxisLabelInterval={CATEGORY_STATS_SCOPE_SET.has(categoryScope) ? categoryBarDenseLabelInterval : 0}
+              xAxisLabelRotate={CATEGORY_STATS_SCOPE_SET.has(categoryScope) ? 0 : undefined}
+              xAxisLabelFontSize={CATEGORY_STATS_SCOPE_SET.has(categoryScope) ? 14 : undefined}
             />
           </div>
           <div className="alerts-analysis__category-card alerts-analysis__category-card--distribution">
@@ -1260,9 +1935,9 @@ function AlarmAnalysisPage({ onDetailBreadcrumbChange }) {
                   optionClassName="alerts-analysis__card-option"
                   triggerAriaLabel="选择告警占比统计范围"
                 />
-                {pieScope === 'heat-pump' ? (
+                {shouldShowHeatPumpSelect ? (
                   <SelectDropdown
-                    options={HEAT_PUMP_FILTER_OPTIONS}
+                    options={heatPumpOptions}
                     value={selectedHeatPump}
                     onChange={setSelectedHeatPump}
 
@@ -1276,15 +1951,25 @@ function AlarmAnalysisPage({ onDetailBreadcrumbChange }) {
               </div>
             </div>
             <div className="alerts-analysis__pie-wrap alerts-analysis__pie-wrap--distribution">
-              <PieChart data={pieData} />
-              <ul className="alerts-analysis__pie-legend">
-                {pieData.map((item) => (
-                  <li key={item.name}>
-                    <span style={{ background: item.color }} />
-                    <em>{item.name}</em>
-                  </li>
-                ))}
-              </ul>
+              <PieChart data={distributionData.pieData} />
+              <div
+                ref={distributionLegendRef}
+                className="alerts-analysis__pie-legend-scroll"
+                onPointerDown={onDistributionLegendPointerDown}
+                onPointerMove={onDistributionLegendPointerMove}
+                onPointerUp={endDistributionLegendDrag}
+                onPointerCancel={endDistributionLegendDrag}
+                onLostPointerCapture={endDistributionLegendDrag}
+              >
+                <ul className="alerts-analysis__pie-legend">
+                  {distributionData.pieData.map((item) => (
+                    <li key={item.name}>
+                      <span style={{ background: item.color }} />
+                      <em>{item.name}</em>
+                    </li>
+                  ))}
+                </ul>
+              </div>
             </div>
           </div>
         </div>
