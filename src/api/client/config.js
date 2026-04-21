@@ -59,6 +59,8 @@ export const ALGORITHM_PROCESS_IDS = {
   QUERY_INIT_STATE: 'queryInitState',
   DEVICE_UNLOCK: 'deviceUnlock',
   WRITE_REALVAL_BY_LONG_NAMES: 'writeRealvalByLongNames',
+  QUERY_REALVAL_BY_LONG_NAMES: 'queryRealvalByLongNames',
+  QUERY_MANUAL_SWITCH: 'queryManualSwitch',
   QUERY_SYSTEM_CONFIG: 'querySystemConfig',
   QUERY_TEMP_24_HOUR: 'queryTemp24hour',
   QUERY_HEAT_PUMP_ARRANGE: 'queryHeatPumpArrange',
