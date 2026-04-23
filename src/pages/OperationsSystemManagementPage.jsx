@@ -323,7 +323,7 @@ function buildSmartStartStopItems() {
     createValueMetric('smart-start-unload-cycle', '减载周期', '10 分钟', '分钟', 'duration'),
     createValueMetric('smart-start-min-freq', '最低频率', '5 Hz', 'Hz', 'frequency'),
     createValueMetric('smart-start-max-freq', '最高频率', '14 Hz', 'Hz', 'frequency'),
-    createValueMetric('smart-start-cooling-diff', '制冷温差设定', '10.0 ℃', '℃', 'temperature'),
+    // createValueMetric('smart-start-cooling-diff', '制冷温差设定', '10.0 ℃', '℃', 'temperature'),
   ]
 }
 

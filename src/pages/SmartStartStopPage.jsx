@@ -1,11 +1,23 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import AttentionModal from '../components/AttentionModal'
 import LabeledSelectRow from '../components/LabeledSelectRow'
 import { useActionConfirm } from '../hooks/useActionConfirm'
+import { usePollRealvals } from '../hooks/usePollRealvals'
+import { useWriteWithDelayedVerify } from '../hooks/useWriteWithDelayedVerify'
+import { queryRealvalByLongNames, writeRealvalByLongNames } from '../api/modules/settings'
+import { extractRealvalMap } from '../utils/realvalMap'
 import './SmartStartStopPage.css'
 
 const SLIDER_MIN = 30
 const SLIDER_MAX = 120
 const SLIDER_THUMB_WIDTH = 56
+
+const LN_JJZWC = 'Sys\\FinforWorx\\JJZWC'
+const LN_JZZQ1 = 'Sys\\FinforWorx\\JZZQ1'
+const LN_JZZQ2 = 'Sys\\FinforWorx\\JZZQ2'
+const LN_ZDPL = 'Sys\\FinforWorx\\ZDPL'
+const LN_ZGPL = 'Sys\\FinforWorx\\ZGPL'
+const SMART_START_POLL = [LN_JJZWC, LN_JZZQ1, LN_JZZQ2, LN_ZDPL, LN_ZGPL]
 
 function valueFromTrackClick(event, min, max) {
   const rect = event.currentTarget.getBoundingClientRect()
@@ -18,17 +30,99 @@ function valueFromTrackClick(event, min, max) {
   return Math.round(rawValue)
 }
 
+function toDisplayString(v, fallback) {
+  if (v == null || v === '') return fallback
+  const n = Number(v)
+  if (!Number.isFinite(n)) return String(v)
+  return String(n)
+}
+
+function parseFreq(n) {
+  const x = Math.round(Number(n))
+  if (!Number.isFinite(x)) return null
+  return Math.min(SLIDER_MAX, Math.max(SLIDER_MIN, x))
+}
+
+function applyFreqPairFromMap(valueMap, setMinFreq, setMaxFreq) {
+  const ra = valueMap[LN_ZDPL]
+  const rb = valueMap[LN_ZGPL]
+  if (ra == null && rb == null) return
+  let nextMin = parseFreq(ra)
+  let nextMax = parseFreq(rb)
+  if (nextMin == null && nextMax == null) return
+  if (nextMin == null) nextMin = SLIDER_MIN
+  if (nextMax == null) nextMax = SLIDER_MAX
+  if (nextMax <= nextMin) {
+    if (nextMax < SLIDER_MAX) nextMax = nextMin + 1
+    else nextMin = nextMax - 1
+  }
+  if (nextMin < SLIDER_MIN) nextMin = SLIDER_MIN
+  if (nextMax > SLIDER_MAX) nextMax = SLIDER_MAX
+  if (nextMax <= nextMin) {
+    nextMax = Math.min(SLIDER_MAX, nextMin + 1)
+  }
+  setMinFreq(nextMin)
+  setMaxFreq(nextMax)
+}
+
 function SmartStartStopPage() {
   const { requestConfirm, confirmModal } = useActionConfirm()
+  const [attentionMessage, setAttentionMessage] = useState('')
+  const onWriteNotify = useCallback((message) => {
+    setAttentionMessage(message)
+  }, [])
+
+  const { performWrite, isMountedRef } = useWriteWithDelayedVerify({
+    write: writeRealvalByLongNames,
+    onNotify: onWriteNotify,
+  })
+
   const [tempDiff, setTempDiff] = useState('10')
   const [loadCycle, setLoadCycle] = useState('10')
   const [unloadCycle, setUnloadCycle] = useState('10')
-  const [coolingDiff, setCoolingDiff] = useState('10')
   const [minFreq, setMinFreq] = useState(55)
   const [maxFreq, setMaxFreq] = useState(120)
   const freqRangeStartRef = useRef({ minFreq: 55, maxFreq: 120 })
   const freqRangeValueRef = useRef({ minFreq: 55, maxFreq: 120 })
   const isFreqRangeDraggingRef = useRef(false)
+
+  const applyValueMap = useCallback((valueMap) => {
+    if (!valueMap || !isMountedRef.current) return
+    if (Object.prototype.hasOwnProperty.call(valueMap, LN_JJZWC)) {
+      setTempDiff(toDisplayString(valueMap[LN_JJZWC], '10'))
+    }
+    if (Object.prototype.hasOwnProperty.call(valueMap, LN_JZZQ1)) {
+      setLoadCycle(toDisplayString(valueMap[LN_JZZQ1], '10'))
+    }
+    if (Object.prototype.hasOwnProperty.call(valueMap, LN_JZZQ2)) {
+      setUnloadCycle(toDisplayString(valueMap[LN_JZZQ2], '10'))
+    }
+    applyFreqPairFromMap(valueMap, setMinFreq, setMaxFreq)
+  }, [isMountedRef])
+
+  const verifyLongNames = useCallback(
+    async (longNames) => {
+      try {
+        const response = await queryRealvalByLongNames(longNames)
+        const m = extractRealvalMap(response)
+        if (m) applyValueMap(m)
+      } catch {
+        // ignore
+      }
+    },
+    [applyValueMap],
+  )
+
+  const handleValueWrite = (longName, nextStr, setLocal) => {
+    const n = Number(nextStr)
+    const payload = Number.isFinite(n) ? { [longName]: n } : { [longName]: nextStr }
+    performWrite(payload, {
+      optimisticApply: () => setLocal(nextStr),
+      delayedVerify: () => verifyLongNames([longName]),
+    })
+  }
+
+  usePollRealvals(SMART_START_POLL, applyValueMap)
 
   const rangeText = useMemo(() => `${minFreq}  -  ${maxFreq}`, [minFreq, maxFreq])
   const sliderTrackStyle = useMemo(
@@ -42,7 +136,12 @@ function SmartStartStopPage() {
   const requestFreqRangeConfirm = (nextMinFreq, nextMaxFreq, previousRange) => {
     requestConfirm(
       { message: `确认将频率区间设定为 ${nextMinFreq} - ${nextMaxFreq} Hz 吗？` },
-      () => {},
+      () => {
+        performWrite(
+          { [LN_ZDPL]: nextMinFreq, [LN_ZGPL]: nextMaxFreq },
+          { delayedVerify: () => verifyLongNames([LN_ZDPL, LN_ZGPL]) },
+        )
+      },
       () => {
         setMinFreq(previousRange.minFreq)
         setMaxFreq(previousRange.maxFreq)
@@ -131,7 +230,7 @@ function SmartStartStopPage() {
             description="维持系统温度在目标温度的偏差范围"
             value={tempDiff}
             suffix="℃"
-            onChange={setTempDiff}
+            onChange={(v) => handleValueWrite(LN_JJZWC, v, setTempDiff)}
             useModeCardControl
             confirmConfig={({ nextValue }) => ({ message: `确认将加减载温差设置为 ${nextValue} ℃吗？` })}
           />
@@ -141,7 +240,7 @@ function SmartStartStopPage() {
             description="用于评估和执行热泵启动操作时间间隔"
             value={loadCycle}
             suffix="分钟"
-            onChange={setLoadCycle}
+            onChange={(v) => handleValueWrite(LN_JZZQ1, v, setLoadCycle)}
             useModeCardControl
             confirmConfig={({ nextValue }) => ({ message: `确认将加载周期设置为 ${nextValue} 分钟吗？` })}
           />
@@ -151,7 +250,7 @@ function SmartStartStopPage() {
             description="用于评估和执行热泵停止操作时间间隔"
             value={unloadCycle}
             suffix="分钟"
-            onChange={setUnloadCycle}
+            onChange={(v) => handleValueWrite(LN_JZZQ2, v, setUnloadCycle)}
             useModeCardControl
             confirmConfig={({ nextValue }) => ({ message: `确认将卸载周期设置为 ${nextValue} 分钟吗？` })}
           />
@@ -198,18 +297,19 @@ function SmartStartStopPage() {
               />
             </div>
           </div>
-
-          <LabeledSelectRow
-            label="制冷温差设定（℃）"
-            value={coolingDiff}
-            suffix="℃"
-            onChange={setCoolingDiff}
-            useModeCardControl
-            confirmConfig={({ nextValue }) => ({ message: `确认将制冷温差设置为 ${nextValue} ℃吗？` })}
-          />
         </div>
       </section>
       {confirmModal}
+      <AttentionModal
+        isOpen={Boolean(attentionMessage)}
+        title="提示"
+        message={attentionMessage}
+        confirmText="确认"
+        showCancel={false}
+        onClose={() => setAttentionMessage('')}
+        onConfirm={() => setAttentionMessage('')}
+        zIndex={300}
+      />
     </main>
   )
 }

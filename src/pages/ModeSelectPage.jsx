@@ -25,6 +25,7 @@ import constantPressurePumpIcon from '../assets/constant-pressure-pump.svg'
 import pressureReliefValveIcon from '../assets/pressure-relief-valve.svg'
 import drainValveIcon from '../assets/drain-value.svg'
 import { useActionConfirm } from '../hooks/useActionConfirm'
+import { useWriteWithDelayedVerify } from '../hooks/useWriteWithDelayedVerify'
 import { getStoredClimateMode, setStoredClimateMode } from '../utils/climateModeState'
 import { getStoredTemperatureMode, setStoredTemperatureMode } from '../utils/temperatureModeState'
 import {
@@ -187,8 +188,6 @@ const MANUAL_DEVICE_TYPE_PARAM_MAP = {
 }
 
 const POLL_INTERVAL_MS = 10_000
-// 下置成功后延迟回读的毫秒数（给后端点位值生效留时间）
-const VERIFY_DELAY_MS = 3000
 
 // 将接口返回的 0/1 或 "0"/"1" 统一为布尔
 function isOnValue(value) {
@@ -202,14 +201,6 @@ function extractRealvalMap(response) {
   const data = payload.data
   if (!data || typeof data !== 'object') return null
   return data
-}
-
-// 统一判断下置是否成功：msg 为 "执行成功!" 或 success === true
-function isWriteSuccess(response) {
-  const payload = response?.data
-  if (!payload) return false
-  if (payload.success === true) return true
-  return String(payload.msg ?? '').includes('执行成功')
 }
 
 // 从 queryManualSwitch 响应中取设备列表
@@ -232,6 +223,7 @@ function ModeSettingCard({
   onArrowClick,
   hasTargetPage,
   toggleConfirmConfig,
+  toggleDisabled = false,
 }) {
   const isClimateCard = id === 'climate'
   const isConstantMode = isClimateCard && !isEnabled
@@ -279,9 +271,10 @@ function ModeSettingCard({
           checked={isEnabled}
           onToggle={onToggle}
           forceOnStyle={isConstantMode}
-          ariaLabel={`${title}${isEnabled ? '关闭' : '开启'}`}
-          className="mode-select-page__switch"
-          confirmConfig={toggleConfirmConfig}
+          ariaLabel={toggleDisabled ? `${title}已开启` : `${title}${isEnabled ? '关闭' : '开启'}`}
+          className={`mode-select-page__switch${toggleDisabled ? ' mode-select-page__switch--locked-on' : ''}`}
+          confirmConfig={toggleDisabled ? null : toggleConfirmConfig}
+          disabled={toggleDisabled}
         />
       </div>
     </article>
@@ -301,37 +294,14 @@ function ModeSelectPage() {
   const [manualDeviceList, setManualDeviceList] = useState([])
   const [attentionMessage, setAttentionMessage] = useState('')
 
-  const isMountedRef = useRef(true)
-  const verifyTimersRef = useRef(new Set())
-
-  useEffect(() => {
-    isMountedRef.current = true
-    const timers = verifyTimersRef.current
-    return () => {
-      isMountedRef.current = false
-      timers.forEach((id) => window.clearTimeout(id))
-      timers.clear()
-    }
+  const onWriteNotify = useCallback((message) => {
+    setAttentionMessage(message)
   }, [])
 
-  const safeSet = useCallback((setter, value) => {
-    if (isMountedRef.current) setter(value)
-  }, [])
-
-  // 下置成功后 VERIFY_DELAY_MS 毫秒再跑一次回读，用来校正乐观更新
-  const scheduleVerify = useCallback((verifyFn) => {
-    if (typeof verifyFn !== 'function') return
-    const timerId = window.setTimeout(() => {
-      verifyTimersRef.current.delete(timerId)
-      if (!isMountedRef.current) return
-      try {
-        verifyFn()
-      } catch {
-        // swallow
-      }
-    }, VERIFY_DELAY_MS)
-    verifyTimersRef.current.add(timerId)
-  }, [])
+  const { performWrite, isMountedRef } = useWriteWithDelayedVerify({
+    write: writeRealvalByLongNames,
+    onNotify: onWriteNotify,
+  })
 
   // 将 queryRealvalByLongNames 返回的值应用到页面状态
   const applyRealvalMap = useCallback(
@@ -404,29 +374,6 @@ function ModeSelectPage() {
       }
     },
     [],
-  )
-
-  // 写入并提示；成功后：立即乐观更新页面 → 提示保存成功 → 延迟回读做最终校正
-  const performWrite = useCallback(
-    async (writeData, { optimisticApply, delayedVerify } = {}) => {
-      try {
-        const response = await writeRealvalByLongNames(writeData)
-        if (isWriteSuccess(response)) {
-          if (typeof optimisticApply === 'function' && isMountedRef.current) {
-            optimisticApply()
-          }
-          safeSet(setAttentionMessage, '保存成功')
-          scheduleVerify(delayedVerify)
-          return true
-        }
-        safeSet(setAttentionMessage, '下置失败，请重试')
-        return false
-      } catch {
-        safeSet(setAttentionMessage, '下置失败，请重试')
-        return false
-      }
-    },
-    [safeSet, scheduleVerify],
   )
 
   // 手动模式下的"当前设备类型"通过 ref 暴露给轮询使用，避免依赖变化导致轮询重置
@@ -527,8 +474,9 @@ function ModeSelectPage() {
   // 点击模式调节里的开关
   const handleSettingToggle = useCallback(
     (cardId) => {
+      if (cardId === 'start-stop') return
       const longName = SETTING_CARD_LONG_NAME_MAP[cardId]
-      // start-stop 没有对应点位，走本地切换
+      // 无后端点位的其它模块走本地切换（智能启停已固定为开，不进入此分支）
       if (!longName) {
         setSettingState((prev) => ({ ...prev, [cardId]: !prev[cardId] }))
         return
@@ -630,24 +578,28 @@ function ModeSelectPage() {
         <section className="mode-select-page__section">
           <h2 className="mode-select-page__section-title">模式调节</h2>
           <div className="mode-select-page__setting-grid">
-            {settingCards.map((item) => (
-              <ModeSettingCard
-                key={item.id}
-                id={item.id}
-                title={item.title}
-                subtitle={item.subtitle}
-                description={item.description}
-                isEnabled={Boolean(settingState[item.id])}
-                onToggle={() => handleSettingToggle(item.id)}
-                statusIcon={item.statusIcon}
-                statusIconActive={item.statusIconActive}
-                hasTargetPage={item.hasTargetPage}
-                onArrowClick={item.routePath ? () => navigate(item.routePath) : undefined}
-                toggleConfirmConfig={({ nextChecked }) => ({
-                  message: `确认${nextChecked ? '开启' : '关闭'}${item.title}吗？`,
-                })}
-              />
-            ))}
+            {settingCards.map((item) => {
+              const isStartStopLocked = item.id === 'start-stop'
+              return (
+                <ModeSettingCard
+                  key={item.id}
+                  id={item.id}
+                  title={item.title}
+                  subtitle={item.subtitle}
+                  description={item.description}
+                  isEnabled={isStartStopLocked ? true : Boolean(settingState[item.id])}
+                  onToggle={() => handleSettingToggle(item.id)}
+                  statusIcon={item.statusIcon}
+                  statusIconActive={item.statusIconActive}
+                  hasTargetPage={item.hasTargetPage}
+                  onArrowClick={item.routePath ? () => navigate(item.routePath) : undefined}
+                  toggleConfirmConfig={({ nextChecked }) => ({
+                    message: `确认${nextChecked ? '开启' : '关闭'}${item.title}吗？`,
+                  })}
+                  toggleDisabled={isStartStopLocked}
+                />
+              )
+            })}
           </div>
         </section>
       ) : (

@@ -66,6 +66,8 @@ export const ALGORITHM_PROCESS_IDS = {
   QUERY_HEAT_PUMP_ARRANGE: 'queryHeatPumpArrange',
   QUERY_HEAT_PUMP_PARAM: 'queryHeatPumpParam',
   QUERY_ALL_HEAT_PUMP_PARAM: 'queryAllHeatPumpParam',
+  QUERY_UNIFY_WRITE_DATA: 'queryUnifyWriteData',
+  QUERY_HEAT_PUMP_DATA: 'queryHeatPumpData',
   QUERY_REAL_ALARM: 'queryRealAlarm',
   HANDLE_REAL_ALARM: 'handleRealAlarm',
   SINGLE_REAL_ALARM: 'singleRealAlarm',

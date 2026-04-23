@@ -1,7 +1,12 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import AttentionModal from '../components/AttentionModal'
 import FeatureInfoCard from '../components/FeatureInfoCard'
 import LabeledSelectRow from '../components/LabeledSelectRow'
 import { useActionConfirm } from '../hooks/useActionConfirm'
+import { usePollRealvals } from '../hooks/usePollRealvals'
+import { useWriteWithDelayedVerify } from '../hooks/useWriteWithDelayedVerify'
+import { queryRealvalByLongNames, writeRealvalByLongNames } from '../api/modules/settings'
+import { extractRealvalMap, isOnValue } from '../utils/realvalMap'
 import peakValleyIcon from '../assets/peak-valley-white.svg'
 import './PeakValleyPage.css'
 
@@ -10,6 +15,14 @@ const STRENGTH_MINUTES_LIMIT = 300
 const STRENGTH_CENTER_VALUE = STRENGTH_MINUTES_LIMIT
 const STRENGTH_MAX_VALUE = STRENGTH_MINUTES_LIMIT * 2
 const STRENGTH_SLIDER_THUMB_WIDTH = 56
+const STRENGTH_STEP_MINUTES = 6
+
+const LN_GFTJ = 'Sys\\FinforWorx\\GFTJ'
+const LN_XNBCZ = 'Sys\\FinforWorx\\XNBCZ'
+const LN_FYCZ = 'Sys\\FinforWorx\\FYCZ'
+const LN_XNQD = 'Sys\\FinforWorx\\XNQD'
+const LN_XNCXZ = 'Sys\\FinforWorx\\XNCXZ'
+const PEAK_VALLEY_POLL = [LN_GFTJ, LN_XNBCZ, LN_FYCZ, LN_XNQD, LN_XNCXZ]
 
 function isThumbHit(clientX, rect, value, min, max) {
   const axisStart = STRENGTH_SLIDER_THUMB_WIDTH / 2
@@ -21,8 +34,6 @@ function isThumbHit(clientX, rect, value, min, max) {
   return Math.abs(pointerX - thumbCenter) <= STRENGTH_SLIDER_THUMB_WIDTH / 2
 }
 
-const STRENGTH_STEP_MINUTES = 6
-
 function minutesToText(minutes) {
   const decimalHours = Math.round((minutes / 60) * 10) / 10
   return String(decimalHours)
@@ -32,8 +43,31 @@ function roundToStep(minutes) {
   return Math.round(minutes / STRENGTH_STEP_MINUTES) * STRENGTH_STEP_MINUTES
 }
 
+function toDisplayString(v) {
+  if (v == null || v === '') return '0'
+  const n = Number(v)
+  if (Number.isFinite(n)) return String(n)
+  return String(v)
+}
+
+function parseMinutes(n) {
+  const x = Math.round(Number(n))
+  if (!Number.isFinite(x)) return null
+  return Math.min(STRENGTH_MINUTES_LIMIT, Math.max(0, x))
+}
+
 function PeakValleyPage() {
   const { requestConfirm, confirmModal } = useActionConfirm()
+  const [attentionMessage, setAttentionMessage] = useState('')
+  const onWriteNotify = useCallback((message) => {
+    setAttentionMessage(message)
+  }, [])
+
+  const { performWrite, isMountedRef } = useWriteWithDelayedVerify({
+    write: writeRealvalByLongNames,
+    onNotify: onWriteNotify,
+  })
+
   const [isEnabled, setIsEnabled] = useState(true)
   const [compensation, setCompensation] = useState('2')
   const [expenseRate, setExpenseRate] = useState('50')
@@ -43,6 +77,45 @@ function PeakValleyPage() {
   const strengthRangeStartRef = useRef({ chargeMinutes: 90, releaseMinutes: 90 })
   const strengthRangeValueRef = useRef({ chargeMinutes: 90, releaseMinutes: 90 })
   const isStrengthDraggingRef = useRef(false)
+
+  const applyValueMap = useCallback(
+    (valueMap) => {
+      if (!valueMap || !isMountedRef.current) return
+      if (Object.prototype.hasOwnProperty.call(valueMap, LN_GFTJ)) {
+        setIsEnabled(isOnValue(valueMap[LN_GFTJ]))
+      }
+      if (Object.prototype.hasOwnProperty.call(valueMap, LN_XNBCZ)) {
+        setCompensation(toDisplayString(valueMap[LN_XNBCZ]))
+      }
+      if (Object.prototype.hasOwnProperty.call(valueMap, LN_FYCZ)) {
+        setExpenseRate(toDisplayString(valueMap[LN_FYCZ]))
+      }
+      if (Object.prototype.hasOwnProperty.call(valueMap, LN_XNQD)) {
+        const m = parseMinutes(valueMap[LN_XNQD])
+        if (m != null) setChargeMinutes(m)
+      }
+      if (Object.prototype.hasOwnProperty.call(valueMap, LN_XNCXZ)) {
+        const m = parseMinutes(valueMap[LN_XNCXZ])
+        if (m != null) setReleaseMinutes(m)
+      }
+    },
+    [isMountedRef],
+  )
+
+  const verifyLongNames = useCallback(
+    async (longNames) => {
+      try {
+        const response = await queryRealvalByLongNames(longNames)
+        const m = extractRealvalMap(response)
+        if (m) applyValueMap(m)
+      } catch {
+        // ignore
+      }
+    },
+    [applyValueMap],
+  )
+
+  usePollRealvals(PEAK_VALLEY_POLL, applyValueMap)
 
   const chargeText = useMemo(() => minutesToText(chargeMinutes), [chargeMinutes])
   const releaseText = useMemo(() => minutesToText(releaseMinutes), [releaseMinutes])
@@ -59,7 +132,12 @@ function PeakValleyPage() {
   const requestStrengthConfirm = (nextChargeMinutes, nextReleaseMinutes, previousRange) => {
     requestConfirm(
       { message: `确认将蓄能强度设置为蓄热 ${minutesToText(nextChargeMinutes)}、放热 ${minutesToText(nextReleaseMinutes)} 吗？` },
-      () => {},
+      () => {
+        performWrite(
+          { [LN_XNQD]: nextChargeMinutes, [LN_XNCXZ]: nextReleaseMinutes },
+          { delayedVerify: () => verifyLongNames([LN_XNQD, LN_XNCXZ]) },
+        )
+      },
       () => {
         setChargeMinutes(previousRange.chargeMinutes)
         setReleaseMinutes(previousRange.releaseMinutes)
@@ -167,7 +245,6 @@ function PeakValleyPage() {
       window.clearTimeout(strengthFinalizeTimeoutRef.current)
     }
 
-    // Touch taps on range inputs may dispatch change after pointerup.
     strengthFinalizeTimeoutRef.current = window.setTimeout(() => {
       finalizeStrengthInteraction()
     }, 0)
@@ -195,21 +272,43 @@ function PeakValleyPage() {
     }
   }, [])
 
+  const handleToggle = () => {
+    const next = !isEnabled
+    performWrite(
+      { [LN_GFTJ]: next ? 1 : 0 },
+      {
+        optimisticApply: () => setIsEnabled(next),
+        delayedVerify: () => verifyLongNames([LN_GFTJ]),
+      },
+    )
+  }
+
+  const handleCompensationChange = (v) => {
+    const n = Number(v)
+    const payload = Number.isFinite(n) ? { [LN_XNBCZ]: n } : { [LN_XNBCZ]: v }
+    performWrite(payload, {
+      optimisticApply: () => setCompensation(v),
+      delayedVerify: () => verifyLongNames([LN_XNBCZ]),
+    })
+  }
+
+  const handleExpenseChange = (v) => {
+    const n = Number(v)
+    const payload = Number.isFinite(n) ? { [LN_FYCZ]: n } : { [LN_FYCZ]: v }
+    performWrite(payload, {
+      optimisticApply: () => setExpenseRate(v),
+      delayedVerify: () => verifyLongNames([LN_FYCZ]),
+    })
+  }
+
   return (
     <main className="peak-valley-page">
       <FeatureInfoCard
         icon={peakValleyIcon}
         iconAlt="热电协同"
         title="热电协同"
-        // description={
-        //   <>
-        //     开启时，处于低电时段，提升运行目标温度，
-        //     <br />
-        //     进行蓄热，当前模式仅适用于供热
-        //   </>
-        // }
         selected={isEnabled}
-        onClick={() => setIsEnabled((previous) => !previous)}
+        onClick={handleToggle}
         className="peak-valley-page__card"
         confirmConfig={({ nextSelected }) => ({
           message: `确认${nextSelected ? '开启' : '关闭'}热电协同吗？`,
@@ -222,7 +321,7 @@ function PeakValleyPage() {
           <LabeledSelectRow
             label="蓄能补偿值"
             value={compensation}
-            onChange={setCompensation}
+            onChange={handleCompensationChange}
             useModeCardControl
             disabled={!isEnabled}
             confirmConfig={({ nextValue }) => ({ message: `确认将蓄能补偿值设置为 ${nextValue} 吗？` })}
@@ -285,10 +384,8 @@ function PeakValleyPage() {
 
           <LabeledSelectRow
             label="费用倍率值"
-            // description="放热区间费用比蓄热区间费用的差值"
             value={expenseRate}
-            // suffix="%"
-            onChange={setExpenseRate}
+            onChange={handleExpenseChange}
             useModeCardControl
             disabled={!isEnabled}
             confirmConfig={({ nextValue }) => ({ message: `确认将费用倍率值设置为 ${nextValue} 吗？` })}
@@ -296,6 +393,16 @@ function PeakValleyPage() {
         </div>
       </section>
       {confirmModal}
+      <AttentionModal
+        isOpen={Boolean(attentionMessage)}
+        title="提示"
+        message={attentionMessage}
+        confirmText="确认"
+        showCancel={false}
+        onClose={() => setAttentionMessage('')}
+        onConfirm={() => setAttentionMessage('')}
+        zIndex={300}
+      />
     </main>
   )
 }

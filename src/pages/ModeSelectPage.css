@@ -311,6 +311,12 @@
   filter: grayscale(1) brightness(1.4);
 }
 
+/* 智能启停：禁用开关但保持与「开启」一致的视觉，避免默认 :disabled 变淡 */
+.mode-select-page__switch.mode-select-page__switch--locked-on:disabled {
+  opacity: 1;
+  cursor: not-allowed;
+}
+
 .mode-select-page__switch {
   --toggle-width: 56px;
   --toggle-height: 32px;

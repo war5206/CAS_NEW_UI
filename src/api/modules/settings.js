@@ -36,6 +36,29 @@ export async function writeRealvalByLongNames(writeData) {
   })
 }
 
+/** 查询热泵批量控制下置点位配置 */
+export async function queryUnifyWriteData() {
+  return callAlgorithmProcess(ALGORITHM_PROCESS_IDS.QUERY_UNIFY_WRITE_DATA, {})
+}
+
+/**
+ * 查询单台热泵数据
+ * @param {{ code: string, alarm?: string, run?: string }} params
+ */
+export async function queryHeatPumpData(params) {
+  const { code = 'No1', alarm = 'false', run = 'false' } = params ?? {}
+  return callAlgorithmProcess(ALGORITHM_PROCESS_IDS.QUERY_HEAT_PUMP_DATA, {
+    code,
+    alarm,
+    run,
+  })
+}
+
+/** 查询热泵下拉选择项 */
+export async function queryHeatPumpSelect() {
+  return callAlgorithmProcess(ALGORITHM_PROCESS_IDS.QUERY_HEAT_PUMP_SELECT, {})
+}
+
 /**
  * 查询手动设备开关列表
  * @param {string} type - 设备类型（如 "热泵"、"热泵循环泵" 等）
