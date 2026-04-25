@@ -4,15 +4,16 @@ import { useCallback, useEffect, useRef } from 'react'
 export const DEFAULT_WRITE_VERIFY_DELAY_MS = 3000
 
 /**
- * 统一判断下置是否成功：msg 为「执行成功!」或 success === true
- * @param {unknown} response
+ * 统一判断下置是否成功：接口 body 的 `data.state === 'success'`
+ * @param {unknown} response - axios 响应，body 在 `response.data`
  * @returns {boolean}
  */
 export function isWriteSuccess(response) {
   const payload = response?.data
-  if (!payload) return false
-  if (payload.success === true) return true
-  return String(payload.msg ?? '').includes('执行成功')
+  if (!payload || typeof payload !== 'object') return false
+  const data = payload.data
+  if (data == null || typeof data !== 'object') return false
+  return data.state === 'success'
 }
 
 /**
@@ -22,7 +23,7 @@ export function isWriteSuccess(response) {
  * @param {object} options
  * @param {(data: Record<string, unknown>) => Promise<unknown>} options.write
  *        下置函数，如 `writeRealvalByLongNames`。
- * @param {(response: unknown) => boolean} [options.isWriteSuccess] 成功判定，默认本模块的 `isWriteSuccess`。
+ * @param {(response: unknown) => boolean} [options.isWriteSuccess] 成功判定，默认以 `data.state === 'success'` 判断。
  * @param {number} [options.verifyDelayMs] 回读延迟毫秒，默认 `DEFAULT_WRITE_VERIFY_DELAY_MS`。
  * @param {(message: string) => void} [options.onNotify] 成功/失败时提示（仅在组件仍挂载时调用）。
  * @returns {{

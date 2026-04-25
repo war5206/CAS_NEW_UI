@@ -189,6 +189,14 @@ const MANUAL_DEVICE_TYPE_PARAM_MAP = {
 
 const POLL_INTERVAL_MS = 10_000
 
+// 相同长名集合的并发 query 合并为单次 HTTP 请求，避免 React 18 StrictMode 下
+// useEffect 双调用时重复打接口，同时不影响分次、非并发的回读
+const realvalQueryInflight = new Map()
+
+function makeRealvalQueryKey(longNames) {
+  return JSON.stringify([...longNames].slice().sort())
+}
+
 // 将接口返回的 0/1 或 "0"/"1" 统一为布尔
 function isOnValue(value) {
   return value === 1 || value === '1'
@@ -284,6 +292,7 @@ function ModeSettingCard({
 function ModeSelectPage() {
   const { requestConfirm, confirmModal } = useActionConfirm()
   const navigate = useNavigate()
+  const [isInitialSyncing, setIsInitialSyncing] = useState(true)
   const [featureMode, setFeatureMode] = useState('smart')
   const [temperatureMode, setTemperatureMode] = useState(() => getStoredTemperatureMode())
   const [settingState, setSettingState] = useState(() => ({
@@ -345,14 +354,24 @@ function ModeSelectPage() {
   // 查询一组点位并应用到状态
   const fetchRealvals = useCallback(
     async (longNames) => {
-      try {
-        const response = await queryRealvalByLongNames(longNames)
-        const valueMap = extractRealvalMap(response)
-        applyRealvalMap(valueMap)
-        return valueMap
-      } catch {
-        return null
+      const key = makeRealvalQueryKey(longNames)
+      if (!realvalQueryInflight.has(key)) {
+        const queryPromise = (async () => {
+          try {
+            const response = await queryRealvalByLongNames(longNames)
+            return extractRealvalMap(response)
+          } catch {
+            return null
+          }
+        })()
+        queryPromise.finally(() => {
+          realvalQueryInflight.delete(key)
+        })
+        realvalQueryInflight.set(key, queryPromise)
       }
+      const valueMap = await realvalQueryInflight.get(key)
+      applyRealvalMap(valueMap)
+      return valueMap
     },
     [applyRealvalMap],
   )
@@ -378,6 +397,7 @@ function ModeSelectPage() {
 
   // 手动模式下的"当前设备类型"通过 ref 暴露给轮询使用，避免依赖变化导致轮询重置
   const manualPollContextRef = useRef({ featureMode, manualDeviceType })
+  const initialModeSyncedRef = useRef(false)
   useEffect(() => {
     manualPollContextRef.current = { featureMode, manualDeviceType }
   }, [featureMode, manualDeviceType])
@@ -386,13 +406,25 @@ function ModeSelectPage() {
   // - 智能模式：模式点位 + 制热制冷 + 5 个开关点位
   // - 手动模式：模式点位 + 制热制冷 + 对应设备类型的手动设备列表
   useEffect(() => {
-    const pollOnce = () => {
+    const pollOnce = async () => {
       const { featureMode: fm, manualDeviceType: mt } = manualPollContextRef.current
+      let valueMap = null
       if (fm === 'manual') {
-        fetchRealvals(MANUAL_MODE_POLL_LONG_NAMES)
-        fetchManualSwitch(mt)
+        valueMap = await fetchRealvals(MANUAL_MODE_POLL_LONG_NAMES)
+        await fetchManualSwitch(mt)
       } else {
-        fetchRealvals(SMART_MODE_POLL_LONG_NAMES)
+        valueMap = await fetchRealvals(SMART_MODE_POLL_LONG_NAMES)
+      }
+
+      if (
+        !initialModeSyncedRef.current &&
+        valueMap &&
+        Object.prototype.hasOwnProperty.call(valueMap, LONG_NAME_SYSTEM_OPERATING_MODE)
+      ) {
+        initialModeSyncedRef.current = true
+        if (isMountedRef.current) {
+          setIsInitialSyncing(false)
+        }
       }
     }
     pollOnce()
@@ -400,7 +432,7 @@ function ModeSelectPage() {
     return () => {
       window.clearInterval(timerId)
     }
-  }, [fetchRealvals, fetchManualSwitch])
+  }, [fetchRealvals, fetchManualSwitch, isMountedRef])
 
   // 页面进入时，若当前已是手动模式，立即拉取手动设备列表
   useEffect(() => {
@@ -536,6 +568,15 @@ function ModeSelectPage() {
     },
     [fetchManualSwitch, manualDeviceType, performWrite],
   )
+
+  if (isInitialSyncing) {
+    return (
+      <main className="mode-select-page mode-select-page--loading" aria-busy="true">
+        <div className="mode-select-page__loading-spinner" aria-hidden />
+        <p className="mode-select-page__loading-text">正在同步模式状态...</p>
+      </main>
+    )
+  }
 
   return (
     <main className="mode-select-page">

@@ -4,9 +4,11 @@ import TimePickerModal from '../TimePickerModal'
 import AttentionModal from '../AttentionModal'
 import addIcon from '../../assets/icons/add.svg'
 import editIcon from '../../assets/edit.svg'
-import { saveEnergyPricePlan } from '../../api/modules/home'
+import { queryEnergyPrice, saveEnergyPrice, saveEnergyPricePlan } from '../../api/modules/home'
 import {
   ENERGY_PRICE_SEGMENT_COLORS,
+  buildEnergyPriceStateFromQueryResponse,
+  getDefaultEnergyPriceState,
   getStoredEnergyPriceState,
   getStoredEnergyPriceStateForGuide,
   setStoredEnergyPriceState,
@@ -230,6 +232,23 @@ const SystemParamsEnergyPrice = forwardRef(function SystemParamsEnergyPrice(
     setAlertDialog({ open: false, title: '', message: '' })
   }, [])
 
+  const loadFromServer = useCallback(async () => {
+    try {
+      const response = await queryEnergyPrice()
+      const nextState = buildEnergyPriceStateFromQueryResponse(response?.data?.data ?? response?.data)
+      setEnergyPriceState(nextState)
+      setSavedEnergyPriceState(deepClone(nextState))
+      persistStoredEnergyPriceState(nextState)
+      return true
+    } catch {
+      const fallback = getDefaultEnergyPriceState()
+      setEnergyPriceState(fallback)
+      setSavedEnergyPriceState(deepClone(fallback))
+      persistStoredEnergyPriceState(fallback)
+      return false
+    }
+  }, [persistStoredEnergyPriceState])
+
   const commit = useCallback(() => {
     if (variant === 'guide') {
       if (!isPositivePriceInput(energyPriceState.waterFixed)) {
@@ -255,7 +274,36 @@ const SystemParamsEnergyPrice = forwardRef(function SystemParamsEnergyPrice(
     return true
   }, [energyPriceState, openAlertDialog, persistStoredEnergyPriceState, variant])
 
-  useImperativeHandle(ref, () => ({ commit }), [commit])
+  const saveToServer = useCallback(async () => {
+    const isCommitOk = commit()
+    if (!isCommitOk) {
+      return false
+    }
+    try {
+      const payload = [
+        {
+          energyTypeCode: 'WATER',
+          fixedPrice: String(energyPriceState?.waterFixed ?? '').trim(),
+        },
+        {
+          energyTypeCode: 'GAS',
+          fixedPrice: String(energyPriceState?.gasFixed ?? '').trim(),
+        },
+      ]
+      const response = await saveEnergyPrice(payload)
+      if (response?.data?.state !== 'success') {
+        openAlertDialog('提示', response?.data?.message || '保存失败')
+        return false
+      }
+      await loadFromServer()
+      return true
+    } catch (error) {
+      openAlertDialog('提示', error?.message || '保存失败，请检查网络')
+      return false
+    }
+  }, [commit, energyPriceState, loadFromServer, openAlertDialog])
+
+  useImperativeHandle(ref, () => ({ commit, loadFromServer, saveToServer }), [commit, loadFromServer, saveToServer])
 
   const openNumberPad = (field, moduleKey = null) => {
     setKeypadState({ open: true, field, moduleKey })

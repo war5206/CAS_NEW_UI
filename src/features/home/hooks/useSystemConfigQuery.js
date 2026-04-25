@@ -20,10 +20,12 @@ export function useSystemConfigQuery({ enabled = true } = {}) {
     lastSuccessRef.current = query.data
   }
 
+  const hasFetchedData = Boolean(query.data ?? lastSuccessRef.current)
   const data = query.data ?? lastSuccessRef.current ?? createDefaultSystemConfig()
 
   return {
     ...query,
     data,
+    hasFetchedData,
   }
 }

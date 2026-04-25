@@ -58,7 +58,7 @@ function ReliefValvePage() {
     [applyValueMap],
   )
 
-  usePollRealvals(RELIEF_VALVE_POLL, applyValueMap)
+  const { isInitialAttemptDone } = usePollRealvals(RELIEF_VALVE_POLL, applyValueMap)
 
   const handleWrite = (longName, valueStr, setLocal) => {
     const n = Number(valueStr)
@@ -67,6 +67,15 @@ function ReliefValvePage() {
       optimisticApply: () => setLocal(valueStr),
       delayedVerify: () => verifyLongNames([longName]),
     })
+  }
+
+  if (!isInitialAttemptDone) {
+    return (
+      <main className="device-param-page page-initial-loading" aria-busy="true">
+        <div className="page-initial-loading__spinner" aria-hidden />
+        <p className="page-initial-loading__text">正在同步页面数据...</p>
+      </main>
+    )
   }
 
   return (

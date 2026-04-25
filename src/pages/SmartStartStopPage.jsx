@@ -122,7 +122,7 @@ function SmartStartStopPage() {
     })
   }
 
-  usePollRealvals(SMART_START_POLL, applyValueMap)
+  const { isInitialAttemptDone } = usePollRealvals(SMART_START_POLL, applyValueMap)
 
   const rangeText = useMemo(() => `${minFreq}  -  ${maxFreq}`, [minFreq, maxFreq])
   const sliderTrackStyle = useMemo(
@@ -219,6 +219,15 @@ function SmartStartStopPage() {
       window.removeEventListener('pointercancel', handlePointerRelease)
     }
   }, [requestConfirm, minFreq, maxFreq])
+
+  if (!isInitialAttemptDone) {
+    return (
+      <main className="smart-start-stop-page page-initial-loading" aria-busy="true">
+        <div className="page-initial-loading__spinner" aria-hidden />
+        <p className="page-initial-loading__text">正在同步页面数据...</p>
+      </main>
+    )
+  }
 
   return (
     <main className="smart-start-stop-page">

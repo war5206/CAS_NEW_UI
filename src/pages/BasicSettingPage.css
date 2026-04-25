@@ -159,6 +159,11 @@
   cursor: pointer;
 }
 
+.basic-setting-page__search-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
 .basic-setting-page__table-wrap {
   border: 1px solid rgba(151, 180, 219, 0.45);
   border-radius: 20px;
@@ -217,4 +222,34 @@
 .basic-setting-page__table th:nth-child(4),
 .basic-setting-page__table td:nth-child(4) {
   width: 48%;
+}
+
+.basic-setting-page__pagination {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 14px;
+}
+
+.basic-setting-page__page-button {
+  min-width: 104px;
+  height: 46px;
+  border: 1px solid rgba(151, 180, 219, 0.45);
+  border-radius: 14px;
+  background: #202734;
+  color: #fff;
+  font-size: 18px;
+  cursor: pointer;
+}
+
+.basic-setting-page__page-button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.basic-setting-page__page-info {
+  min-width: 120px;
+  text-align: center;
+  color: rgba(255, 255, 255, 0.86);
+  font-size: 18px;
 }

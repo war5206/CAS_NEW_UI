@@ -70,7 +70,7 @@ function HeatPumpLoopPumpPage() {
     [applyValueMap],
   )
 
-  usePollRealvals(HP_LOOP_PUMP_POLL, applyValueMap)
+  const { isInitialAttemptDone } = usePollRealvals(HP_LOOP_PUMP_POLL, applyValueMap)
 
   const handleWrite = (longName, valueStr, setLocal) => {
     const n = Number(valueStr)
@@ -89,6 +89,15 @@ function HeatPumpLoopPumpPage() {
         optimisticApply: () => setIsIntervalSavingEnabled(next),
         delayedVerify: () => verifyLongNames([LN_HPXHB1]),
       },
+    )
+  }
+
+  if (!isInitialAttemptDone) {
+    return (
+      <main className="hp-loop-pump-page page-initial-loading" aria-busy="true">
+        <div className="page-initial-loading__spinner" aria-hidden />
+        <p className="page-initial-loading__text">正在同步页面数据...</p>
+      </main>
     )
   }
 

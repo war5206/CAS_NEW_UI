@@ -63,6 +63,12 @@ export const ALGORITHM_PROCESS_IDS = {
   QUERY_MANUAL_SWITCH: 'queryManualSwitch',
   QUERY_SYSTEM_CONFIG: 'querySystemConfig',
   QUERY_TEMP_24_HOUR: 'queryTemp24hour',
+  QUERY_WEATHER_COMPENSATE_CURVE: 'queryWeatherCompensateCurve',
+  SAVE_WEATHER_COMPENSATE_GEAR: 'saveWeatherCompensateGear',
+  SAVE_WEATHER_COMPENSATE_CURVE: 'saveWeatherCompensateCurve',
+  SAVE_INDOOR_TEMPERATURE: 'saveIndoorTemperature',
+  QUERY_CUSTOMIZE_CURVE: 'queryCustomizeCurve',
+  SAVE_CUSTOMIZE_CURVE: 'saveCustomizeCurve',
   QUERY_HEAT_PUMP_ARRANGE: 'queryHeatPumpArrange',
   QUERY_HEAT_PUMP_PARAM: 'queryHeatPumpParam',
   QUERY_ALL_HEAT_PUMP_PARAM: 'queryAllHeatPumpParam',
@@ -84,4 +90,27 @@ export const ALGORITHM_PROCESS_IDS = {
   GIVE_ALARM_HEAT_PUMP_DISTRIBUTION: 'giveAlarmHeatPumpDistribution',
   GIVE_ALARM_SYSTEM_DISTRIBUTION: 'giveAlarmSystemDistribution',
   GIVE_ALARM_DEVICE_DISTRIBUTION: 'giveAlarmDeviceDistribution',
+  /** 系统参数 — 项目系统类型：查询/保存 */
+  QUERY_PROJECT_DATA: 'queryProjectData',
+  SAVE_PROJECT_DATA: 'saveProjectData',
+  /** 系统参数 — 循环泵台数：查询/保存 */
+  QUERY_CIRCULATION_PUMP: 'queryCirculationPump',
+  SAVE_CIRCULATION_PUMP: 'saveCirculationPump',
+  /** 系统参数 — 主板类型：查询/保存 */
+  QUERY_MOTHERBOARD_DATA: 'queryMotherboardData',
+  UPDATE_MOTHERBOARD_DATA: 'updateMotherboardData',
+  /** 系统参数 — 耦合能源：查询 */
+  QUERY_COUPLE_ENERGY: 'queryCoupleEnergy',
+  /** 系统参数 — 耦合能源：保存 */
+  SAVE_COUPLE_ENERGY: 'saveCoupleEnergy',
+  /** 基础设置 — 操作日志：查询 */
+  READ_OPERATION_LOGS: 'readOperationLog',
+  /** 基础设置 — 参数重置 */
+  RESET_PARAMETER: 'resetParameter',
+  /** 基础设置 — 恢复出厂 */
+  RESTORE_ORIGINAL: 'restoreOriginal',
+  /** 基础设置 — 重启 PLC：保存 EF 数据 */
+  SAVE_PLC_POINT_EF_DATA: 'savePLCPointEFData',
+  /** 基础设置 — 重启 PLC：下置 EF 数据 */
+  WRITE_PLC_POINT_EF_DATA: 'writePLCPointEFData',
 }

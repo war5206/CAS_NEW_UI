@@ -90,7 +90,7 @@ function DrainValvePage() {
     [applyValueMap],
   )
 
-  usePollRealvals(DRAIN_VALVE_POLL, applyValueMap)
+  const { isInitialAttemptDone } = usePollRealvals(DRAIN_VALVE_POLL, applyValueMap)
 
   const handleTimeChange = (nextTimeText) => {
     const [h, m] = parseTimeString(nextTimeText)
@@ -110,6 +110,15 @@ function DrainValvePage() {
       optimisticApply: () => setLocal(valueStr),
       delayedVerify: () => verifyLongNames([longName]),
     })
+  }
+
+  if (!isInitialAttemptDone) {
+    return (
+      <main className="device-param-page page-initial-loading" aria-busy="true">
+        <div className="page-initial-loading__spinner" aria-hidden />
+        <p className="page-initial-loading__text">正在同步页面数据...</p>
+      </main>
+    )
   }
 
   return (

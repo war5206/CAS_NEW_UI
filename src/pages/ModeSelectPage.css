@@ -8,6 +8,36 @@
   color: #ffffff;
 }
 
+.mode-select-page--loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+}
+
+.mode-select-page__loading-spinner {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: 3px solid rgba(255, 255, 255, 0.2);
+  border-top-color: #45b0ff;
+  animation: mode-select-loading-spin 0.9s linear infinite;
+}
+
+.mode-select-page__loading-text {
+  margin: 0;
+  color: rgba(255, 255, 255, 0.78);
+  font-size: 18px;
+  line-height: 1;
+}
+
+@keyframes mode-select-loading-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 .mode-select-page__feature-pair {
   display: inline-flex;
   width: max-content;

@@ -50,7 +50,7 @@ function CouplingEnergyPage() {
     [applyValueMap],
   )
 
-  usePollRealvals(COUPLING_POLL, applyValueMap)
+  const { isInitialAttemptDone } = usePollRealvals(COUPLING_POLL, applyValueMap)
 
   const handleToggle = () => {
     const next = !isCouplingEnabled
@@ -60,6 +60,15 @@ function CouplingEnergyPage() {
         optimisticApply: () => setIsCouplingEnabled(next),
         delayedVerify: () => verifyLongNames([LN_OHNY]),
       },
+    )
+  }
+
+  if (!isInitialAttemptDone) {
+    return (
+      <main className="coupling-energy-page page-initial-loading" aria-busy="true">
+        <div className="page-initial-loading__spinner" aria-hidden />
+        <p className="page-initial-loading__text">正在同步页面数据...</p>
+      </main>
     )
   }
 

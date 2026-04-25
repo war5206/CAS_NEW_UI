@@ -110,9 +110,16 @@ function HomePage({ onActivePageChange, committedUnitLayoutSlots }) {
   const [isSystemImageLoaded, setIsSystemImageLoaded] = useState(false)
   const isHomeRoute = location.pathname === '/home' || location.pathname === '/home/'
   const isHomeDashboard = activePage === HOME_PAGE_VIEW.DASHBOARD
-  const { data: homeOverview } = useHomeOverviewQuery({ enabled: isHomeRoute && isHomeDashboard })
-  const { data: systemConfig } = useSystemConfigQuery({ enabled: isHomeRoute })
-  const { data: temp24HourTrend } = useTemp24HourQuery({ enabled: isHomeRoute && isHomeDashboard })
+  const homeOverviewQuery = useHomeOverviewQuery({ enabled: isHomeRoute && isHomeDashboard })
+  const systemConfigQuery = useSystemConfigQuery({ enabled: isHomeRoute })
+  const temp24HourQuery = useTemp24HourQuery({ enabled: isHomeRoute && isHomeDashboard })
+  const homeOverview = homeOverviewQuery.data
+  const systemConfig = systemConfigQuery.data
+  const temp24HourTrend = temp24HourQuery.data
+  const shouldDelayDashboardRender =
+    isHomeRoute &&
+    isHomeDashboard &&
+    (!homeOverviewQuery.hasFetchedData || !systemConfigQuery.hasFetchedData || !temp24HourQuery.hasFetchedData)
 
   const isSystemType2 = systemConfig.systemTypeUuid === '2'
   const resolvedSystemImage = isSystemType2 && SYSTEM_IMAGE_TYPE2 ? SYSTEM_IMAGE_TYPE2 : systemMap
@@ -138,6 +145,16 @@ function HomePage({ onActivePageChange, committedUnitLayoutSlots }) {
   const isManualModeAvatar = homeOverview.mode.avatarType === 'H'
   const modeAvatar = isManualModeAvatar ? avatarH : avatarA
   const modeAIcon = homeOverview.mode.iconASrc === 'cooling' ? coolingIcon : heatingIcon
+
+  if (shouldDelayDashboardRender) {
+    return (
+      <div className="home-page-loading" aria-busy="true">
+        <div className="home-page-loading__spinner" aria-hidden />
+        <p className="home-page-loading__text">正在加载首页数据...</p>
+      </div>
+    )
+  }
+
   return (
     <div className="home-pager">
       <div className="home-pager-track">

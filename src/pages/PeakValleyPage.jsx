@@ -115,7 +115,7 @@ function PeakValleyPage() {
     [applyValueMap],
   )
 
-  usePollRealvals(PEAK_VALLEY_POLL, applyValueMap)
+  const { isInitialAttemptDone } = usePollRealvals(PEAK_VALLEY_POLL, applyValueMap)
 
   const chargeText = useMemo(() => minutesToText(chargeMinutes), [chargeMinutes])
   const releaseText = useMemo(() => minutesToText(releaseMinutes), [releaseMinutes])
@@ -299,6 +299,15 @@ function PeakValleyPage() {
       optimisticApply: () => setExpenseRate(v),
       delayedVerify: () => verifyLongNames([LN_FYCZ]),
     })
+  }
+
+  if (!isInitialAttemptDone) {
+    return (
+      <main className="peak-valley-page page-initial-loading" aria-busy="true">
+        <div className="page-initial-loading__spinner" aria-hidden />
+        <p className="page-initial-loading__text">正在同步页面数据...</p>
+      </main>
+    )
   }
 
   return (

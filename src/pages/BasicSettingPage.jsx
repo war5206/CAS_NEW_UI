@@ -1,14 +1,26 @@
-import { useState } from 'react'
-import { Link } from 'react-router-dom'
+import { useEffect, useRef, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import FeatureInfoCard from '../components/FeatureInfoCard'
 import TimePickerModal from '../components/TimePickerModal'
 import AttentionModal from '../components/AttentionModal'
+import {
+  queryRealvalByLongNames,
+  readOperationLogs,
+  resetParameter,
+  restoreOriginal,
+  savePLCPointEFData,
+  writePLCPointEFData,
+  writeRealvalByLongNames,
+} from '../api/modules/settings'
 import dateIcon from '../assets/icons/date.svg'
 import './BasicSettingPage.css'
 
 const DATE_YEARS = [2022, 2023, 2024, 2025, 2026, 2027, 2028]
 const MONTHS = Array.from({ length: 12 }, (_, index) => index + 1)
 const DAYS = Array.from({ length: 31 }, (_, index) => index + 1)
+const HOURS = Array.from({ length: 24 }, (_, index) => index)
+const MINUTES = Array.from({ length: 60 }, (_, index) => index)
+const SECONDS = Array.from({ length: 60 }, (_, index) => index)
 
 function formatTwoDigits(value) {
   return String(value).padStart(2, '0')
@@ -32,36 +44,21 @@ const RESET_ACTIONS = [
     title: '系统关机',
     description: '',
     icon: 'power',
-    fullWidth: true,
+  },
+  {
+    id: 'plc-restart',
+    title: '重启PLC',
+    description: '',
+    icon: 'restart',
   },
 ]
 
-const OPERATION_LOG_ROWS = [
-  {
-    time: '2026年03月14日 17:59:42',
-    type: '下发',
-    operator: '管理员',
-    action: '气候补偿开启',
-  },
-  {
-    time: '2026年03月15日 14:23:00',
-    type: '下发',
-    operator: '管理员',
-    action: '智能定时模式定时段一开启',
-  },
-  {
-    time: '',
-    type: '',
-    operator: '',
-    action: '',
-  },
-  {
-    time: '',
-    type: '',
-    operator: '',
-    action: '',
-  },
-]
+const LONG_NAME_SYSTEM_STATUS = 'Sys\\FinforWorx\\SystemStatus'
+const LONG_NAME_LOCK_STATUS = 'Sys\\FinforWorx\\LockStatus'
+
+function isWriteSuccess(response) {
+  return String(response?.data?.data?.state ?? '') === 'success'
+}
 
 function ActionIcon({ type }) {
   if (type === 'power') {
@@ -80,6 +77,17 @@ function ActionIcon({ type }) {
         <path d="M4 19v-5h5" />
         <path d="M19 10a7 7 0 0 0-12-3" />
         <path d="M5 14a7 7 0 0 0 12 3" />
+      </svg>
+    )
+  }
+
+  if (type === 'restart') {
+    return (
+      <svg viewBox="0 0 24 24" className="basic-setting-page__action-icon" aria-hidden="true">
+        <path d="M4 11a8 8 0 0 1 13.6-5.7L20 8" />
+        <path d="M20 8V3" />
+        <path d="M20 13a8 8 0 0 1-13.6 5.7L4 16" />
+        <path d="M4 16v5" />
       </svg>
     )
   }
@@ -107,32 +115,187 @@ function LockIcon() {
 }
 
 function SystemResetView() {
+  const navigate = useNavigate()
   const [confirmAction, setConfirmAction] = useState(null)
+  const [systemStatusValue, setSystemStatusValue] = useState('0')
+  const [loadingActionId, setLoadingActionId] = useState('')
+  const [attentionConfig, setAttentionConfig] = useState({
+    open: false,
+    title: '提示',
+    message: '',
+    showCancel: false,
+    confirmText: '确定',
+    cancelText: '取消',
+    onConfirm: null,
+    onCancel: null,
+    isLoading: false,
+    loadingText: '处理中...',
+  })
+
+  useEffect(() => {
+    let cancelled = false
+    void (async () => {
+      try {
+        const response = await queryRealvalByLongNames(LONG_NAME_SYSTEM_STATUS)
+        const value = String(response?.data?.data?.[LONG_NAME_SYSTEM_STATUS] ?? '0')
+        if (!cancelled) {
+          setSystemStatusValue(value === '1' ? '1' : '0')
+        }
+      } catch {
+        if (!cancelled) {
+          setSystemStatusValue('0')
+        }
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   const handleActionClick = (action) => {
     setConfirmAction(action)
   }
 
   const handleCloseConfirm = () => {
+    if (loadingActionId) {
+      return
+    }
     setConfirmAction(null)
   }
 
-  const handleConfirm = () => {
-    // TODO: 在此处触发具体的系统重置/关机指令
-    setConfirmAction(null)
+  const openAlert = (message) => {
+    setAttentionConfig({
+      open: true,
+      title: '提示',
+      message,
+      showCancel: false,
+      confirmText: '我知道了',
+      cancelText: '取消',
+      onConfirm: null,
+      onCancel: null,
+      isLoading: false,
+      loadingText: '处理中...',
+    })
   }
+
+  const closeAttention = () => {
+    setAttentionConfig((previous) => ({ ...previous, open: false }))
+  }
+
+  const handleConfirm = async () => {
+    if (!confirmAction || loadingActionId) {
+      return
+    }
+    setLoadingActionId(confirmAction.id)
+    try {
+      if (confirmAction.id === 'parameter-reset') {
+        const response = await resetParameter()
+        openAlert(response?.data?.success ? '保存成功' : '保存失败')
+      } else if (confirmAction.id === 'factory-reset') {
+        const response = await restoreOriginal()
+        if (response?.data?.success) {
+          setConfirmAction(null)
+          navigate('/auth/set-password')
+          return
+        }
+        openAlert('执行失败')
+      } else if (confirmAction.id === 'system-shutdown') {
+        const nextValue = systemStatusValue === '1' ? '0' : '1'
+        const response = await writeRealvalByLongNames({
+          [LONG_NAME_SYSTEM_STATUS]: nextValue,
+        })
+        if (isWriteSuccess(response)) {
+          setSystemStatusValue(nextValue)
+          openAlert('保存成功')
+        } else {
+          openAlert('保存失败')
+        }
+      } else if (confirmAction.id === 'plc-restart') {
+        setAttentionConfig({
+          open: true,
+          title: '提示',
+          message: '',
+          showCancel: false,
+          confirmText: '确定',
+          cancelText: '取消',
+          onConfirm: null,
+          onCancel: null,
+          isLoading: true,
+          loadingText: '正在保存数据中...',
+        })
+        const saveResponse = await savePLCPointEFData()
+        const saveState = String(saveResponse?.data?.data?.state ?? '')
+        if (saveState !== 'success') {
+          openAlert('保存失败')
+          return
+        }
+        setAttentionConfig({
+          open: true,
+          title: '下置EF数据',
+          message: 'PLC测点EF数据保存成功，请重启PLC。\n重启完成后点击确定，下置保存的EF数据',
+          showCancel: true,
+          confirmText: '确定',
+          cancelText: '取消',
+          onConfirm: async () => {
+            setAttentionConfig({
+              open: true,
+              title: '提示',
+              message: '',
+              showCancel: false,
+              confirmText: '确定',
+              cancelText: '取消',
+              onConfirm: null,
+              onCancel: null,
+              isLoading: true,
+              loadingText: '下置数据中...',
+            })
+            try {
+              const writeResponse = await writePLCPointEFData()
+              if (String(writeResponse?.data?.data?.state ?? '') === 'success') {
+                openAlert('下置成功')
+              } else {
+                openAlert('下置失败')
+              }
+            } catch {
+              openAlert('下置失败')
+            }
+          },
+          onCancel: closeAttention,
+          isLoading: false,
+          loadingText: '处理中...',
+        })
+        return
+      }
+    } catch {
+      openAlert('操作失败，请检查网络')
+    } finally {
+      setLoadingActionId('')
+      setConfirmAction(null)
+    }
+  }
+
+  const visibleActions = RESET_ACTIONS.map((action) => {
+    if (action.id !== 'system-shutdown') {
+      return action
+    }
+    return {
+      ...action,
+      title: systemStatusValue === '1' ? '系统关机' : '系统开机',
+    }
+  })
 
   return (
     <div className="basic-setting-page basic-setting-page--system-reset">
       <div className="basic-setting-page__action-grid">
-        {RESET_ACTIONS.map((action) => (
+        {visibleActions.map((action) => (
           <button
             type="button"
             key={action.id}
-            className={`basic-setting-page__action-button${action.fullWidth ? ' is-full' : ''}`}
+            className="basic-setting-page__action-button"
             onClick={() => handleActionClick(action)}
+            disabled={Boolean(loadingActionId)}
           >
-            {action.icon === 'power' ? (
+            {!action.description ? (
               <span className="basic-setting-page__shutdown-title-wrap">
                 <ActionIcon type={action.icon} />
                 <span>{action.title}</span>
@@ -163,29 +326,94 @@ function SystemResetView() {
         }
         confirmText="确定"
         showCancel
+        isLoading={Boolean(loadingActionId)}
+        loadingText="执行中..."
         onClose={handleCloseConfirm}
         onConfirm={handleConfirm}
         onCancel={handleCloseConfirm}
+      />
+
+      <AttentionModal
+        isOpen={attentionConfig.open}
+        title={attentionConfig.title}
+        message={attentionConfig.message}
+        confirmText={attentionConfig.confirmText}
+        cancelText={attentionConfig.cancelText}
+        showCancel={attentionConfig.showCancel}
+        onClose={closeAttention}
+        onConfirm={attentionConfig.onConfirm ?? closeAttention}
+        onCancel={attentionConfig.onCancel ?? closeAttention}
+        isLoading={attentionConfig.isLoading}
+        loadingText={attentionConfig.loadingText}
       />
     </div>
   )
 }
 
 function DeviceLockView() {
+  const navigate = useNavigate()
   const [isDeviceLocked, setIsDeviceLocked] = useState(false)
   const [showConfirm, setShowConfirm] = useState(false)
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [attentionMessage, setAttentionMessage] = useState('')
+
+  useEffect(() => {
+    let cancelled = false
+    void (async () => {
+      try {
+        const response = await queryRealvalByLongNames(LONG_NAME_LOCK_STATUS)
+        const lockValue = String(response?.data?.data?.[LONG_NAME_LOCK_STATUS] ?? '0')
+        if (!cancelled) {
+          setIsDeviceLocked(lockValue === '1')
+        }
+      } catch {
+        if (!cancelled) {
+          setIsDeviceLocked(false)
+        }
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   const handleClick = () => {
     setShowConfirm(true)
   }
 
   const handleCloseConfirm = () => {
+    if (isSubmitting) {
+      return
+    }
     setShowConfirm(false)
   }
 
-  const handleConfirm = () => {
-    setIsDeviceLocked((previous) => !previous)
-    setShowConfirm(false)
+  const handleConfirm = async () => {
+    if (isSubmitting) {
+      return
+    }
+    const nextValue = isDeviceLocked ? '0' : '1'
+    setIsSubmitting(true)
+    try {
+      const response = await writeRealvalByLongNames({
+        [LONG_NAME_LOCK_STATUS]: nextValue,
+      })
+      if (!isWriteSuccess(response)) {
+        setAttentionMessage('操作失败')
+        return
+      }
+      if (nextValue === '1') {
+        navigate('/auth/login', { state: { deviceLocked: true } })
+        return
+      }
+      setIsDeviceLocked(false)
+      setAttentionMessage('解锁成功')
+    } catch {
+      setAttentionMessage('操作失败，请检查网络')
+    } finally {
+      setIsSubmitting(false)
+      setShowConfirm(false)
+    }
   }
 
   const confirmActionName = isDeviceLocked ? '解锁设备' : '锁定设备'
@@ -201,10 +429,6 @@ function DeviceLockView() {
         className="basic-setting-page__device-lock-card"
       />
 
-      <Link to="/playground" className="basic-setting-page__playground-link">
-        进入 Playground
-      </Link>
-
       <AttentionModal
         isOpen={showConfirm}
         title="确认操作"
@@ -213,13 +437,32 @@ function DeviceLockView() {
             确定要
             <span className="attention-modal__highlight">{confirmActionName}</span>
             吗？
+            {!isDeviceLocked ? (
+              <>
+                <br />
+                系统锁机中，防冻功能正常运行，现场请勿断电；
+                <br />
+                如断电导致系统冻坏，后果由断电方承担。
+              </>
+            ) : null}
           </>
         }
         confirmText="确定"
         showCancel
+        isLoading={isSubmitting}
+        loadingText="操作中..."
         onClose={handleCloseConfirm}
         onConfirm={handleConfirm}
         onCancel={handleCloseConfirm}
+      />
+      <AttentionModal
+        isOpen={Boolean(attentionMessage)}
+        title="提示"
+        message={attentionMessage}
+        confirmText="我知道了"
+        showCancel={false}
+        onClose={() => setAttentionMessage('')}
+        onConfirm={() => setAttentionMessage('')}
       />
     </div>
   )
@@ -229,27 +472,99 @@ const DATE_PICKER_COLUMNS = [
   { key: 'year', options: DATE_YEARS, formatter: (value) => String(value) },
   { key: 'month', options: MONTHS, formatter: (value) => formatTwoDigits(value) },
   { key: 'day', options: DAYS, formatter: (value) => formatTwoDigits(value) },
+  { key: 'hour', options: HOURS, formatter: (value) => formatTwoDigits(value) },
+  { key: 'minute', options: MINUTES, formatter: (value) => formatTwoDigits(value) },
+  { key: 'second', options: SECONDS, formatter: (value) => formatTwoDigits(value) },
 ]
 
-function formatDateDisplay(value) {
-  if (!Array.isArray(value) || value.length < 3) return null
-  return `${value[0]}.${formatTwoDigits(value[1])}.${formatTwoDigits(value[2])}`
+function formatDateTimeDisplay(value) {
+  if (!Array.isArray(value) || value.length < 6) return null
+  return `${value[0]}.${formatTwoDigits(value[1])}.${formatTwoDigits(value[2])} ${formatTwoDigits(value[3])}:${formatTwoDigits(value[4])}:${formatTwoDigits(value[5])}`
+}
+
+function formatDateTimeForApi(value) {
+  if (!Array.isArray(value) || value.length < 6) return ''
+  return `${value[0]}-${formatTwoDigits(value[1])}-${formatTwoDigits(value[2])} ${formatTwoDigits(value[3])}:${formatTwoDigits(value[4])}:${formatTwoDigits(value[5])}`
+}
+
+function getNowDateTimeParts() {
+  const now = new Date()
+  return [now.getFullYear(), now.getMonth() + 1, now.getDate(), now.getHours(), now.getMinutes(), now.getSeconds()]
+}
+
+function getTodayStartDateTimeParts() {
+  const now = new Date()
+  return [now.getFullYear(), now.getMonth() + 1, now.getDate(), 0, 0, 0]
+}
+
+function normalizeLogRow(source, index) {
+  return {
+    id: source?.id ?? `${source?.operation_datetime ?? 'row'}-${index}`,
+    time: source?.operation_datetime ?? '--',
+    type: source?.operation_type ?? '--',
+    operator: source?.operator_uuid ?? '--',
+    action: source?.operation_content ?? '--',
+  }
 }
 
 function OperationLogView() {
-  const [startDate, setStartDate] = useState([2026, 3, 13])
-  const [endDate, setEndDate] = useState([2026, 3, 16])
+  const [startDate, setStartDate] = useState(() => getTodayStartDateTimeParts())
+  const [endDate, setEndDate] = useState(() => getNowDateTimeParts())
   const [activePickerKey, setActivePickerKey] = useState('')
+  const [rows, setRows] = useState([])
+  const [page, setPage] = useState(1)
+  const [limit] = useState(9)
+  const [total, setTotal] = useState(0)
+  const [loading, setLoading] = useState(false)
+  const hasLoadedOnEnterRef = useRef(false)
+
+  const totalPages = Math.max(1, Math.ceil(total / limit))
+
+  const fetchLogs = async (nextPage = 1) => {
+    setLoading(true)
+    try {
+      const response = await readOperationLogs({
+        start: formatDateTimeForApi(startDate),
+        end: formatDateTimeForApi(endDate),
+        page: String(nextPage),
+        limit: String(limit),
+      })
+      const payload = response?.data?.data ?? response?.data ?? {}
+      const nextRows = Array.isArray(payload?.operationLog)
+        ? payload.operationLog.map((item, index) => normalizeLogRow(item, index))
+        : []
+      const nextPageValue = Number(payload?.page) || nextPage
+      const nextTotalValue = Number(payload?.total) || 0
+      setRows(nextRows)
+      setPage(nextPageValue)
+      setTotal(nextTotalValue)
+    } catch (error) {
+      console.error('readOperationLogs failed:', error)
+      setRows([])
+      setTotal(0)
+      setPage(nextPage)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    if (hasLoadedOnEnterRef.current) {
+      return
+    }
+    hasLoadedOnEnterRef.current = true
+    fetchLogs(1)
+  }, [])
 
   const pickerMap = {
     start: {
-      title: '选择开始日期',
+      title: '选择开始时间',
       columns: DATE_PICKER_COLUMNS,
       value: startDate,
       onConfirm: setStartDate,
     },
     end: {
-      title: '选择结束日期',
+      title: '选择结束时间',
       columns: DATE_PICKER_COLUMNS,
       value: endDate ?? startDate,
       onConfirm: setEndDate,
@@ -267,7 +582,7 @@ function OperationLogView() {
           className={`basic-setting-page__datetime-input ${startDate ? 'is-filled' : 'is-empty'}`}
           onClick={() => setActivePickerKey('start')}
         >
-          <span>{formatDateDisplay(startDate) ?? '请选择日期'}</span>
+          <span>{formatDateTimeDisplay(startDate) ?? '请选择日期时间'}</span>
           <CalendarIcon />
         </button>
         <span className="basic-setting-page__range-sep">-</span>
@@ -276,10 +591,15 @@ function OperationLogView() {
           className={`basic-setting-page__datetime-input ${endDate ? 'is-filled' : 'is-empty'}`}
           onClick={() => setActivePickerKey('end')}
         >
-          <span>{formatDateDisplay(endDate) ?? '请选择日期'}</span>
+          <span>{formatDateTimeDisplay(endDate) ?? '请选择日期时间'}</span>
           <CalendarIcon />
         </button>
-        <button type="button" className="basic-setting-page__search-button">
+        <button
+          type="button"
+          className="basic-setting-page__search-button"
+          onClick={() => fetchLogs(1)}
+          disabled={loading}
+        >
           查询
         </button>
       </div>
@@ -307,16 +627,43 @@ function OperationLogView() {
             </tr>
           </thead>
           <tbody>
-            {OPERATION_LOG_ROWS.map((row, index) => (
-              <tr key={`${row.time}-${index}`}>
+            {rows.map((row) => (
+              <tr key={row.id}>
                 <td>{row.time}</td>
                 <td>{row.type}</td>
                 <td>{row.operator}</td>
                 <td>{row.action}</td>
               </tr>
             ))}
+            {rows.length === 0 ? (
+              <tr>
+                <td colSpan={4}>{loading ? '加载中...' : '暂无操作日志'}</td>
+              </tr>
+            ) : null}
           </tbody>
         </table>
+      </div>
+
+      <div className="basic-setting-page__pagination">
+        <button
+          type="button"
+          className="basic-setting-page__page-button"
+          disabled={loading || page <= 1}
+          onClick={() => fetchLogs(page - 1)}
+        >
+          上一页
+        </button>
+        <span className="basic-setting-page__page-info">
+          第 {page} / {totalPages} 页
+        </span>
+        <button
+          type="button"
+          className="basic-setting-page__page-button"
+          disabled={loading || page >= totalPages}
+          onClick={() => fetchLogs(page + 1)}
+        >
+          下一页
+        </button>
       </div>
     </div>
   )

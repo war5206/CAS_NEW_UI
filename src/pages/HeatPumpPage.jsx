@@ -66,6 +66,7 @@ function normalizeSelectOptions(selectList) {
 
 function HeatPumpPage() {
   const [attentionMessage, setAttentionMessage] = useState('')
+  const [isInitialAttemptDone, setIsInitialAttemptDone] = useState(false)
   const [isGroupControlEnabled, setIsGroupControlEnabled] = useState(true)
   const [heatPumpOptions, setHeatPumpOptions] = useState(DEFAULT_HEAT_PUMP_OPTIONS)
   const [selectedHeatPumpCode, setSelectedHeatPumpCode] = useState('No1')
@@ -160,9 +161,13 @@ function HeatPumpPage() {
       if (isMountedRef.current) {
         setGroupWriteConfig(nextConfig)
         setParameters((prev) => ({ ...prev, ...nextParams }))
+        setIsInitialAttemptDone(true)
       }
     } catch {
       onWriteNotify('热泵批量参数获取失败')
+      if (isMountedRef.current) {
+        setIsInitialAttemptDone(true)
+      }
     }
   }, [isMountedRef, onWriteNotify])
 
@@ -200,9 +205,13 @@ function HeatPumpPage() {
             run: toDisplayValue(data.run, 'false'),
             alarm: toDisplayValue(data.alarm, 'false'),
           })
+          setIsInitialAttemptDone(true)
         }
       } catch {
         onWriteNotify(`${heatPumpCode}数据获取失败`)
+        if (isMountedRef.current) {
+          setIsInitialAttemptDone(true)
+        }
       }
     },
     [isMountedRef, onWriteNotify],
@@ -251,9 +260,14 @@ function HeatPumpPage() {
       try {
         const response = await queryRealvalByLongNames(pollLongNames)
         const valueMap = extractRealvalMap(response)
-        if (!cancelled) applyRealvalMap(valueMap)
+        if (!cancelled) {
+          applyRealvalMap(valueMap)
+          setIsInitialAttemptDone(true)
+        }
       } catch {
-        // ignore
+        if (!cancelled) {
+          setIsInitialAttemptDone(true)
+        }
       }
     }
     run()
@@ -348,6 +362,15 @@ function HeatPumpPage() {
   const showRunning = deviceState.run === 'true'
   const stateIcon = showAlarm ? malfunctionIcon : showRunning ? runningIcon : standbyIcon
   const stateText = showAlarm ? '故障' : showRunning ? '运行' : '待机'
+
+  if (!isInitialAttemptDone) {
+    return (
+      <main className="heat-pump-page page-initial-loading" aria-busy="true">
+        <div className="page-initial-loading__spinner" aria-hidden />
+        <p className="page-initial-loading__text">正在同步页面数据...</p>
+      </main>
+    )
+  }
 
   return (
     <main className="heat-pump-page">

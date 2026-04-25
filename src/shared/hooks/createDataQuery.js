@@ -23,11 +23,13 @@ export function createDataQuery({
       lastSuccessRef.current = query.data
     }
 
+    const hasFetchedData = Boolean(query.data ?? lastSuccessRef.current)
     const data = query.data ?? lastSuccessRef.current ?? createDefaultData()
 
     return {
       ...query,
       data,
+      hasFetchedData,
     }
   }
 }

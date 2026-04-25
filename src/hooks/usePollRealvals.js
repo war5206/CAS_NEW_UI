@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { queryRealvalByLongNames } from '../api/modules/settings'
 import { extractRealvalMap } from '../utils/realvalMap'
 
@@ -14,6 +14,7 @@ export function usePollRealvals(longNames, onData, intervalMs = DEFAULT_INTERVAL
   const onDataRef = useRef(onData)
   const longNamesRef = useRef(longNames)
   const namesKey = longNames.join('\u0000')
+  const [isInitialAttemptDone, setIsInitialAttemptDone] = useState(false)
 
   useEffect(() => {
     onDataRef.current = onData
@@ -24,7 +25,9 @@ export function usePollRealvals(longNames, onData, intervalMs = DEFAULT_INTERVAL
   }, [longNames])
 
   useEffect(() => {
+    setIsInitialAttemptDone(false)
     let cancelled = false
+    let firstRun = true
     const run = async () => {
       const names = longNamesRef.current
       if (!names.length) return
@@ -34,6 +37,11 @@ export function usePollRealvals(longNames, onData, intervalMs = DEFAULT_INTERVAL
         if (!cancelled) onDataRef.current(valueMap)
       } catch {
         if (!cancelled) onDataRef.current(null)
+      } finally {
+        if (!cancelled && firstRun) {
+          setIsInitialAttemptDone(true)
+          firstRun = false
+        }
       }
     }
     run()
@@ -43,4 +51,8 @@ export function usePollRealvals(longNames, onData, intervalMs = DEFAULT_INTERVAL
       window.clearInterval(timerId)
     }
   }, [namesKey, intervalMs])
+
+  return {
+    isInitialAttemptDone,
+  }
 }

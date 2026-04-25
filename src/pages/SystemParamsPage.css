@@ -239,6 +239,17 @@
   line-height: 1;
 }
 
+.system-params-save:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.system-params-detail.is-project-loading,
+.system-params-detail.is-circulation-pump-loading {
+  opacity: 0.88;
+  pointer-events: none;
+}
+
 .system-params-detail h3 {
   margin: 0;
   font-size: 20px;
@@ -297,6 +308,30 @@
 
 .system-params-form-grid--loop-pump .system-params-field .select-dropdown {
   flex: 1;
+}
+
+.system-params-loop-pump {
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+}
+
+.system-params-pump-block--terminal {
+  padding-top: 4px;
+}
+
+.system-params-pump-divider {
+  margin: 0 0 16px 32px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  font-size: 18px;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.65);
+  line-height: 1.2;
+}
+
+.system-params-form-grid--loop-pump-terminal .system-params-field--full-row {
+  grid-column: 1 / -1;
 }
 
 .system-params-field .select-dropdown {

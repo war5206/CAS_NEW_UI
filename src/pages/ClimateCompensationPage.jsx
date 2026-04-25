@@ -1,5 +1,6 @@
 ﻿import { useEffect, useRef, useState } from 'react'
 import * as echarts from 'echarts'
+import AttentionModal from '../components/AttentionModal'
 import FeatureInfoCard from '../components/FeatureInfoCard'
 import LabeledSelectRow from '../components/LabeledSelectRow'
 import SelectDropdown from '../components/SelectDropdown'
@@ -14,16 +15,37 @@ import weatherCompensateDividerIcon from '../assets/weather-compensate-divider.s
 import weatherCompensateCurveIcon from '../assets/weather-compensate-curve.svg'
 import { useDeferredVisible } from '../hooks/useDeferredVisible'
 import { useActionConfirm } from '../hooks/useActionConfirm'
+import { useWriteWithDelayedVerify } from '../hooks/useWriteWithDelayedVerify'
+import {
+  queryCustomizeCurve,
+  queryRealvalByLongNames,
+  saveIndoorTemperature,
+  saveWeatherCompensateCurve,
+  saveWeatherCompensateGear,
+  queryTemp24hour,
+  queryWeatherCompensateCurve,
+  saveCustomizeCurve,
+  writeRealvalByLongNames,
+} from '../api/modules/settings'
 import { getStoredClimateMode, setStoredClimateMode } from '../utils/climateModeState'
 import { getStoredTemperatureMode } from '../utils/temperatureModeState'
+import { extractRealvalMap, isOnValue } from '../utils/realvalMap'
 import './ClimateCompensationPage.css'
 
 const levelLabels = Array.from({ length: 16 }, (_, index) => String(index + 1))
 
 const trendHours = Array.from({ length: 24 }, (_, index) => `${String(index).padStart(2, '0')}:00`)
-const targetReturnData = [24, 24, 24, 24, 24, 24, 26, 28, 30, 32, 34, 34, 32, 30, 28, 26, 24, 24, 24, 24, 24, 24, 24, 24]
-const actualSupplyData = [35, 33, 31, 30, 29, 30, 32, 35, 38, 39, 38, 36, 33, 30, 28, 27, 28, 30, 32, 33, 32, 30, 28, 26]
-const actualReturnData = [18, 20, 22, 24, 25, 24, 22, 20, 19, 20, 22, 24, 26, 28, 30, 31, 30, 28, 26, 24, 23, 24, 25, 26]
+const CLIMATE_LONG_NAME_QHBC = 'Sys\\FinforWorx\\QHBC'
+const CLIMATE_LONG_NAME_MDLD = 'Sys\\FinforWorx\\MDLD'
+const CLIMATE_LONG_NAME_AMBIENT = 'Sys\\FinforWorx\\AmbientTemperature1'
+const CLIMATE_LONG_NAME_BACKWATER = 'Sys\\FinforWorx\\BackwaterTemperature'
+const CLIMATE_LONG_NAME_SET_TEMP = 'Sys\\FinforWorx\\SetTemperature1'
+const CLIMATE_BASE_LONG_NAMES = [
+  CLIMATE_LONG_NAME_QHBC,
+  CLIMATE_LONG_NAME_MDLD,
+  CLIMATE_LONG_NAME_AMBIENT,
+  CLIMATE_LONG_NAME_BACKWATER,
+]
 
 const REGULATION_OPTIONS = [
   {
@@ -43,7 +65,27 @@ const SMART_ADJUST_OPTIONS = [
   { value: 'manual', label: '人工调节' },
 ]
 
-const HEATING_CURVE_X_MIN = -60
+const REGULATION_LABEL_TO_VALUE = {
+  智能调节: 'smart',
+  自定义调节: 'custom',
+}
+
+const SMART_ADJUST_LABEL_TO_VALUE = {
+  自动校准调节: 'auto-calibration',
+  人工调节: 'manual',
+}
+
+const REGULATION_VALUE_TO_LABEL = {
+  smart: '智能调节',
+  custom: '自定义调节',
+}
+
+const SMART_ADJUST_VALUE_TO_LABEL = {
+  'auto-calibration': '自动校准调节',
+  manual: '人工调节',
+}
+
+const HEATING_CURVE_X_MIN = -50
 const HEATING_CURVE_X_MAX = 19
 const COOLING_CURVE_X_MIN = 0
 const COOLING_CURVE_X_MAX = 40
@@ -96,6 +138,11 @@ function clampCurveValueWithNeighbors(values, index, nextValue, tempMin, tempMax
 
 function ClimateCompensationPage() {
   const { requestConfirm, confirmModal } = useActionConfirm()
+  const [attentionMessage, setAttentionMessage] = useState('')
+  const { performWrite } = useWriteWithDelayedVerify({
+    write: writeRealvalByLongNames,
+    onNotify: setAttentionMessage,
+  })
   const [selectedMode, setSelectedMode] = useState(() => getStoredClimateMode())
   const [regulateType, setRegulateType] = useState(REGULATION_OPTIONS[0].value)
   const [smartAdjustType, setSmartAdjustType] = useState(SMART_ADJUST_OPTIONS[0].value)
@@ -125,7 +172,17 @@ function ClimateCompensationPage() {
   const [draftAdvancedEnabled, setDraftAdvancedEnabled] = useState(true)
   const [draftAdvancedCurves, setDraftAdvancedCurves] = useState([])
   const [draftActiveAdvancedCurveId, setDraftActiveAdvancedCurveId] = useState(null)
+  const [isSavingAdvancedCurve, setIsSavingAdvancedCurve] = useState(false)
   const [constantReturnTemp, setConstantReturnTemp] = useState('10')
+  const [weatherCurveId, setWeatherCurveId] = useState('')
+  const [outdoorTemperature, setOutdoorTemperature] = useState('--')
+  const [trendXAxis, setTrendXAxis] = useState(trendHours)
+  const [targetReturnData, setTargetReturnData] = useState(Array.from({ length: 24 }, () => 0))
+  const [actualSupplyData, setActualSupplyData] = useState(Array.from({ length: 24 }, () => 0))
+  const [actualReturnData, setActualReturnData] = useState(Array.from({ length: 24 }, () => 0))
+  const [isInitialLoading, setIsInitialLoading] = useState(true)
+  const isHydratingRef = useRef(false)
+  const hasLoadedCustomizeCurveRef = useRef(false)
   const levelSliderStartRef = useRef(8)
   const levelValueRef = useRef(8)
   const isLevelSliderDraggingRef = useRef(false)
@@ -165,6 +222,54 @@ function ClimateCompensationPage() {
       }
     },
   )
+
+  const toSafeNumber = (value, fallback = 0) => {
+    const num = Number(value)
+    return Number.isFinite(num) ? num : fallback
+  }
+
+  const toDisplayTempText = (value) => {
+    const num = Number(value)
+    if (!Number.isFinite(num)) return '--'
+    return String(Math.round(num))
+  }
+
+  const normalizeCurveValues = (values) => {
+    if (!Array.isArray(values)) return createInitialCurveValues(curveTempMin, curveTempMax, curveXAxisList)
+    return curveXAxisList.map((_, index) =>
+      clampCurveTemp(Math.round(toSafeNumber(values[index], curveTempMin)), curveTempMin, curveTempMax),
+    )
+  }
+
+  const parseWeatherCurveResponse = (response) => {
+    const weather = response?.data?.data?.weather ?? {}
+    const nextRegulateType = REGULATION_LABEL_TO_VALUE[weather.adjustmentMode] ?? 'smart'
+    const nextSmartAdjustType = SMART_ADJUST_LABEL_TO_VALUE[weather.intelligentAdjustment] ?? SMART_ADJUST_OPTIONS[0].value
+    const hasIndoorTemperature =
+      weather &&
+      Object.prototype.hasOwnProperty.call(weather, 'indoorTemperature') &&
+      weather.indoorTemperature !== '' &&
+      weather.indoorTemperature != null
+    const hasGearPosition =
+      weather &&
+      Object.prototype.hasOwnProperty.call(weather, 'gearPosition') &&
+      weather.gearPosition !== '' &&
+      weather.gearPosition != null
+    const hasCurveValues =
+      weather?.curve &&
+      Array.isArray(weather.curve.curve) &&
+      weather.curve.curve.length > 0
+    return {
+      nextRegulateType,
+      nextSmartAdjustType,
+      indoorTemperature: hasIndoorTemperature ? String(weather.indoorTemperature) : null,
+      gearPosition: hasGearPosition
+        ? Math.min(16, Math.max(1, Math.round(toSafeNumber(weather.gearPosition, 1))))
+        : null,
+      curveValues: hasCurveValues ? normalizeCurveValues(weather?.curve?.curve) : null,
+      curveId: weather?.curve?.id == null ? '' : String(weather.curve.id),
+    }
+  }
 
   const updateCurveValue = (index, nextValue) => {
     if (advancedEnabled && activeAdvancedCurve) {
@@ -260,34 +365,53 @@ function ClimateCompensationPage() {
         return
       }
 
+      const rollbackCurveValue = () => {
+        if (advancedEnabled && activeAdvancedCurve) {
+          setAdvancedCurves((previous) =>
+            previous.map((curve) => {
+              if (curve.id !== activeAdvancedCurve.id) {
+                return curve
+              }
+
+              const nextValues = [...curve.values]
+              nextValues[index] = dragState.startValue
+              return {
+                ...curve,
+                values: nextValues,
+              }
+            }),
+          )
+          return
+        }
+
+        setCurveValues((previous) => {
+          const next = [...previous]
+          next[index] = dragState.startValue
+          return next
+        })
+      }
+
       requestConfirm(
         { message: `确认将环境温度 ${curveXAxisList[index]}℃ 对应的目标温度设置为 ${nextValue}℃吗？` },
-        () => {},
-        () => {
-          if (advancedEnabled && activeAdvancedCurve) {
-            setAdvancedCurves((previous) =>
-              previous.map((curve) => {
-                if (curve.id !== activeAdvancedCurve.id) {
-                  return curve
-                }
-
-                const nextValues = [...curve.values]
-                nextValues[index] = dragState.startValue
-                return {
-                  ...curve,
-                  values: nextValues,
-                }
-              }),
-            )
-            return
+        async () => {
+          try {
+            const response = await saveWeatherCompensateCurve({
+              curveId: weatherCurveId || '0',
+              curvePoint: curveXAxisList[index],
+              curveValue: nextValue,
+            })
+            if (response?.data?.success === true) {
+              setAttentionMessage('下置成功')
+              return
+            }
+            setAttentionMessage('下置失败')
+            rollbackCurveValue()
+          } catch {
+            setAttentionMessage('下置失败')
+            rollbackCurveValue()
           }
-
-          setCurveValues((previous) => {
-            const next = [...previous]
-            next[index] = dragState.startValue
-            return next
-          })
         },
+        rollbackCurveValue,
       )
     }
 
@@ -362,7 +486,33 @@ function ClimateCompensationPage() {
     dragArea.addEventListener('pointercancel', handlePointerEnd)
   }
 
-  const openAdvancedModal = () => {
+  const openAdvancedModal = async () => {
+    if (regulateType !== 'custom' || smartAdjustType !== 'manual') {
+      return
+    }
+    if (!hasLoadedCustomizeCurveRef.current) {
+      try {
+        const response = await queryCustomizeCurve()
+        const weather = response?.data?.data?.weather ?? {}
+        const serverUse = weather?.use
+        const serverEnabled = String(weather?.useAdvancedAdjustment ?? '1') === '1'
+        const serverCurves = Array.isArray(weather?.curveData) ? weather.curveData : []
+        if (serverCurves.length) {
+          const normalized = serverCurves.map((item, index) => ({
+            id: item?.id || `server-${index + 1}`,
+            values: normalizeCurveValues(item?.curve),
+            name: String(item?.name || `曲线${index + 1}`),
+          }))
+          setAdvancedCurves(normalized)
+          setAdvancedEnabled(serverEnabled)
+          const activeByName = normalized.find((item) => item.name === serverUse)
+          setActiveAdvancedCurveId(activeByName?.id ?? normalized[0]?.id ?? null)
+          hasLoadedCustomizeCurveRef.current = true
+        }
+      } catch {
+        // ignore
+      }
+    }
     const fallbackActiveId = activeAdvancedCurveId ?? advancedCurves[0]?.id ?? null
     setDraftAdvancedEnabled(advancedEnabled)
     setDraftAdvancedCurves(cloneAdvancedCurves(advancedCurves))
@@ -372,6 +522,9 @@ function ClimateCompensationPage() {
   }
 
   const closeAdvancedModal = () => {
+    if (isSavingAdvancedCurve) {
+      return
+    }
     setIsAdvancedModalOpen(false)
   }
 
@@ -390,32 +543,41 @@ function ClimateCompensationPage() {
     setDraftActiveAdvancedCurveId(nextCurve.id)
   }
 
-  const handleDeleteAdvancedCurve = () => {
-    if (!activeDraftAdvancedCurve) {
+  const commitAdvancedCurve = async () => {
+    if (isSavingAdvancedCurve) {
       return
     }
-
-    const currentIndex = draftAdvancedCurves.findIndex((curve) => curve.id === activeDraftAdvancedCurve.id)
-    const nextCurves = draftAdvancedCurves.filter((curve) => curve.id !== activeDraftAdvancedCurve.id)
-    const nextActiveId =
-      nextCurves[currentIndex]?.id ??
-      nextCurves[currentIndex - 1]?.id ??
-      null
-
-    setDraftAdvancedCurves(nextCurves)
-    setDraftActiveAdvancedCurveId(nextActiveId)
-    setAdvancedCurvePageIndex(0)
-  }
-
-  const commitAdvancedCurve = () => {
     const nextCurves = cloneAdvancedCurves(draftAdvancedCurves)
     const fallbackActiveId = draftActiveAdvancedCurveId ?? nextCurves[0]?.id ?? null
-
-    setAdvancedEnabled(draftAdvancedEnabled)
-    setAdvancedCurves(nextCurves)
-    setActiveAdvancedCurveId(fallbackActiveId)
-
-    setIsAdvancedModalOpen(false)
+    const activeCurve = nextCurves.find((item) => item.id === fallbackActiveId) ?? nextCurves[0]
+    const payload = {
+      curveData: nextCurves.map((item, index) => ({
+        curve: item.values.map((value) => Math.round(toSafeNumber(value, curveTempMin))),
+        name: item.name || ADVANCED_CURVE_LABELS[index] || `曲线${index + 1}`,
+        id: String(item.id),
+      })),
+      use: activeCurve?.name || ADVANCED_CURVE_LABELS[0] || '曲线1',
+      useAdvancedAdjustment: draftAdvancedEnabled ? '1' : '0',
+    }
+    try {
+      setIsSavingAdvancedCurve(true)
+      const response = await saveCustomizeCurve(payload)
+      const state = response?.data?.data?.state
+      const backendMessage = response?.data?.data?.message || response?.data?.msg
+      if (state !== 'success') {
+        setAttentionMessage(backendMessage || '设置自定义曲线失败')
+        return
+      }
+      setAdvancedEnabled(draftAdvancedEnabled)
+      setAdvancedCurves(nextCurves)
+      setActiveAdvancedCurveId(fallbackActiveId)
+      setIsAdvancedModalOpen(false)
+      setAttentionMessage(backendMessage || '设置自定义曲线成功')
+    } catch {
+      setAttentionMessage('设置自定义曲线失败')
+    } finally {
+      setIsSavingAdvancedCurve(false)
+    }
   }
 
   const handleConfirmAdvancedCurve = () => {
@@ -428,6 +590,103 @@ function ClimateCompensationPage() {
   useEffect(() => {
     setStoredClimateMode(selectedMode)
   }, [selectedMode])
+
+  const loadTempTrend = async () => {
+    try {
+      const response = await queryTemp24hour()
+      const result = response?.data?.data?.result ?? {}
+      const xAxis = Array.isArray(result?.xList) && result.xList.length ? result.xList : trendHours
+      const mapToLine = (node) => {
+        const source = Array.isArray(node?.yList) ? node.yList : []
+        return xAxis.map((_, index) => toSafeNumber(source[index], 0))
+      }
+      setTrendXAxis(xAxis)
+      setActualSupplyData(mapToLine(result?.supplyTempData))
+      setActualReturnData(mapToLine(result?.backwaterTempData))
+      setTargetReturnData(mapToLine(result?.targetBackwaterTempData))
+    } catch {
+      // ignore
+    }
+  }
+
+  const loadWeatherCurve = async (adjustmentMode = '', intelligentAdjustment = '') => {
+    const response = await queryWeatherCompensateCurve({ adjustmentMode, intelligentAdjustment })
+    const parsed = parseWeatherCurveResponse(response)
+    setRegulateType(parsed.nextRegulateType)
+    setSmartAdjustType(parsed.nextSmartAdjustType)
+    if (parsed.indoorTemperature != null) {
+      setIndoorTempSetting(parsed.indoorTemperature)
+    }
+    if (parsed.gearPosition != null) {
+      setLevelValue(parsed.gearPosition)
+    }
+    if (parsed.nextRegulateType === 'custom' && parsed.curveValues) {
+      setCurveValues(parsed.curveValues)
+      setWeatherCurveId(parsed.curveId)
+    }
+  }
+
+  const loadBaseRealvals = async () => {
+    const response = await queryRealvalByLongNames(CLIMATE_BASE_LONG_NAMES)
+    const map = extractRealvalMap(response)
+    if (!map) return null
+    const nextMode = isOnValue(map[CLIMATE_LONG_NAME_QHBC]) ? 'climate' : 'constant'
+    const linked = isOnValue(map[CLIMATE_LONG_NAME_MDLD])
+    setSelectedMode(nextMode)
+    setTerminalLinked(linked)
+    setOutdoorTemperature(toDisplayTempText(map[CLIMATE_LONG_NAME_AMBIENT]))
+    return nextMode
+  }
+
+  const loadConstantModeData = async () => {
+    try {
+      const response = await queryRealvalByLongNames([CLIMATE_LONG_NAME_SET_TEMP])
+      const map = extractRealvalMap(response)
+      if (map && Object.prototype.hasOwnProperty.call(map, CLIMATE_LONG_NAME_SET_TEMP)) {
+        setConstantReturnTemp(String(map[CLIMATE_LONG_NAME_SET_TEMP] ?? '10'))
+      }
+    } catch {
+      // ignore
+    }
+  }
+
+  useEffect(() => {
+    let cancelled = false
+    const init = async () => {
+      isHydratingRef.current = true
+      try {
+        const mode = await loadBaseRealvals()
+        if (!cancelled && mode === 'constant') {
+          await loadConstantModeData()
+        }
+        if (!cancelled && mode !== 'constant') {
+          await loadWeatherCurve('', '')
+          await loadTempTrend()
+        }
+      } catch {
+        // ignore
+      } finally {
+        if (!cancelled) {
+          setIsInitialLoading(false)
+        }
+        isHydratingRef.current = false
+      }
+    }
+    init()
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
+  useEffect(() => {
+    if (isHydratingRef.current || isInitialLoading || selectedMode !== 'climate') {
+      return
+    }
+    const adjustmentMode = REGULATION_VALUE_TO_LABEL[regulateType] ?? ''
+    const intelligentAdjustment = SMART_ADJUST_VALUE_TO_LABEL[smartAdjustType] ?? ''
+    loadWeatherCurve(adjustmentMode, intelligentAdjustment).catch(() => {})
+    loadTempTrend().catch(() => {})
+  }, [regulateType, smartAdjustType, selectedMode, isInitialLoading])
 
   useEffect(() => {
     if (!isAdvancedModalOpen) {
@@ -472,7 +731,25 @@ function ClimateCompensationPage() {
 
     requestConfirm(
       { message: `确认将温度档位设定为 ${nextValue} 档吗？` },
-      () => {},
+      async () => {
+        try {
+          const response = await saveWeatherCompensateGear(nextValue)
+          const state = response?.data?.data?.state
+          if (state === 'success') {
+            setAttentionMessage('下置档位成功')
+            await loadWeatherCurve(
+              REGULATION_VALUE_TO_LABEL[regulateType] ?? '',
+              SMART_ADJUST_VALUE_TO_LABEL[smartAdjustType] ?? '',
+            )
+            return
+          }
+          setAttentionMessage('下置档位失败')
+          setLevelValue(previousValue)
+        } catch {
+          setAttentionMessage('下置档位失败')
+          setLevelValue(previousValue)
+        }
+      },
       () => setLevelValue(previousValue),
     )
   }
@@ -514,7 +791,7 @@ function ClimateCompensationPage() {
       grid: { top: 52, left: 62, right: 26, bottom: 66 },
       xAxis: {
         type: 'category',
-        data: trendHours,
+        data: trendXAxis,
         boundaryGap: false,
         axisLine: { lineStyle: { color: 'rgba(201, 216, 237, 0.35)' } },
         axisTick: { show: false },
@@ -605,7 +882,78 @@ function ClimateCompensationPage() {
       resizeObserver.disconnect()
       chart.dispose()
     }
-  }, [selectedMode, regulateType, shouldInitChart])
+  }, [selectedMode, regulateType, shouldInitChart, trendXAxis, targetReturnData, actualSupplyData, actualReturnData])
+
+  const handleModeChange = (nextMode) => {
+    const nextQhbc = nextMode === 'climate' ? 1 : 0
+    performWrite(
+      { [CLIMATE_LONG_NAME_QHBC]: nextQhbc },
+      {
+        optimisticApply: () => setSelectedMode(nextMode),
+        delayedVerify: async () => {
+          const mode = await loadBaseRealvals()
+          if (mode === 'constant') {
+            await loadConstantModeData()
+          } else {
+            await loadWeatherCurve('', '')
+            await loadTempTrend()
+          }
+        },
+      },
+    )
+  }
+
+  const handleTerminalLinkedToggle = () => {
+    const nextChecked = !terminalLinked
+    performWrite(
+      { [CLIMATE_LONG_NAME_MDLD]: nextChecked ? 1 : 0 },
+      {
+        optimisticApply: () => setTerminalLinked(nextChecked),
+        delayedVerify: () => loadBaseRealvals(),
+      },
+    )
+  }
+
+  const handleConstantReturnTempChange = (nextValue) => {
+    const writeValue = Number(nextValue)
+    const payloadValue = Number.isFinite(writeValue) ? writeValue : nextValue
+    performWrite(
+      { [CLIMATE_LONG_NAME_SET_TEMP]: payloadValue },
+      {
+        optimisticApply: () => setConstantReturnTemp(String(nextValue)),
+        delayedVerify: () => loadConstantModeData(),
+      },
+    )
+  }
+
+  const handleIndoorTempChange = async (nextValue) => {
+    const previousValue = indoorTempSetting
+    const nextText = String(nextValue)
+    setIndoorTempSetting(nextText)
+    try {
+      const response = await saveIndoorTemperature(nextValue)
+      const state = response?.data?.data?.state
+      if (state === 'success') {
+        setAttentionMessage('保存成功')
+        setIndoorTempSetting(nextText)
+        return
+      }
+      setAttentionMessage('保存失败')
+      setIndoorTempSetting(previousValue)
+    } catch {
+      setAttentionMessage('保存失败')
+      setIndoorTempSetting(previousValue)
+    }
+  }
+
+  if (isInitialLoading) {
+    return (
+      <main className="climate-page page-initial-loading" aria-busy="true">
+        <div className="page-initial-loading__spinner" aria-hidden />
+        <p className="page-initial-loading__text">正在同步页面数据...</p>
+      </main>
+    )
+  }
 
   return (
     <>
@@ -617,7 +965,7 @@ function ClimateCompensationPage() {
           description="根据环境温度不同自动调节回水目标温度"
           selected={selectedMode === 'climate'}
           selectedBadgePosition="start"
-          onClick={() => setSelectedMode('climate')}
+          onClick={() => handleModeChange('climate')}
           className="climate-page__mode-card"
           confirmConfig={selectedMode === 'climate' ? null : { message: '确认切换为气候补偿模式吗？' }}
         />
@@ -626,7 +974,7 @@ function ClimateCompensationPage() {
           title="定温模式"
           description="固定温度运行"
           selected={selectedMode === 'constant'}
-          onClick={() => setSelectedMode('constant')}
+          onClick={() => handleModeChange('constant')}
           className="climate-page__mode-card"
           confirmConfig={selectedMode === 'constant' ? null : { message: '确认切换为定温模式吗？' }}
         />
@@ -688,33 +1036,37 @@ function ClimateCompensationPage() {
                   listAriaLabel="智能调节方式列表"
                 />
               </div>
-              <div className="climate-page__row-divider" aria-hidden="true">
-                <img src={weatherCompensateDividerIcon} alt="" />
-              </div>
-              <div className="climate-page__row climate-page__row--switch">
-                <div>
-                  <div className="climate-page__row-title">末端联调</div>
-                  <div className="climate-page__row-desc">功能开启时，自动校准调节生效</div>
+              {smartAdjustType !== 'manual' ? (
+                <div className="climate-page__row-divider" aria-hidden="true">
+                  <img src={weatherCompensateDividerIcon} alt="" />
                 </div>
-                <ToggleSwitch
-                  checked={terminalLinked}
-                  onToggle={() => setTerminalLinked((prev) => !prev)}
-                  className="climate-page__terminal-switch"
-                  ariaLabel={`末端联调${terminalLinked ? '关闭' : '开启'}`}
-                  confirmConfig={({ nextChecked }) => ({
-                    message: `确认${nextChecked ? '开启' : '关闭'}末端联调吗？`,
-                  })}
-                />
-              </div>
+              ) : null}
+              {smartAdjustType !== 'manual' ? (
+                <div className="climate-page__row climate-page__row--switch">
+                  <div>
+                    <div className="climate-page__row-title">末端联调</div>
+                    <div className="climate-page__row-desc">功能开启时，自动校准调节生效</div>
+                  </div>
+                  <ToggleSwitch
+                    checked={terminalLinked}
+                    onToggle={handleTerminalLinkedToggle}
+                    className="climate-page__terminal-switch"
+                    ariaLabel={`末端联调${terminalLinked ? '关闭' : '开启'}`}
+                    confirmConfig={({ nextChecked }) => ({
+                      message: `确认${nextChecked ? '开启' : '关闭'}末端联调吗？`,
+                    })}
+                  />
+                </div>
+              ) : null}
             </div>
           </section>
 
-          {terminalLinked ? (
+          {smartAdjustType !== 'manual' && terminalLinked ? (
             <section className="climate-page__panel climate-page__panel--indoor-temp">
               <LabeledSelectRow
                 label="室内温度设定"
                 value={indoorTempSetting}
-                onChange={setIndoorTempSetting}
+                onChange={handleIndoorTempChange}
                 suffix="℃"
                 className="climate-page__indoor-temp-setting"
                 confirmConfig={({ nextValue }) => ({ message: `确认将室内温度设定为 ${nextValue} ℃吗？` })}
@@ -730,7 +1082,9 @@ function ClimateCompensationPage() {
                   <h3 className="climate-page__panel-title">气候补偿曲线</h3>
                 </div>
                 <div className="climate-page__curve-actions">
-                  <button type="button" className="climate-page__curve-action-btn" onClick={openAdvancedModal}>高级调节</button>
+                  {smartAdjustType === 'manual' ? (
+                    <button type="button" className="climate-page__curve-action-btn" onClick={openAdvancedModal}>高级调节</button>
+                  ) : null}
                 </div>
               </div>
 
@@ -751,7 +1105,10 @@ function ClimateCompensationPage() {
                 <div className="climate-page__curve-plot" style={{ '--curve-grid-line-count': curveYGridLineCount }}>
                   {isCurveDragDisabled ? <div className="climate-page__curve-mask" aria-hidden="true" /> : null}
                   <div className="climate-page__curve-grid" aria-hidden="true" />
-                  <div className="climate-page__curve-columns">
+                  <div
+                    className="climate-page__curve-columns climate-page__curve-columns--fixed-slots"
+                    style={{ '--curve-page-slots': CURVE_PAGE_SIZE }}
+                  >
                     {visibleCurveItems.map((item) => (
                       <div key={item.outdoorTemp} className="climate-page__curve-column">
                         <div
@@ -851,11 +1208,7 @@ function ClimateCompensationPage() {
                 <div className="climate-page__metrics">
                   <article className="climate-page__metric">
                     <span>室外温度 (℃)</span>
-                    <strong>-10</strong>
-                  </article>
-                  <article className="climate-page__metric">
-                    <span>室外温度 (℃)</span>
-                    <strong>-10</strong>
+                    <strong>{outdoorTemperature}</strong>
                   </article>
                 </div>
                 <div ref={chartRef} className="climate-page__chart" />
@@ -869,7 +1222,7 @@ function ClimateCompensationPage() {
           <LabeledSelectRow
             label="回水温度设定"
             value={constantReturnTemp}
-            onChange={setConstantReturnTemp}
+            onChange={handleConstantReturnTempChange}
             suffix="℃"
             className="climate-page__constant-row"
             confirmConfig={({ nextValue }) => ({ message: `确认将回水温度设定为 ${nextValue} ℃吗？` })}
@@ -1008,17 +1361,11 @@ function ClimateCompensationPage() {
               <div className="climate-page__advanced-actions">
                 <button
                   type="button"
-                  className="climate-page__advanced-action-btn is-delete"
-                  onClick={handleDeleteAdvancedCurve}
-                >
-                  删除曲线
-                </button>
-                <button
-                  type="button"
                   className="climate-page__advanced-action-btn is-confirm"
                   onClick={handleConfirmAdvancedCurve}
+                  disabled={isSavingAdvancedCurve}
                 >
-                  确定
+                  {isSavingAdvancedCurve ? '保存中...' : '确定'}
                 </button>
               </div>
             ) : (
@@ -1037,6 +1384,16 @@ function ClimateCompensationPage() {
       </div>
     ) : null}
     {confirmModal}
+    <AttentionModal
+      isOpen={Boolean(attentionMessage)}
+      title="提示"
+      message={attentionMessage}
+      confirmText="确认"
+      showCancel={false}
+      onClose={() => setAttentionMessage('')}
+      onConfirm={() => setAttentionMessage('')}
+      zIndex={300}
+    />
     </>
   )
 }
