@@ -116,7 +116,7 @@ function clampCurveTemp(value, tempMin, tempMax) {
 }
 
 function cloneAdvancedCurves(curves) {
-  return curves.map((curve) => ({
+  return curves.slice(0, ADVANCED_CURVE_MAX_COUNT).map((curve) => ({
     ...curve,
     values: [...curve.values],
   }))
@@ -174,6 +174,7 @@ function ClimateCompensationPage() {
   const [draftActiveAdvancedCurveId, setDraftActiveAdvancedCurveId] = useState(null)
   const [isSavingAdvancedCurve, setIsSavingAdvancedCurve] = useState(false)
   const [constantReturnTemp, setConstantReturnTemp] = useState('10')
+  const [pendingLevelSubmitMessage, setPendingLevelSubmitMessage] = useState('')
   const [weatherCurveId, setWeatherCurveId] = useState('')
   const [outdoorTemperature, setOutdoorTemperature] = useState('--')
   const [trendXAxis, setTrendXAxis] = useState(trendHours)
@@ -187,6 +188,9 @@ function ClimateCompensationPage() {
   const levelValueRef = useRef(8)
   const isLevelSliderDraggingRef = useRef(false)
   const curveValuesRef = useRef([])
+  const baseCurveValuesBeforeAdvancedRef = useRef(null)
+  const advancedCurvesRef = useRef([])
+  const activeAdvancedCurveIdRef = useRef(null)
   const curveDragStateRef = useRef({ active: false, index: -1, startValue: null })
   const chartRef = useRef(null)
   const shouldInitChart = useDeferredVisible(chartRef)
@@ -329,6 +333,7 @@ function ClimateCompensationPage() {
       active: true,
       index,
       startValue: effectiveCurveValues[index],
+      curveId: activeAdvancedCurve?.id ?? null,
     }
     const updateByClientY = (clientY) => {
       updateCurveValue(index, resolveCurveValueByPointer(clientY, rect))
@@ -360,16 +365,22 @@ function ClimateCompensationPage() {
         return
       }
 
-      const nextValue = advancedEnabled && activeAdvancedCurve ? activeAdvancedCurve.values[index] : curveValuesRef.current[index]
+      let nextValue = curveValuesRef.current[index]
+      if (advancedEnabled && activeAdvancedCurveIdRef.current != null) {
+        const latestActiveCurve = advancedCurvesRef.current.find((curve) => curve.id === activeAdvancedCurveIdRef.current)
+        if (latestActiveCurve) {
+          nextValue = latestActiveCurve.values[index]
+        }
+      }
       if (dragState.startValue === nextValue) {
         return
       }
 
       const rollbackCurveValue = () => {
-        if (advancedEnabled && activeAdvancedCurve) {
+        if (advancedEnabled && dragState.curveId != null) {
           setAdvancedCurves((previous) =>
             previous.map((curve) => {
-              if (curve.id !== activeAdvancedCurve.id) {
+              if (curve.id !== dragState.curveId) {
                 return curve
               }
 
@@ -490,6 +501,9 @@ function ClimateCompensationPage() {
     if (regulateType !== 'custom' || smartAdjustType !== 'manual') {
       return
     }
+    let nextAdvancedEnabled = advancedEnabled
+    let nextAdvancedCurves = advancedCurves
+    let nextActiveAdvancedCurveId = activeAdvancedCurveId
     if (!hasLoadedCustomizeCurveRef.current) {
       try {
         const response = await queryCustomizeCurve()
@@ -498,24 +512,35 @@ function ClimateCompensationPage() {
         const serverEnabled = String(weather?.useAdvancedAdjustment ?? '1') === '1'
         const serverCurves = Array.isArray(weather?.curveData) ? weather.curveData : []
         if (serverCurves.length) {
-          const normalized = serverCurves.map((item, index) => ({
-            id: item?.id || `server-${index + 1}`,
-            values: normalizeCurveValues(item?.curve),
-            name: String(item?.name || `曲线${index + 1}`),
-          }))
+          const normalized = serverCurves
+            .slice(0, ADVANCED_CURVE_MAX_COUNT)
+            .map((item, index) => ({
+              id: item?.id || `server-${index + 1}`,
+              values: normalizeCurveValues(item?.curve),
+              name: String(item?.name || ADVANCED_CURVE_LABELS[index] || `曲线${index + 1}`),
+              isNew: false,
+            }))
+          const activeByName = normalized.find((item) => item.name === serverUse)
+          const resolvedActiveId = activeByName?.id ?? normalized[0]?.id ?? null
+
+          nextAdvancedEnabled = serverEnabled
+          nextAdvancedCurves = normalized
+          nextActiveAdvancedCurveId = resolvedActiveId
+
           setAdvancedCurves(normalized)
           setAdvancedEnabled(serverEnabled)
-          const activeByName = normalized.find((item) => item.name === serverUse)
-          setActiveAdvancedCurveId(activeByName?.id ?? normalized[0]?.id ?? null)
+          setActiveAdvancedCurveId(resolvedActiveId)
           hasLoadedCustomizeCurveRef.current = true
         }
       } catch {
         // ignore
       }
     }
-    const fallbackActiveId = activeAdvancedCurveId ?? advancedCurves[0]?.id ?? null
-    setDraftAdvancedEnabled(advancedEnabled)
-    setDraftAdvancedCurves(cloneAdvancedCurves(advancedCurves))
+    const limitedAdvancedCurves = cloneAdvancedCurves(nextAdvancedCurves)
+    const activeExists = limitedAdvancedCurves.some((curve) => curve.id === nextActiveAdvancedCurveId)
+    const fallbackActiveId = activeExists ? nextActiveAdvancedCurveId : limitedAdvancedCurves[0]?.id ?? null
+    setDraftAdvancedEnabled(nextAdvancedEnabled)
+    setDraftAdvancedCurves(limitedAdvancedCurves)
     setDraftActiveAdvancedCurveId(fallbackActiveId)
     setAdvancedCurvePageIndex(0)
     setIsAdvancedModalOpen(true)
@@ -534,8 +559,9 @@ function ClimateCompensationPage() {
     }
 
     const nextCurve = {
-      id: nextAdvancedCurveId,
+      id: `new-${nextAdvancedCurveId}`,
       values: curveXAxisList.map(() => curveTempMin),
+      isNew: true,
     }
 
     setNextAdvancedCurveId((previous) => previous + 1)
@@ -550,12 +576,19 @@ function ClimateCompensationPage() {
     const nextCurves = cloneAdvancedCurves(draftAdvancedCurves)
     const fallbackActiveId = draftActiveAdvancedCurveId ?? nextCurves[0]?.id ?? null
     const activeCurve = nextCurves.find((item) => item.id === fallbackActiveId) ?? nextCurves[0]
+    const wasAdvancedEnabled = advancedEnabled
+    const willAdvancedBeEnabled = draftAdvancedEnabled
     const payload = {
-      curveData: nextCurves.map((item, index) => ({
-        curve: item.values.map((value) => Math.round(toSafeNumber(value, curveTempMin))),
-        name: item.name || ADVANCED_CURVE_LABELS[index] || `曲线${index + 1}`,
-        id: String(item.id),
-      })),
+      curveData: nextCurves.map((item, index) => {
+        const curveItem = {
+          curve: item.values.map((value) => Math.round(toSafeNumber(value, curveTempMin))),
+          name: item.name || ADVANCED_CURVE_LABELS[index] || `曲线${index + 1}`,
+        }
+        if (!item.isNew) {
+          curveItem.id = String(item.id)
+        }
+        return curveItem
+      }),
       use: activeCurve?.name || ADVANCED_CURVE_LABELS[0] || '曲线1',
       useAdvancedAdjustment: draftAdvancedEnabled ? '1' : '0',
     }
@@ -568,11 +601,27 @@ function ClimateCompensationPage() {
         setAttentionMessage(backendMessage || '设置自定义曲线失败')
         return
       }
+      if (!wasAdvancedEnabled && willAdvancedBeEnabled) {
+        baseCurveValuesBeforeAdvancedRef.current = [...curveValuesRef.current]
+      }
+      const restoredBaseCurveValues = wasAdvancedEnabled && !willAdvancedBeEnabled && baseCurveValuesBeforeAdvancedRef.current
+      if (restoredBaseCurveValues) {
+        setCurveValues(baseCurveValuesBeforeAdvancedRef.current)
+      }
       setAdvancedEnabled(draftAdvancedEnabled)
       setAdvancedCurves(nextCurves)
       setActiveAdvancedCurveId(fallbackActiveId)
+      if (!willAdvancedBeEnabled && !restoredBaseCurveValues) {
+        await loadWeatherCurve(
+          REGULATION_VALUE_TO_LABEL[regulateType] ?? '',
+          SMART_ADJUST_VALUE_TO_LABEL[smartAdjustType] ?? '',
+        ).catch(() => {})
+      }
+      if (!willAdvancedBeEnabled) {
+        baseCurveValuesBeforeAdvancedRef.current = null
+      }
       setIsAdvancedModalOpen(false)
-      setAttentionMessage(backendMessage || '设置自定义曲线成功')
+      setAttentionMessage(backendMessage || (draftAdvancedEnabled ? '设置自定义曲线成功' : '关闭高级调节成功'))
     } catch {
       setAttentionMessage('设置自定义曲线失败')
     } finally {
@@ -609,7 +658,8 @@ function ClimateCompensationPage() {
     }
   }
 
-  const loadWeatherCurve = async (adjustmentMode = '', intelligentAdjustment = '') => {
+  const loadWeatherCurve = async (adjustmentMode = '', intelligentAdjustment = '', options = {}) => {
+    const { syncCurveValues = true } = options
     const response = await queryWeatherCompensateCurve({ adjustmentMode, intelligentAdjustment })
     const parsed = parseWeatherCurveResponse(response)
     setRegulateType(parsed.nextRegulateType)
@@ -620,10 +670,11 @@ function ClimateCompensationPage() {
     if (parsed.gearPosition != null) {
       setLevelValue(parsed.gearPosition)
     }
-    if (parsed.nextRegulateType === 'custom' && parsed.curveValues) {
+    if (syncCurveValues && parsed.curveValues) {
       setCurveValues(parsed.curveValues)
       setWeatherCurveId(parsed.curveId)
     }
+    return parsed
   }
 
   const loadBaseRealvals = async () => {
@@ -660,7 +711,15 @@ function ClimateCompensationPage() {
           await loadConstantModeData()
         }
         if (!cancelled && mode !== 'constant') {
-          await loadWeatherCurve('', '')
+          const parsed = await loadWeatherCurve('', '')
+          const needsFullWeatherCurve =
+            parsed.gearPosition == null || (parsed.nextRegulateType === 'custom' && !parsed.curveValues)
+          if (!cancelled && needsFullWeatherCurve) {
+            await loadWeatherCurve(
+              REGULATION_VALUE_TO_LABEL[parsed.nextRegulateType] ?? '',
+              SMART_ADJUST_VALUE_TO_LABEL[parsed.nextSmartAdjustType] ?? '',
+            )
+          }
           await loadTempTrend()
         }
       } catch {
@@ -708,6 +767,14 @@ function ClimateCompensationPage() {
   }, [curveValues])
 
   useEffect(() => {
+    advancedCurvesRef.current = advancedCurves
+  }, [advancedCurves])
+
+  useEffect(() => {
+    activeAdvancedCurveIdRef.current = activeAdvancedCurveId
+  }, [activeAdvancedCurveId])
+
+  useEffect(() => {
     levelValueRef.current = levelValue
   }, [levelValue])
 
@@ -732,6 +799,7 @@ function ClimateCompensationPage() {
     requestConfirm(
       { message: `确认将温度档位设定为 ${nextValue} 档吗？` },
       async () => {
+        setPendingLevelSubmitMessage('档位下置中...')
         try {
           const response = await saveWeatherCompensateGear(nextValue)
           const state = response?.data?.data?.state
@@ -748,6 +816,8 @@ function ClimateCompensationPage() {
         } catch {
           setAttentionMessage('下置档位失败')
           setLevelValue(previousValue)
+        } finally {
+          setPendingLevelSubmitMessage('')
         }
       },
       () => setLevelValue(previousValue),
@@ -1181,7 +1251,7 @@ function ClimateCompensationPage() {
                   </div>
 
                   <div
-                    className={`climate-page__level-slider-wrap${isLevelSliderDisabled ? ' is-disabled' : ''}`}
+                    className={`climate-page__level-slider-wrap${isCoolingTemperatureMode ? ' is-cooling' : ''}${isLevelSliderDisabled ? ' is-disabled' : ''}`}
                     style={{ '--ratio': levelRatio }}
                   >
                     <div className="climate-page__level-slider-track" aria-hidden="true" />
@@ -1261,7 +1331,7 @@ function ClimateCompensationPage() {
               <div className="climate-page__advanced-tabs-row">
                 <div className="climate-page__advanced-tabs">
                   {draftAdvancedCurves.length > 0 ? (
-                    draftAdvancedCurves.map((curve, index) => (
+                    draftAdvancedCurves.slice(0, ADVANCED_CURVE_MAX_COUNT).map((curve, index) => (
                       <button
                         key={curve.id}
                         type="button"
@@ -1306,7 +1376,10 @@ function ClimateCompensationPage() {
                 <div className="climate-page__curve-plot" style={{ '--curve-grid-line-count': curveYGridLineCount }}>
                   <div className="climate-page__curve-grid" aria-hidden="true" />
                   {!draftAdvancedEnabled ? <div className="climate-page__curve-mask" aria-hidden="true" /> : null}
-                  <div className="climate-page__curve-columns">
+                  <div
+                    className="climate-page__curve-columns climate-page__curve-columns--fixed-slots"
+                    style={{ '--curve-page-slots': CURVE_PAGE_SIZE }}
+                  >
                     {visibleDraftCurveItems.map((item) => (
                       <div key={`advanced-${item.outdoorTemp}`} className="climate-page__curve-column">
                         <div
@@ -1394,6 +1467,11 @@ function ClimateCompensationPage() {
       onConfirm={() => setAttentionMessage('')}
       zIndex={300}
     />
+    {pendingLevelSubmitMessage ? (
+      <div className="climate-page__pending-toast" role="status" aria-live="polite">
+        {pendingLevelSubmitMessage}
+      </div>
+    ) : null}
     </>
   )
 }

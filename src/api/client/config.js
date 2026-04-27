@@ -63,6 +63,7 @@ export const ALGORITHM_PROCESS_IDS = {
   QUERY_MANUAL_SWITCH: 'queryManualSwitch',
   QUERY_SYSTEM_CONFIG: 'querySystemConfig',
   QUERY_TEMP_24_HOUR: 'queryTemp24hour',
+  HP_RUN_MODE_SWITCH: 'hpRunModeSwitch',
   QUERY_WEATHER_COMPENSATE_CURVE: 'queryWeatherCompensateCurve',
   SAVE_WEATHER_COMPENSATE_GEAR: 'saveWeatherCompensateGear',
   SAVE_WEATHER_COMPENSATE_CURVE: 'saveWeatherCompensateCurve',

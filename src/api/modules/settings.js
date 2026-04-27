@@ -37,6 +37,16 @@ export async function writeRealvalByLongNames(writeData) {
 }
 
 /**
+ * 模式选择：切换制热/制冷，并同步气候补偿曲线配置
+ * @param {number | string} runMode - 1 制热，0 制冷
+ */
+export async function hpRunModeSwitch(runMode) {
+  return callAlgorithmProcess(ALGORITHM_PROCESS_IDS.HP_RUN_MODE_SWITCH, {
+    runMode: String(runMode ?? ''),
+  })
+}
+
+/**
  * 气候补偿：查询气候补偿曲线
  * @param {{ adjustmentMode?: string, intelligentAdjustment?: string }} params
  */

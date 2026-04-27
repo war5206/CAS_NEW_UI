@@ -29,6 +29,7 @@ import { useWriteWithDelayedVerify } from '../hooks/useWriteWithDelayedVerify'
 import { getStoredClimateMode, setStoredClimateMode } from '../utils/climateModeState'
 import { getStoredTemperatureMode, setStoredTemperatureMode } from '../utils/temperatureModeState'
 import {
+  hpRunModeSwitch,
   queryRealvalByLongNames,
   writeRealvalByLongNames,
   queryManualSwitch,
@@ -302,6 +303,7 @@ function ModeSelectPage() {
   const [manualDeviceType, setManualDeviceType] = useState(MANUAL_TYPE_OPTIONS[0].value)
   const [manualDeviceList, setManualDeviceList] = useState([])
   const [attentionMessage, setAttentionMessage] = useState('')
+  const [isRunModeSwitching, setIsRunModeSwitching] = useState(false)
 
   const onWriteNotify = useCallback((message) => {
     setAttentionMessage(message)
@@ -310,6 +312,9 @@ function ModeSelectPage() {
   const { performWrite, isMountedRef } = useWriteWithDelayedVerify({
     write: writeRealvalByLongNames,
     onNotify: onWriteNotify,
+  })
+  const { performWrite: performRunModeSwitch } = useWriteWithDelayedVerify({
+    write: hpRunModeSwitch,
   })
 
   // 将 queryRealvalByLongNames 返回的值应用到页面状态
@@ -486,21 +491,21 @@ function ModeSelectPage() {
 
   // 点击制热/制冷
   const handleTemperatureSelect = useCallback(
-    (nextTemperatureId) => {
-      if (nextTemperatureId === temperatureMode) return
+    async (nextTemperatureId) => {
+      if (nextTemperatureId === temperatureMode || isRunModeSwitching) return
       const writeValue = nextTemperatureId === 'heating' ? 1 : 0
-      performWrite(
-        { [LONG_NAME_HP_TOTAL_RUN_MODE]: writeValue },
-        {
-          optimisticApply: () => {
-            setTemperatureMode(nextTemperatureId)
-            setStoredTemperatureMode(nextTemperatureId)
-          },
-          delayedVerify: () => fetchRealvals([LONG_NAME_HP_TOTAL_RUN_MODE]),
+      setIsRunModeSwitching(true)
+      const success = await performRunModeSwitch(writeValue, {
+        optimisticApply: () => {
+          setTemperatureMode(nextTemperatureId)
+          setStoredTemperatureMode(nextTemperatureId)
         },
-      )
+        delayedVerify: () => fetchRealvals([LONG_NAME_HP_TOTAL_RUN_MODE]),
+      })
+      setIsRunModeSwitching(false)
+      setAttentionMessage(success ? '切换模式成功' : '切换模式失败')
     },
-    [fetchRealvals, performWrite, temperatureMode],
+    [fetchRealvals, isRunModeSwitching, performRunModeSwitch, temperatureMode],
   )
 
   // 点击模式调节里的开关
@@ -607,6 +612,7 @@ function ModeSelectPage() {
                 icon={selected ? item.activeIcon : item.inactiveIcon}
                 label={item.label}
                 selected={selected}
+                disabled={isRunModeSwitching}
                 onClick={() => handleTemperatureSelect(item.id)}
                 confirmConfig={selected ? null : { message: `确认切换为${item.label}模式吗？` }}
               />
@@ -690,6 +696,13 @@ function ModeSelectPage() {
         </section>
       )}
       {confirmModal}
+      <AttentionModal
+        isOpen={isRunModeSwitching}
+        isLoading
+        loadingText="模式切换中..."
+        showBackdrop
+        zIndex={320}
+      />
       <AttentionModal
         isOpen={Boolean(attentionMessage)}
         title="提示"
