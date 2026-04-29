@@ -393,11 +393,17 @@
   scrollbar-width: none;
   -ms-overflow-style: none;
   padding: 16px 34px 24px;
+  cursor: grab;
 }
 
 .smart-timer-page__editor-body::-webkit-scrollbar {
   width: 0;
   height: 0;
+}
+
+.smart-timer-page__editor-body.is-dragging {
+  cursor: grabbing;
+  user-select: none;
 }
 
 .smart-timer-page__editor-plan-row {

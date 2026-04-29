@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import FeatureInfoCard from '../components/FeatureInfoCard'
 import SelectDropdown from '../components/SelectDropdown'
 import TimePickerModal from '../components/TimePickerModal'
@@ -6,6 +6,13 @@ import NumericKeypadModal from '../components/NumericKeypadModal'
 import AttentionModal from '../components/AttentionModal'
 import ToggleSwitch from '../components/ToggleSwitch'
 import { useActionConfirm } from '../hooks/useActionConfirm'
+import { useSmartTimerPlansQuery } from '../features/settings/hooks/useSmartTimerPlansQuery'
+import { buildSmartTimerPlanPayload } from '../api/adapters/smartTimer'
+import {
+  saveSmartTimerPlan,
+  deleteSmartTimerPlan,
+  toggleSmartTimerPlan,
+} from '../api/modules/smartTimer'
 import intelligentTimeSettingIcon from '../assets/intelligent-time-setting.svg'
 import day24Icon from '../assets/24hour.svg'
 import editIcon from '../assets/edit.svg'
@@ -46,37 +53,6 @@ const CHINESE_NUMERAL_MAP = new Map(CHINESE_NUMERAL_DIGITS.map((digit, index) =>
 const PLAN_LEGEND_CLIMATE = '\u84dd\u8272\u4e3a\u6c14\u5019\u8865\u507f\u667a\u80fd\u8c03\u8282'
 const PLAN_LEGEND_CONSTANT = '\u9ec4\u8272\u4e3a\u5b9a\u6e29\u6a21\u5f0f'
 const PLAN_LEGEND_SEPARATOR = '\uFF0C'
-
-const INITIAL_PLANS = [
-  {
-    name: '方案一',
-    enabled: true,
-    cycles: [
-      {
-        days: [1, 2, 3, 4],
-        periods: [
-          { start: '00:00', end: '06:00', mode: 'climate' },
-          { start: '06:00', end: '15:00', mode: 'constant', temperature: '35' },
-          { start: '15:00', end: '24:00', mode: 'climate' },
-        ],
-      },
-      {
-        days: [5, 6, 0],
-        periods: [],
-      },
-    ],
-  },
-  {
-    name: '方案二',
-    enabled: false,
-    cycles: [
-      {
-        days: [1, 2, 3, 4, 5, 6, 0],
-        periods: [],
-      },
-    ],
-  },
-]
 
 let entityIdSeed = 1000
 
@@ -266,10 +242,20 @@ function resolvePeriodLabel(period) {
   return '气候补偿智能调节'
 }
 
+function resolveEntityId(initialId) {
+  if (Number.isFinite(initialId)) {
+    return initialId
+  }
+  if (typeof initialId === 'string' && initialId.trim() !== '') {
+    return initialId.trim()
+  }
+  return createEntityId()
+}
+
 function createPeriod(initial = {}) {
   const mode = initial.mode === 'constant' ? 'constant' : 'climate'
   return {
-    id: Number.isFinite(initial.id) ? initial.id : createEntityId(),
+    id: resolveEntityId(initial.id),
     start: normalizeTimeValue(initial.start ?? '00:00'),
     end: normalizeTimeValue(initial.end ?? '00:00'),
     mode,
@@ -280,7 +266,7 @@ function createPeriod(initial = {}) {
 function createCycle(initial = {}) {
   const sourcePeriods = Array.isArray(initial.periods) ? initial.periods : [{}]
   return {
-    id: Number.isFinite(initial.id) ? initial.id : createEntityId(),
+    id: resolveEntityId(initial.id),
     days: sortDays(Array.isArray(initial.days) ? initial.days : []),
     periods: sourcePeriods.map((period) => createPeriod(period)),
   }
@@ -289,9 +275,10 @@ function createCycle(initial = {}) {
 function createPlan(initial = {}) {
   const sourceCycles = Array.isArray(initial.cycles) && initial.cycles.length > 0 ? initial.cycles : [{}]
   return {
-    id: Number.isFinite(initial.id) ? initial.id : createEntityId(),
+    id: resolveEntityId(initial.id),
     name: sanitizePlanName(initial.name),
     enabled: initial.enabled !== false,
+    pageMode: initial.pageMode === 'all-day' ? 'all-day' : 'smart',
     cycles: sourceCycles.map((cycle) => createCycle(cycle)),
   }
 }
@@ -666,20 +653,13 @@ function SmartTimerPlanCard({ plan, onEdit, onToggle, toggleConfirmConfig }) {
 function SmartTimerPage() {
   const { requestConfirm, confirmModal } = useActionConfirm()
   const [pageMode, setPageMode] = useState('smart')
-  const [plans, setPlans] = useState(() => {
-    const seededPlans = INITIAL_PLANS.map((plan) => createPlan(plan))
-    if (seededPlans.length <= 0) {
-      return []
-    }
-
-    const [firstPlan] = seededPlans
-    return [
-      {
-        ...firstPlan,
-        cycles: firstPlan.cycles.slice(0, 1),
-      },
-    ]
+  const { data: plansQueryData, refetch: refetchPlans } = useSmartTimerPlansQuery({
+    enabled: pageMode === 'smart',
   })
+  const plans = useMemo(() => {
+    const rawPlans = Array.isArray(plansQueryData?.plans) ? plansQueryData.plans : []
+    return rawPlans.map((plan) => createPlan(plan))
+  }, [plansQueryData])
   const [editorState, setEditorState] = useState({
     isOpen: false,
     type: 'create',
@@ -689,6 +669,13 @@ function SmartTimerPage() {
   const [timePickerTarget, setTimePickerTarget] = useState(null)
   const [temperatureKeypadTarget, setTemperatureKeypadTarget] = useState(null)
   const [attentionModalMessage, setAttentionModalMessage] = useState('')
+  const [isMutating, setIsMutating] = useState(false)
+  const [isEditorDragging, setIsEditorDragging] = useState(false)
+  const editorBodyRef = useRef(null)
+  const editorDragStateRef = useRef({
+    startY: 0,
+    startScrollTop: 0,
+  })
   const draftPlan = editorState.draftPlan
   const isEditing = editorState.type === 'edit'
 
@@ -709,6 +696,46 @@ function SmartTimerPage() {
     })
     setTimePickerTarget(null)
     setTemperatureKeypadTarget(null)
+    setIsEditorDragging(false)
+  }
+
+  const handleEditorBodyMouseDown = (event) => {
+    if (event.button !== 0) {
+      return
+    }
+
+    const targetElement = event.target
+    if (
+      targetElement instanceof Element &&
+      targetElement.closest('button, input, textarea, select, a, [role="button"], [data-no-drag-scroll="true"]')
+    ) {
+      return
+    }
+
+    const container = editorBodyRef.current
+    if (!container) {
+      return
+    }
+
+    editorDragStateRef.current = {
+      startY: event.clientY,
+      startScrollTop: container.scrollTop,
+    }
+    setIsEditorDragging(true)
+
+    const handleMouseMove = (moveEvent) => {
+      const deltaY = moveEvent.clientY - editorDragStateRef.current.startY
+      container.scrollTop = editorDragStateRef.current.startScrollTop - deltaY
+    }
+
+    const handleMouseUp = () => {
+      setIsEditorDragging(false)
+      window.removeEventListener('mousemove', handleMouseMove)
+      window.removeEventListener('mouseup', handleMouseUp)
+    }
+
+    window.addEventListener('mousemove', handleMouseMove)
+    window.addEventListener('mouseup', handleMouseUp)
   }
 
   const openCreateEditor = () => {
@@ -1034,8 +1061,8 @@ function SmartTimerPage() {
     setTemperatureKeypadTarget(null)
   }
 
-  const handleConfirmEditor = () => {
-    if (!draftPlan) {
+  const handleConfirmEditor = async () => {
+    if (!draftPlan || isMutating) {
       return
     }
 
@@ -1064,40 +1091,100 @@ function SmartTimerPage() {
       return
     }
 
-    const normalizedPlan = createPlan({
-      ...draftPlan,
+    const planForPayload = {
+      id: isEditing ? editorState.planId : null,
+      name: draftPlan.name,
+      enabled: draftPlan.enabled,
+      pageMode: draftPlan.pageMode ?? pageMode,
       cycles: draftPlan.cycles.map((cycle) => ({
-        ...cycle,
         days: sortDays(cycle.days),
         periods: cycle.periods.map((period) => ({
-          ...period,
           start: normalizeTimeValue(period.start),
           end: normalizeTimeValue(period.end),
           mode: period.mode === 'constant' ? 'constant' : 'climate',
           temperature: period.mode === 'constant' ? sanitizeTemperature(period.temperature) : '',
         })),
       })),
-    })
-
-    if (isEditing) {
-      setPlans((currentPlans) =>
-        currentPlans.map((plan) => (plan.id === editorState.planId ? normalizedPlan : plan)),
-      )
-    } else {
-      setPlans((currentPlans) => [...currentPlans, normalizedPlan])
     }
 
-    closeEditor()
+    const planJson = buildSmartTimerPlanPayload(planForPayload)
+    if (!planJson) {
+      showAttentionModal('当前方案数据无效，无法保存。')
+      return
+    }
+
+    setIsMutating(true)
+    try {
+      const response = await saveSmartTimerPlan(planJson)
+      const responseData = response?.data ?? {}
+      if (responseData.state !== 'success') {
+        showAttentionModal(responseData.message || '保存方案失败，请稍后再试。')
+        return
+      }
+
+      closeEditor()
+      await refetchPlans()
+    } catch (error) {
+      showAttentionModal(error?.message || '保存方案失败，请检查网络。')
+    } finally {
+      setIsMutating(false)
+    }
   }
 
-  const handleDeletePlan = () => {
+  const handleDeletePlan = async () => {
     if (!isEditing) {
       closeEditor()
       return
     }
+    if (isMutating) {
+      return
+    }
 
-    setPlans((currentPlans) => currentPlans.filter((plan) => plan.id !== editorState.planId))
-    closeEditor()
+    const targetPlanId = editorState.planId
+    if (targetPlanId == null || String(targetPlanId).trim() === '') {
+      closeEditor()
+      return
+    }
+
+    setIsMutating(true)
+    try {
+      const response = await deleteSmartTimerPlan(targetPlanId)
+      const responseData = response?.data ?? {}
+      if (responseData.state !== 'success') {
+        showAttentionModal(responseData.message || '删除方案失败，请稍后再试。')
+        return
+      }
+
+      closeEditor()
+      await refetchPlans()
+    } catch (error) {
+      showAttentionModal(error?.message || '删除方案失败，请检查网络。')
+    } finally {
+      setIsMutating(false)
+    }
+  }
+
+  const handleTogglePlan = async (plan) => {
+    if (!plan || isMutating) {
+      return
+    }
+
+    const nextEnabled = !plan.enabled
+    setIsMutating(true)
+    try {
+      const response = await toggleSmartTimerPlan({ id: plan.id, enabled: nextEnabled })
+      const responseData = response?.data ?? {}
+      if (responseData.state !== 'success') {
+        showAttentionModal(responseData.message || '切换方案状态失败，请稍后再试。')
+        return
+      }
+
+      await refetchPlans()
+    } catch (error) {
+      showAttentionModal(error?.message || '切换方案状态失败，请检查网络。')
+    } finally {
+      setIsMutating(false)
+    }
   }
 
   return (
@@ -1145,18 +1232,7 @@ function SmartTimerPage() {
                     key={plan.id}
                     plan={plan}
                     onEdit={() => openEditEditor(plan.id)}
-                    onToggle={() =>
-                      setPlans((currentPlans) =>
-                        currentPlans.map((item) =>
-                          item.id === plan.id
-                            ? {
-                                ...item,
-                                enabled: !item.enabled,
-                              }
-                            : item,
-                        ),
-                      )
-                    }
+                    onToggle={() => handleTogglePlan(plan)}
                     toggleConfirmConfig={({ nextChecked }) => ({
                       message: `确认${nextChecked ? '开启' : '关闭'}${plan.name}吗？`,
                     })}
@@ -1186,7 +1262,11 @@ function SmartTimerPage() {
               </button>
             </header>
 
-            <div className="smart-timer-page__editor-body">
+            <div
+              ref={editorBodyRef}
+              className={`smart-timer-page__editor-body${isEditorDragging ? ' is-dragging' : ''}`}
+              onMouseDown={handleEditorBodyMouseDown}
+            >
               <section className="smart-timer-page__editor-plan-row">
                 <span className="smart-timer-page__editor-plan-name">{draftPlan.name}</span>
                 <ToggleSwitch
@@ -1338,15 +1418,30 @@ function SmartTimerPage() {
 
               <footer className="smart-timer-page__editor-actions">
                 {isEditing ? (
-                  <button type="button" className="smart-timer-page__editor-action is-delete" onClick={handleDeletePlan}>
+                  <button
+                    type="button"
+                    className="smart-timer-page__editor-action is-delete"
+                    onClick={() => requestConfirm({ message: '确认删除当前定时方案吗？', zIndex: 320 }, handleDeletePlan)}
+                    disabled={isMutating}
+                  >
                     删除方案
                   </button>
                 ) : (
-                  <button type="button" className="smart-timer-page__editor-action is-cancel" onClick={closeEditor}>
+                  <button
+                    type="button"
+                    className="smart-timer-page__editor-action is-cancel"
+                    onClick={closeEditor}
+                    disabled={isMutating}
+                  >
                     取消
                   </button>
                 )}
-                <button type="button" className="smart-timer-page__editor-action is-confirm" onClick={() => requestConfirm({ message: '确认保存当前定时方案吗？', zIndex: 320 }, handleConfirmEditor)}>
+                <button
+                  type="button"
+                  className="smart-timer-page__editor-action is-confirm"
+                  onClick={() => requestConfirm({ message: '确认保存当前定时方案吗？', zIndex: 320 }, handleConfirmEditor)}
+                  disabled={isMutating}
+                >
                   确定
                 </button>
               </footer>

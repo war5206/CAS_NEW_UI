@@ -114,4 +114,33 @@ export const ALGORITHM_PROCESS_IDS = {
   SAVE_PLC_POINT_EF_DATA: 'savePLCPointEFData',
   /** 基础设置 — 重启 PLC：下置 EF 数据 */
   WRITE_PLC_POINT_EF_DATA: 'writePLCPointEFData',
+  /** 智能定时 — 查询所有方案及其周期/时段/动作 */
+  QUERY_SMART_TIMER_PLAN: 'querySmartTimerPlan',
+  /** 智能定时 — 新增/编辑方案（一次性提交完整方案 JSON） */
+  SAVE_SMART_TIMER_PLAN: 'saveSmartTimerPlan',
+  /** 智能定时 — 软删除方案 */
+  DELETE_SMART_TIMER_PLAN: 'deleteSmartTimerPlan',
+  /** 智能定时 — 切换方案启用状态 */
+  TOGGLE_SMART_TIMER_PLAN: 'toggleSmartTimerPlan',
+  /** 分析模块 — 数据综述卡片 */
+  ANALYSIS_OVERVIEW_SUMMARY: 'selRealValueRatioSJZS',
+  /** 分析模块 — 数据综述 COP 柱图 */
+  ANALYSIS_OVERVIEW_COP_BAR: 'queryCOPBar',
+  /** 分析模块 — 用电统计 */
+  ANALYSIS_ELECTRICITY_CONSUMPTION: 'queryElectricityConsumption',
+  /** 分析模块 — 用水统计 */
+  ANALYSIS_WATER_CONSUMPTION: 'queryWaterConsumption',
+  /** 分析模块 — 热量统计 */
+  ANALYSIS_HEAT_PRODUCTION: 'queryHeatProduction',
+  /** 分析模块 — 费用分析 */
+  ANALYSIS_EXPENSE: 'queryExpense',
+  /** 运维模块 — 系统管理 */
+  OPS_QUERY_SYSTEM_STATE_DATA: 'querySystemStateData',
+  OPS_QUERY_HEAT_PUMP_SINGLE: 'queryHeatPumpSingle',
+  OPS_QUERY_HEAT_PUMP_LIST: 'queryHeatPumpList',
+  OPS_QUERY_SYSTEM_CONFIG_SINGLE: 'querySystemConfigSingle',
+  OPS_QUERY_CURVE_BY_LONG_NAME: 'queryCurveByLongName',
+  /** 运维模块 — 设备管理 */
+  OPS_QUERY_SYSTEM_TYPE: 'querySystemType',
+  OPS_HEAT_PUMP_OPERATING_TIME: 'heatPumpOperatingTime',
 }

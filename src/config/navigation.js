@@ -56,7 +56,7 @@ export const modules = [
         path: 'device-params',
         tabs: [
           { id: 'hp-loop-pump', label: '热泵循环泵', path: 'heat-pump-loop-pump' },
-          // { id: 'terminal-loop-pump', label: '末端循环泵', path: 'terminal-loop-pump' },
+          { id: 'terminal-loop-pump', label: '末端循环泵', path: 'terminal-loop-pump' },
           { id: 'heat-pump', label: '热泵', path: 'heat-pump' },
           { id: 'heat-trace', label: '伴热带', path: 'heat-trace' },
           { id: 'constant-pressure-pump', label: '定压泵', path: 'constant-pressure-pump' },
@@ -98,7 +98,7 @@ export const modules = [
       { id: 'power', label: '用电统计', path: 'power-statistics', tabs: [] },
       { id: 'water', label: '用水统计', path: 'water-statistics', tabs: [] },
       { id: 'heat', label: '热量统计', path: 'heat-statistics', tabs: [] },
-      { id: 'cold', label: '冷量统计', path: 'cold-statistics', tabs: [] },
+      // { id: 'cold', label: '冷量统计', path: 'cold-statistics', tabs: [] }, // 暂时隐藏
       { id: 'cost', label: '费用分析', path: 'cost-analysis', tabs: [] },
     ],
   },
@@ -126,6 +126,7 @@ export const modules = [
         tabs: [
           { id: 'ops-heat-pump', label: '热泵', path: 'heat-pump' },
           { id: 'ops-loop-pump', label: '热泵循环泵', path: 'heat-pump-loop-pump' },
+          { id: 'ops-terminal-loop-pump', label: '末端循环泵', path: 'terminal-loop-pump' },
           { id: 'ops-coupling', label: '耦合能源', path: 'coupling-energy' },
         ],
       },

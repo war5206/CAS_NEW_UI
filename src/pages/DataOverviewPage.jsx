@@ -4,30 +4,11 @@ import DataOverviewChart from '../components/DataOverviewChart'
 import upIcon from '../assets/icons/data-up.svg'
 import downIcon from '../assets/icons/data-down.svg'
 import { syncMonthRange } from '../utils/analysisFilterUtils'
+import {
+  useAnalysisOverviewCopChartQuery,
+  useAnalysisOverviewSummaryQuery,
+} from '../features/analysis/hooks/useAnalysisOverviewQueries'
 import './DataOverviewPage.css'
-
-const metrics = [
-  { title: 'COP', value: '2.0', color: '#FF5A36', trend: '+3.2%', trendDir: 'up' },
-  { title: '总供热量（kWh）', value: '645.12', color: '#6B3DFF', trend: '+3.2%', trendDir: 'up' },
-  { title: '节费比（%）', value: '10.01', color: '#F4AE21', trend: null, trendDir: null },
-  {
-    title: '费用（元）',
-    color: '#D749C7',
-    trend: '-3.2%',
-    trendDir: 'down',
-    totalValue: '800.01',
-    averageValue: '10.01',
-  },
-  {
-    title: '耗电量（kWh）',
-    color: '#22A8FF',
-    trend: '+3.2%',
-    trendDir: 'up',
-    totalValue: '2156',
-    averageValue: '6.55',
-  },
-  { title: '节碳量（t）', value: '10.01', color: '#62F96D', trend: null, trendDir: null },
-]
 
 const DEFAULT_FILTERS = {
   day: {
@@ -43,28 +24,36 @@ const DEFAULT_FILTERS = {
   },
 }
 
-function renderMetricValue(metric) {
-  if (metric.totalValue && metric.averageValue) {
-    return (
-      <>
-        <span className="data-overview-page__value-label">总</span>
-        {metric.totalValue}
-        <span className="data-overview-page__value-gap" />
-        <span className="data-overview-page__value-label">每平</span>
-        {metric.averageValue}
-      </>
-    )
+/** 同比区域是否为数值意义上的 0（含 0、0.0、0.00、0.00% 等）——此类情况不展示升降箭头 */
+function isZeroYoYTrend(trend) {
+  if (trend == null || trend === '') {
+    return false
   }
+  const normalized = String(trend).trim().replace(/%/g, '')
+  const n = Number.parseFloat(normalized)
+  return Number.isFinite(n) && n === 0
+}
 
-  return metric.value
+function getTrendIconSideClass(trend) {
+  if (isZeroYoYTrend(trend)) {
+    return 'is-neutral'
+  }
+  if (trend.startsWith('-')) {
+    return 'is-down'
+  }
+  return 'is-up'
 }
 
 function getCardState(metric) {
-  if (metric.trendDir === 'up') {
+  if (isZeroYoYTrend(metric.trend)) {
+    return 'is-neutral'
+  }
+
+  if (metric.trend?.startsWith('+')) {
     return 'is-up'
   }
 
-  if (metric.trendDir === 'down') {
+  if (metric.trend?.startsWith('-')) {
     return 'is-down'
   }
 
@@ -75,6 +64,7 @@ function DataOverviewPage() {
   const [period, setPeriod] = useState('日')
   const [compareMode, setCompareMode] = useState('none')
   const [filters, setFilters] = useState(DEFAULT_FILTERS)
+  const summaryQuery = useAnalysisOverviewSummaryQuery()
 
   const handleFilterChange = (nextRange) => {
     const filterKey = period === '日' ? 'day' : period === '月' ? 'month' : 'year'
@@ -93,14 +83,19 @@ function DataOverviewPage() {
   }
 
   const activeRange = period === '日' ? filters.day : period === '月' ? filters.month : filters.year
+  const chartQuery = useAnalysisOverviewCopChartQuery({
+    period,
+    compareMode,
+    range: activeRange,
+  })
 
   return (
     <main className="data-overview-page">
-      <h2 className="data-overview-page__title">本采暖季（2025.11.15 - 2026.03.15）</h2>
+      <h2 className="data-overview-page__title">{summaryQuery.data.seasonLabel}</h2>
       <p className="data-overview-page__tip">热表精度影响 COP，COP 仅作参考；节碳量以供热数据为准</p>
 
       <section className="data-overview-page__cards">
-        {metrics.map((metric) => (
+        {summaryQuery.data.metrics.map((metric) => (
           <article key={metric.title} className={`data-overview-page__card ${getCardState(metric)}`}>
             <div className="data-overview-page__card-head">
               <div className="data-overview-page__card-label">
@@ -108,15 +103,17 @@ function DataOverviewPage() {
                 {metric.title}
               </div>
               {metric.trend ? (
-                <div className={`data-overview-page__trend is-${metric.trendDir}`}>
-                  <img src={metric.trendDir === 'up' ? upIcon : downIcon} alt="" aria-hidden="true" />
+                <div className={`data-overview-page__trend ${getTrendIconSideClass(metric.trend)}`}>
+                  {!isZeroYoYTrend(metric.trend) ? (
+                    <img src={metric.trend.startsWith('-') ? downIcon : upIcon} alt="" aria-hidden="true" />
+                  ) : null}
                   {metric.trend}
                 </div>
               ) : (
                 <span className="data-overview-page__trend-placeholder">--</span>
               )}
             </div>
-            <div className="data-overview-page__card-value">{renderMetricValue(metric)}</div>
+            <div className="data-overview-page__card-value">{metric.value}</div>
           </article>
         ))}
       </section>
@@ -130,7 +127,7 @@ function DataOverviewPage() {
         onRangeChange={handleFilterChange}
       />
 
-      <DataOverviewChart period={period} compareMode={compareMode} range={activeRange} />
+      <DataOverviewChart period={period} compareMode={compareMode} range={activeRange} chartModel={chartQuery.data} />
     </main>
   )
 }

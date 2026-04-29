@@ -1,11 +1,10 @@
-import { useMemo, useState } from 'react'
+import { useState } from 'react'
 import DataOverviewChart from '../components/DataOverviewChart'
 import DataOverviewFilterBar from '../components/DataOverviewFilterBar'
 import { syncMonthRange } from '../utils/analysisFilterUtils'
-import { getStoredEnergyPriceState } from '../utils/energyPriceState'
 import './DataOverviewPage.css'
 import './ResourceStatisticsPage.css'
-import { buildResourceStatisticsViewModel, getResourceStatisticsPageConfig } from './resourceStatisticsData'
+import { useAnalysisTrendQuery } from '../features/analysis/hooks/useAnalysisTrendQuery'
 
 const DEFAULT_FILTERS = {
   day: {
@@ -34,27 +33,36 @@ function formatFilterDateLabel(value, type, placeholder) {
 }
 
 function ResourceStatisticsPage({ pageType }) {
-  const pageConfig = getResourceStatisticsPageConfig(pageType)
+  const pageConfig =
+    pageType === 'water'
+      ? { title: '用水量', titleOptions: [] }
+      : pageType === 'heat'
+        ? { title: '耗热量', titleOptions: [] }
+        : pageType === 'cold'
+          ? { title: '制冷量', titleOptions: [] }
+          : {
+              title: '总费用',
+              titleOptions: [
+                { label: '总费用', value: 'total-cost' },
+                { label: '热泵', value: 'heat-pump' },
+                { label: '水泵', value: 'water-pump' },
+                { label: '耦合能源', value: 'coupling-energy' },
+              ],
+            }
   const [period, setPeriod] = useState('日')
   const [compareMode, setCompareMode] = useState('none')
   const [filters, setFilters] = useState(DEFAULT_FILTERS)
   const [titleValue, setTitleValue] = useState(pageConfig.titleOptions[0]?.value ?? '')
-  const [energyPriceState] = useState(() => getStoredEnergyPriceState())
 
   const activeRange = period === '日' ? filters.day : period === '月' ? filters.month : filters.year
-
-  const viewModel = useMemo(
-    () =>
-      buildResourceStatisticsViewModel({
-        pageType,
-        period,
-        range: activeRange,
-        compareMode,
-        titleValue,
-        energyPriceState,
-      }),
-    [activeRange, compareMode, energyPriceState, pageType, period, titleValue],
-  )
+  const queryPageType = pageType === 'cold' ? 'heat' : pageType
+  const viewModelQuery = useAnalysisTrendQuery({
+    pageType: queryPageType,
+    period,
+    compareMode,
+    range: activeRange,
+    titleValue,
+  })
 
   const handleFilterChange = (nextRange) => {
     const filterKey = period === '日' ? 'day' : period === '月' ? 'month' : 'year'
@@ -75,7 +83,7 @@ function ResourceStatisticsPage({ pageType }) {
   return (
     <main className="resource-statistics-page">
       <section className="resource-statistics-page__cards" aria-label={`${pageConfig.title}摘要`}>
-        {viewModel.summaryCards.map((card) => (
+        {viewModelQuery.data.summaryCards.map((card) => (
           <article key={card.label} className="resource-statistics-page__card">
             <div className="resource-statistics-page__card-label">
               <span style={{ backgroundColor: card.color }} />
@@ -103,7 +111,12 @@ function ResourceStatisticsPage({ pageType }) {
       />
 
       <div className="resource-statistics-page__chart-panel">
-        <DataOverviewChart period={period} compareMode={compareMode} range={activeRange} chartModel={viewModel.chartModel} />
+        <DataOverviewChart
+          period={period}
+          compareMode={compareMode}
+          range={activeRange}
+          chartModel={viewModelQuery.data.chartModel}
+        />
       </div>
     </main>
   )

@@ -1,9 +1,8 @@
-import { useMemo, useState } from 'react'
+import { useState } from 'react'
 import DataOverviewFilterBar from '../components/DataOverviewFilterBar'
 import DataOverviewChart from '../components/DataOverviewChart'
 import { syncMonthRange } from '../utils/analysisFilterUtils'
-import { getStoredEnergyPriceState } from '../utils/energyPriceState'
-import { buildPowerStatisticsViewModel, getPowerTypeOptions } from './powerStatisticsData'
+import { useAnalysisTrendQuery } from '../features/analysis/hooks/useAnalysisTrendQuery'
 import './DataOverviewPage.css'
 import './PowerStatisticsPage.css'
 
@@ -36,23 +35,17 @@ function formatFilterDateLabel(value, type, placeholder) {
 function PowerStatisticsPage() {
   const [period, setPeriod] = useState('日')
   const [compareMode, setCompareMode] = useState('none')
-  const [equipmentType, setEquipmentType] = useState('heat-pump')
+  const [equipmentType, setEquipmentType] = useState('total-power')
   const [filters, setFilters] = useState(DEFAULT_FILTERS)
-  const [energyPriceState] = useState(() => getStoredEnergyPriceState())
 
   const activeRange = period === '日' ? filters.day : period === '月' ? filters.month : filters.year
-
-  const viewModel = useMemo(
-    () =>
-      buildPowerStatisticsViewModel({
-        period,
-        range: activeRange,
-        compareMode,
-        equipmentType,
-        energyPriceState,
-      }),
-    [activeRange, compareMode, energyPriceState, equipmentType, period],
-  )
+  const viewModelQuery = useAnalysisTrendQuery({
+    pageType: 'power',
+    period,
+    compareMode,
+    range: activeRange,
+    titleValue: equipmentType,
+  })
 
   const handleFilterChange = (nextRange) => {
     const filterKey = period === '日' ? 'day' : period === '月' ? 'month' : 'year'
@@ -73,7 +66,7 @@ function PowerStatisticsPage() {
   return (
     <main className="power-statistics-page">
       <section className="power-statistics-page__cards" aria-label="用电统计摘要">
-        {viewModel.summaryCards.map((card) => (
+        {viewModelQuery.data.summaryCards.map((card) => (
           <article key={card.label} className="power-statistics-page__card">
             <div className="power-statistics-page__card-label">
               <span style={{ backgroundColor: card.color }} />
@@ -86,7 +79,12 @@ function PowerStatisticsPage() {
 
       <DataOverviewFilterBar
         className="power-statistics-filter-bar"
-        titleOptions={getPowerTypeOptions()}
+        titleOptions={[
+          { label: '总用电', value: 'total-power' },
+          { label: '热泵', value: 'heat-pump' },
+          { label: '水泵', value: 'water-pump' },
+          { label: '耦合能源', value: 'coupling-energy' },
+        ]}
         titleValue={equipmentType}
         onTitleChange={setEquipmentType}
         titleAriaLabel="选择用电统计对象"
@@ -100,7 +98,12 @@ function PowerStatisticsPage() {
       />
 
       <div className="power-statistics-page__chart-panel">
-        <DataOverviewChart period={period} compareMode={compareMode} range={activeRange} chartModel={viewModel.chartModel} />
+        <DataOverviewChart
+          period={period}
+          compareMode={compareMode}
+          range={activeRange}
+          chartModel={viewModelQuery.data.chartModel}
+        />
       </div>
     </main>
   )

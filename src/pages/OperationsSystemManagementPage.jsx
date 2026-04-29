@@ -4,6 +4,13 @@ import SelectDropdown from '../components/SelectDropdown'
 import TimePickerModal from '../components/TimePickerModal'
 import dateIcon from '../assets/icons/date.svg'
 import closeIcon from '../assets/icons/close.svg'
+import {
+  useOpsCurveQuery,
+  useOpsHeatPumpListQuery,
+  useOpsHeatPumpSingleQuery,
+  useOpsSystemConfigQuery,
+  useOpsSystemStateQuery,
+} from '@/features/operations/hooks/useOperationsQueries'
 import { getStoredClimateMode } from '../utils/climateModeState'
 import { getStoredEnergyPriceState } from '../utils/energyPriceState'
 import { getStoredTemperatureMode } from '../utils/temperatureModeState'
@@ -36,7 +43,8 @@ const SETTING_OPTIONS = [
   { value: 'heat-pump-meter-1', label: '热泵电表1' },
   { value: 'heat-pump-meter-2', label: '热泵电表2' },
   { value: 'water-pump-meter', label: '水泵电表' },
-  { value: 'water-heat-meter', label: '水表和热表' },
+  { value: 'water-meter', label: '水表' },
+  { value: 'heat-meter', label: '热表' },
 ]
 const UNIT_OPTIONS = Array.from({ length: 33 }, (_, index) => ({
   value: `heat-pump-${index + 1}`,
@@ -176,7 +184,7 @@ function getCurrentDateTimeParts() {
 
 function getDefaultTrendTimeRange() {
   const endDate = new Date()
-  const startDate = new Date(endDate.getTime() - DAY_IN_MS)
+  const startDate = new Date(endDate.getTime() - HOUR_IN_MS)
 
   return {
     startTime: normalizeDateTime(
@@ -484,9 +492,14 @@ function buildPowerMeterItems(prefix) {
   ]
 }
 
-function buildWaterHeatMeterItems() {
+function buildWaterMeterItems() {
   return [
     createValueMetric('water-meter-total-flow', '水表累计流量', '3256.0 m³', 'm³', 'flow'),
+  ]
+}
+
+function buildHeatMeterItems() {
+  return [
     createValueMetric('heat-meter-supply-temp', '热表供水温度', '38.6 ℃', '℃', 'temperature'),
     createValueMetric('heat-meter-return-temp', '热表回水温度', '31.4 ℃', '℃', 'temperature'),
     createValueMetric('heat-meter-power', '热表功率', '186.0 kW', 'kW', 'power'),
@@ -535,8 +548,10 @@ function buildSystemSettingItems(settingKey) {
       return buildPowerMeterItems('heat-pump-meter-2')
     case 'water-pump-meter':
       return buildPowerMeterItems('water-pump-meter')
-    case 'water-heat-meter':
-      return buildWaterHeatMeterItems()
+    case 'water-meter':
+      return buildWaterMeterItems()
+    case 'heat-meter':
+      return buildHeatMeterItems()
     default:
       return buildModeSelectItems()
   }
@@ -1110,33 +1125,52 @@ function MetricCard({ item, onClick }) {
 
 function OperationsSystemManagementPage({ tabId }) {
   const [activeSetting, setActiveSetting] = useState(SETTING_OPTIONS[0].value)
-  const [activeUnit, setActiveUnit] = useState(UNIT_OPTIONS[0].value)
+  const [activeUnit, setActiveUnit] = useState('No1')
   const [activeMetric, setActiveMetric] = useState(null)
   const defaultTrendTimeRange = useMemo(() => getDefaultTrendTimeRange(), [])
   const [startTime, setStartTime] = useState(defaultTrendTimeRange.startTime)
   const [endTime, setEndTime] = useState(defaultTrendTimeRange.endTime)
-  const [chartVersion, setChartVersion] = useState(0)
-  const systemSettingItems = buildSystemSettingItems(activeSetting)
-  const chartData = useMemo(
-    () => (activeMetric ? createRandomSeries(activeMetric, startTime, endTime, chartVersion) : []),
-    [activeMetric, chartVersion, endTime, startTime],
+  const selectedSettingLabel = useMemo(
+    () => SETTING_OPTIONS.find((item) => item.value === activeSetting)?.label ?? SETTING_OPTIONS[0].label,
+    [activeSetting],
   )
+  const { data: stateMetrics = [] } = useOpsSystemStateQuery({
+    enabled: tabId === 'status-data',
+  })
+  const { data: configMetrics = [] } = useOpsSystemConfigQuery(selectedSettingLabel, {
+    enabled: tabId === 'setting-data',
+  })
+  const { data: heatPumpOptions = [] } = useOpsHeatPumpListQuery({
+    enabled: tabId === 'unit-data',
+  })
+  const { data: unitMetrics = [] } = useOpsHeatPumpSingleQuery(activeUnit, {
+    enabled: tabId === 'unit-data',
+  })
+  const { data: chartData = [], refetch: refetchCurve } = useOpsCurveQuery({
+    longName: activeMetric?.longName,
+    startTime,
+    endTime,
+    enabled: Boolean(activeMetric?.longName),
+  })
 
   useEffect(() => {
     setActiveMetric(null)
   }, [activeSetting, activeUnit, tabId])
 
-  const selectedUnit = useMemo(
-    () => UNIT_OPTIONS.find((item) => item.value === activeUnit) ?? UNIT_OPTIONS[0],
-    [activeUnit],
-  )
+  useEffect(() => {
+    if (tabId !== 'unit-data' || !heatPumpOptions.length) return
+    const exists = heatPumpOptions.some((item) => item.value === activeUnit)
+    if (!exists) {
+      setActiveUnit(heatPumpOptions[0].value)
+    }
+  }, [activeUnit, heatPumpOptions, tabId])
 
   const viewConfig = useMemo(() => {
     if (tabId === 'status-data') {
       return {
         selector: null,
         tip: '点击卡片查看历史状态数据曲线图',
-        items: SYSTEM_STATUS_ITEMS,
+        items: stateMetrics,
       }
     }
 
@@ -1156,11 +1190,10 @@ function OperationsSystemManagementPage({ tabId }) {
           />
         ),
         tip: '点击卡片查看历史状态数据曲线图',
-        items: systemSettingItems,
+        items: configMetrics,
       }
     }
-
-    const unitNumber = Number(activeUnit.replace('heat-pump-', '')) || 1
+    const selectedUnit = heatPumpOptions.find((item) => item.value === activeUnit) ?? heatPumpOptions[0]
     return {
       selector: (
         <SelectDropdown
@@ -1168,7 +1201,7 @@ function OperationsSystemManagementPage({ tabId }) {
           triggerClassName="ops-system-page__select-trigger"
           dropdownClassName="ops-system-page__select-menu"
           optionClassName="ops-system-page__select-option"
-          options={UNIT_OPTIONS}
+          options={heatPumpOptions}
           value={activeUnit}
           onChange={setActiveUnit}
           triggerAriaLabel="选择热泵机组"
@@ -1176,37 +1209,10 @@ function OperationsSystemManagementPage({ tabId }) {
         />
       ),
       tip: '点击卡片查看历史状态数据曲线图',
-      items: UNIT_ITEMS.map((item, index) => {
-        if (!item.unit || item.unit === 'switch') {
-          return item
-        }
-
-        if (item.chartType === 'temperature') {
-          const nextValue = 12 + ((unitNumber + index * 2) % 24)
-          return { ...item, value: `${nextValue.toFixed(1)} ℃` }
-        }
-
-        if (item.chartType === 'current') {
-          const nextValue = ((unitNumber + index) % 8) + 0.5
-          return { ...item, value: `${nextValue.toFixed(1)} A` }
-        }
-
-        if (item.chartType === 'opening') {
-          const nextValue = (unitNumber * 7 + index * 9) % 100
-          return { ...item, value: `${nextValue.toFixed(1)}` }
-        }
-
-        return item
-      }).map((item) =>
-        item.label === '通讯状态'
-          ? { ...item, value: unitNumber % 3 === 0 ? '关闭' : '开启' }
-          : item.label === '总故障代码'
-            ? { ...item, value: `${unitNumber % 4}` }
-            : item,
-      ),
-      currentTitle: selectedUnit.label,
+      items: unitMetrics,
+      currentTitle: selectedUnit?.label ?? '热泵',
     }
-  }, [activeSetting, activeUnit, selectedUnit.label, systemSettingItems, tabId])
+  }, [activeSetting, activeUnit, configMetrics, heatPumpOptions, stateMetrics, tabId, unitMetrics])
 
   const handleOpenMetric = (item) => {
     const nextRange = getDefaultTrendTimeRange()
@@ -1230,10 +1236,10 @@ function OperationsSystemManagementPage({ tabId }) {
   }
 
   const handleSearch = () => {
-    if (!activeMetric) {
+    if (!activeMetric?.longName) {
       return
     }
-    setChartVersion((previous) => previous + 1)
+    refetchCurve()
   }
 
   return (

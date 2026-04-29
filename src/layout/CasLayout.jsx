@@ -10,6 +10,7 @@ import { buildTabPath, getModuleDefaultPath, getSectionDefaultPath, modules } fr
 import { ignoreAllAlerts, useAlertsStore } from '@/features/alerts/store/alertsStore'
 
 const WEEK_LABELS = ['周日', '周一', '周二', '周三', '周四', '周五', '周六']
+const OPS_SYSTEM_TYPE_STORAGE_KEY = 'ops.systemType'
 
 const formatDateTime = (date) => {
   const month = date.getMonth() + 1
@@ -36,6 +37,7 @@ function CasLayout({
   const navigate = useNavigate()
   const [now, setNow] = useState(() => new Date())
   const [isAlertModalOpen, setIsAlertModalOpen] = useState(false)
+  const [opsSystemType, setOpsSystemType] = useState(() => window.localStorage.getItem(OPS_SYSTEM_TYPE_STORAGE_KEY) || '1')
   const [pendingPrimaryNavTarget, setPendingPrimaryNavTarget] = useState(null)
   const [isSystemPoweredOn, setIsSystemPoweredOn] = useState(true)
   const [pendingPowerAction, setPendingPowerAction] = useState(null)
@@ -50,6 +52,16 @@ function CasLayout({
     const updateTime = () => setNow(new Date())
     const timer = setInterval(updateTime, 60_000)
     return () => clearInterval(timer)
+  }, [])
+
+  useEffect(() => {
+    const onOpsTypeChanged = (event) => {
+      setOpsSystemType(String(event?.detail || window.localStorage.getItem(OPS_SYSTEM_TYPE_STORAGE_KEY) || '1'))
+    }
+    window.addEventListener('ops-system-type-change', onOpsTypeChanged)
+    return () => {
+      window.removeEventListener('ops-system-type-change', onOpsTypeChanged)
+    }
   }, [])
 
   const breadcrumbParts = useMemo(() => {
@@ -68,7 +80,16 @@ function CasLayout({
   }, [activeModule, activeSection, activeTab, extraBreadcrumbLabel, homePageTitle, isHomeLayout])
 
   const sectionList = activeModule.sections ?? []
-  const tabList = activeSection?.tabs ?? []
+  const tabList = useMemo(() => {
+    const source = activeSection?.tabs ?? []
+    if (activeModule.id !== 'operations' || activeSection?.id !== 'device-management') {
+      return source
+    }
+    if (String(opsSystemType) === '2') {
+      return source
+    }
+    return source.filter((item) => item.id !== 'ops-terminal-loop-pump')
+  }, [activeModule.id, activeSection, opsSystemType])
   const showSecondaryNav = !hideSecondaryNav && (sectionList.length > 0 || !isHomeLayout)
   const hasTabs = !hideModuleTabs && tabList.length > 0
   const hasActiveAlerts = activeAlerts.length > 0 && !isAlertIgnored

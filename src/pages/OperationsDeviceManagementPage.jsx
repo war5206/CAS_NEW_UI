@@ -1,83 +1,36 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import useActionConfirm from '../hooks/useActionConfirm'
+import { writeRealvalByLongNames } from '@/api/modules/settings'
+import { useOpsOperatingTimeQuery, useOpsSystemTypeQuery } from '@/features/operations/hooks/useOperationsQueries'
 import './OperationsSystemManagementPage.css'
 
 const TABLE_COLUMNS = ['设备名称', '累计运行时长（h）', '健康状况', '操作']
 const PAGE_SIZE = 10
+const OPS_SYSTEM_TYPE_STORAGE_KEY = 'ops.systemType'
 
-function createHeatPumpRows(count) {
-  return Array.from({ length: count }, (_, index) => {
-    const pumpNumber = index + 1
-    const runtime = 96 + ((pumpNumber * 7) % 58)
-    const health = pumpNumber % 6 === 0 ? '运行过长，请检修' : '正常'
-
-    return {
-      id: `heat-pump-${pumpNumber}`,
-      name: `热泵${pumpNumber}`,
-      runtime,
-      health,
-    }
-  })
+const DEVICE_TYPE_MAP = {
+  'ops-heat-pump': '热泵',
+  'ops-loop-pump': '热泵循环泵',
+  'ops-terminal-loop-pump': '末端循环泵',
+  'ops-coupling': '耦合能源',
 }
-
-function createLoopPumpRows(count) {
-  return Array.from({ length: count }, (_, index) => {
-    const pumpNumber = index + 1
-    const runtime = 108 + pumpNumber * 12
-    const health = pumpNumber === 2 ? '运行过长，请检修' : '正常'
-
-    return {
-      id: `loop-pump-${pumpNumber}`,
-      name: `热泵循环泵${pumpNumber}`,
-      runtime,
-      health,
-    }
-  })
-}
-
-function createCouplingRows() {
-  return [
-    {
-      id: 'coupling-1',
-      name: '电锅炉1',
-      runtime: 84,
-      health: '正常',
-    },
-    {
-      id: 'coupling-2',
-      name: '电锅炉2',
-      runtime: 91,
-      health: '正常',
-    },
-  ]
-}
-
-function createInitialTableData() {
-  return {
-    'ops-heat-pump': createHeatPumpRows(33),
-    'ops-loop-pump': createLoopPumpRows(3),
-    'ops-coupling': createCouplingRows(),
-  }
-}
-
-function cloneTableData(tableData) {
-  return Object.fromEntries(
-    Object.entries(tableData).map(([key, rows]) => [
-      key,
-      rows.map((row) => ({
-        ...row,
-      })),
-    ]),
-  )
-}
-
-let tableDataStore = createInitialTableData()
 
 function OperationsDeviceManagementPage({ tabId }) {
   const [currentPageByTab, setCurrentPageByTab] = useState({})
-  const [tableData, setTableData] = useState(() => cloneTableData(tableDataStore))
   const { requestConfirm, confirmModal } = useActionConfirm()
-  const rows = useMemo(() => tableData[tabId] ?? [], [tabId, tableData])
+  const deviceType = DEVICE_TYPE_MAP[tabId] ?? '热泵'
+  const { data: systemType = '1' } = useOpsSystemTypeQuery()
+  const { data: rows = [] } = useOpsOperatingTimeQuery(deviceType, { enabled: Boolean(deviceType) })
+
+  useEffect(() => {
+    window.localStorage.setItem(OPS_SYSTEM_TYPE_STORAGE_KEY, String(systemType))
+    window.dispatchEvent(
+      new CustomEvent('ops-system-type-change', {
+        detail: String(systemType),
+      }),
+    )
+  }, [systemType])
+
   const isEmpty = rows.length === 0
   const totalPages = Math.max(1, Math.ceil(rows.length / PAGE_SIZE))
   const currentPage = Math.min(currentPageByTab[tabId] ?? 1, totalPages)
@@ -111,18 +64,17 @@ function OperationsDeviceManagementPage({ tabId }) {
         confirmText: '确定',
         cancelText: '取消',
       },
-      () => {
-        setTableData((previous) => {
-          const nextTableData = Object.fromEntries(
-            Object.entries(previous).map(([key, currentRows]) => [
-              key,
-              currentRows.map((row) => (row.id === rowId ? { ...row, runtime: 0 } : row)),
-            ]),
-          )
-
-          tableDataStore = cloneTableData(nextTableData)
-          return nextTableData
+      async () => {
+        if (!currentRow.zeroLongName) {
+          return
+        }
+        const response = await writeRealvalByLongNames({
+          [currentRow.zeroLongName]: 1,
         })
+        const state = response?.data?.data?.state
+        if (state !== 'success') {
+          throw new Error('reset runtime failed')
+        }
       },
     )
   }
