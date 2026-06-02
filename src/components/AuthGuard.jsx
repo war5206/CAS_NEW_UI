@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { Navigate, useNavigate } from 'react-router-dom'
+import { isInitGateSkipped } from '@/api/client/config'
 import { getStoredToken } from '@/api/client/auth'
 import { queryInitState } from '@/api/modules/home'
 
@@ -16,13 +17,14 @@ export function markAuthGuardLockCheckComplete() {
 
 function AuthGuard({ children, skipInitLockCheck = false }) {
   const navigate = useNavigate()
+  const skipInitGate = isInitGateSkipped()
   const hasToken = Boolean(getStoredToken())
   const [checking, setChecking] = useState(
-    () => !skipInitLockCheck && !lockCheckDone && Boolean(getStoredToken()),
+    () => !skipInitGate && !skipInitLockCheck && !lockCheckDone && Boolean(getStoredToken()),
   )
 
   useEffect(() => {
-    if (skipInitLockCheck || lockCheckDone || !hasToken) return
+    if (skipInitGate || skipInitLockCheck || lockCheckDone || !hasToken) return
 
     let cancelled = false
 
@@ -43,7 +45,11 @@ function AuthGuard({ children, skipInitLockCheck = false }) {
       })
 
     return () => { cancelled = true }
-  }, [navigate, hasToken, skipInitLockCheck])
+  }, [navigate, hasToken, skipInitLockCheck, skipInitGate])
+
+  if (skipInitGate) {
+    return children
+  }
 
   if (!hasToken) {
     return <Navigate to="/" replace />

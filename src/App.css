@@ -72,6 +72,11 @@
   overflow: hidden;
   border: 2px solid rgba(75, 94, 126, 0.36);
   box-shadow: 0 0 20px rgba(36, 76, 136, 0.3);
+  padding: 0;
+  background: transparent;
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
 }
 
 .avatar img {
@@ -743,6 +748,10 @@
   box-sizing: border-box;
 }
 
+.home-screen.home-screen--no-side-panel {
+  grid-template-columns: minmax(0, 1fr);
+}
+
 .home-system-panel {
   overflow: hidden;
   display: grid;
@@ -778,18 +787,18 @@
 
 .home-terminal-device-banner {
   position: absolute;
-  top: 0;
-  left: 0;
+  top: 130px;
+  left: 750px;
   right: 0;
   z-index: 2;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 8px 0;
+  width: 390px;
 }
 
 .home-terminal-device-image {
-  max-height: 80px;
+  width: 400px;
+  height: auto;
+  max-width: none;
+  max-height: none;
   object-fit: contain;
 }
 
@@ -874,15 +883,15 @@
 
 .home-system-hitbox--heat-pump-icon {
   left: -0.1%;
-  top: 12%;
+  top: 20%;
   width: 15.5%;
   height: 19.5%;
   border-radius: 5%;
 }
 
 .home-system-hitbox--terminal-building-icon {
-  left: 86.8%;
-  top: 46.2%;
+  left: 87%;
+  top: 54.3%;
   width: 12.5%;
   height: 22.5%;
   border-radius: 5%;
@@ -910,7 +919,7 @@
 }
 
 .home-system-node--heat-pump-click-tip {
-  top: 25%;
+  top: 33%;
   left: 4.7%;
   margin-top: var(--home-system-tip-margin-top);
   font-size: 14px;
@@ -976,18 +985,23 @@
 
 .home-system-node--heat-pump {
   left: 18%;
-  top: 8%;
+  top: 20%;
 }
 
-.home-system-node--heat-pump .home-system-value {
+.home-system-node--air-cooled-module {
+  left: 28%;
+  top: 20%;
+}
+
+.home-unit-status-block .home-system-value {
   min-width: 2ch;
   text-align: right;
   font-variant-numeric: tabular-nums;
 }
 
 .home-system-node--outdoor-temperature {
-  left: 52.5%;
-  top: 14%;
+  left: 83.5%;
+  top: 22.5%;
   transform: translateX(-50%);
 }
 
@@ -1010,76 +1024,76 @@
 }
 
 .home-system-node--indoor-temperature-list {
-  left: 87.5%;
-  top: 27.5%;
+  left: 88.5%;
+  top: 69%;
 }
 
 .home-system-node--supply-temperature {
-  left: 68%;
-  top: 45%;
+  left: 70%;
+  top: 53.5%;
 }
 
 .home-system-node--supply-pressure {
-  left: 68%;
-  top: 55%;
+  left: 70%;
+  top: 63%;
 }
 
 .home-system-node--return-pressure {
-  left: 16%;
-  top: 59.5%;
+  left: 6%;
+  top: 67.5%;
 }
 
 .home-system-node--return-temperature {
   left: 79%;
-  top: 62%;
+  top: 75%;
   transform: translateX(-50%);
 }
 
 .home-system-node--circulation-pump {
-  left: 7%;
-  top: 70%;
+  left: 17.7%;
+  top: 77.5%;
 }
 
 .home-system-node--terminal-loop-pump {
-  left: 44%;
+  left: 38%;
   top: 38%;
 }
 
 .home-system-node--primary-supply-main-temp {
-  left: 19%;
+  left: 16%;
   top: 48%;
 }
 
 .home-system-node--bypass-valve {
   left: 38.5%;
-  top: 54%;
+  top: 54.7%;
   writing-mode: vertical-rl;
   text-orientation: mixed;
   letter-spacing: var(--home-system-letter-spacing);
 }
 
 .home-system-node--drain-valve {
-  left: 62.5%;
-  top: 72%;
+  left: 63.9%;
+  top: 80%;
 }
 
 .home-system-node--pressure-tank {
-  left: 39.5%;
+  left: 40%;
   top: 71%;
 }
 
 .home-system-node--pressure-valve {
-  left: 28%;
+  left: 28.5%;
   top: 89%;
 }
 
 .home-system-node--makeup-pump {
-  left: 51%;
+  left: 51.5%;
   top: 90%;
 }
 
 .home-system-node--water-tank {
-  left: 66%;
+  left: 66.5%;
   top: 79%;
 }
 
@@ -1091,15 +1105,15 @@
 }
 
 .home-system-node--terminal-building {
-  left: 89.5%;
-  top: 70%;
+  left: 90.5%;
+  top: 51.2%;
   font-size: 18px;
   font-weight: 700;
 }
 
 .home-system-node--terminal-building-tip {
-  left: 89.7%;
-  top: 59.8%;
+  left: 90.2%;
+  top: 68.2%;
   font-size: 14px;
   color: #0e0e14;
 }
@@ -1360,10 +1374,13 @@
 }
 
 .home-hp-modal {
-  width: min(920px, 100%);
+  width: min(980px, 100%);
+  max-height: calc(100vh - 72px);
   border-radius: 14px;
   overflow: hidden;
   border: 1px solid rgba(255, 255, 255, 0.08);
+  display: flex;
+  flex-direction: column;
   background:
     linear-gradient(105deg, rgba(28, 33, 47, 0.96) 0%, rgba(8, 16, 33, 0.96) 44%, rgba(28, 33, 47, 0.96) 100%);
 }
@@ -1399,8 +1416,9 @@
 }
 
 .home-hp-modal-header {
-  height: 72px;
-  padding: 0 28px;
+  height: 64px;
+  flex-shrink: 0;
+  padding: 0 24px;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -1408,7 +1426,7 @@
 }
 
 .home-hp-modal-title {
-  font-size: 25px;
+  font-size: 22px;
   font-weight: 500;
   color: #ffffff;
 }
@@ -1432,24 +1450,27 @@
 }
 
 .home-hp-modal-body {
-  padding: 26px 28px 30px;
+  flex: 1;
+  min-height: 0;
+  padding: 18px 24px 22px;
   display: flex;
   flex-direction: column;
-  gap: 22px;
+  gap: 14px;
 }
 
 .home-hp-modal-status {
   display: inline-flex;
   align-items: center;
-  gap: 10px;
-  font-size: 29px;
+  gap: 8px;
+  flex-shrink: 0;
+  font-size: 18px;
   font-weight: 600;
-  line-height: 1;
+  line-height: 1.2;
 }
 
 .home-hp-modal-status-icon {
-  width: 28px;
-  height: 28px;
+  width: 22px;
+  height: 22px;
 }
 
 .home-hp-modal-status.is-running {
@@ -1468,44 +1489,67 @@
   color: #909da2;
 }
 
+.home-hp-modal-metrics-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
 .home-hp-modal-metrics {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 14px 18px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px 12px;
 }
 
 .home-hp-modal-metric {
-  min-height: 80px;
-  border-radius: 16px;
-  padding: 0 22px;
+  min-height: 68px;
+  border-radius: 12px;
+  padding: 10px 14px;
   background: linear-gradient(90deg, rgba(45, 57, 75, 0.65), rgba(32, 42, 56, 0.86));
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 6px;
 }
 
 .home-hp-modal-metric-label {
-  font-size: 20px;
+  font-size: 13px;
+  line-height: 1.35;
   color: rgba(166, 180, 201, 0.92);
 }
 
 .home-hp-modal-metric-value {
-  font-size: 25px;
+  font-size: 20px;
   font-weight: 600;
+  line-height: 1.2;
   color: rgba(243, 248, 255, 0.96);
 }
 
 .home-hp-modal-action {
-  width: 200px;
-  height: 72px;
+  width: 180px;
+  height: 52px;
+  flex-shrink: 0;
   border: none;
-  border-radius: 18px;
+  border-radius: 14px;
   margin: 0 auto;
   background: linear-gradient(160deg, rgba(36, 46, 62, 0.96), rgba(28, 36, 52, 0.96));
   color: #ffffff;
-  font-size: 20px;
+  font-size: 18px;
   cursor: pointer;
+}
+
+@media (max-width: 900px) {
+  .home-hp-modal-metrics {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 640px) {
+  .home-hp-modal-metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 .home-hp-summary-modal-body {
@@ -1989,6 +2033,12 @@
   background: url('./assets/home/modeStatusBg.png') center / cover no-repeat;
 }
 
+.home-widget-mode.home-widget-mode--compact .home-widget-content {
+  padding-top: 12px;
+  padding-bottom: 12px;
+  gap: 6px;
+}
+
 .home-widget-cost .home-widget-content {
   padding: 16px 24px;
 }
@@ -2398,6 +2448,16 @@
 .home-device-pump-name.is-fault,
 .home-device-pump-state.is-fault {
   color: #f9573f;
+}
+
+.home-system-node--indoor-temperature-list .home-system-caption {
+  font-size: 13px; /* 名称字号 */
+}
+.home-system-node--indoor-temperature-list .home-system-value {
+  font-size: 17px; /* 数值字号 */
+}
+.home-system-node--indoor-temperature-list .home-system-unit {
+  font-size: 11px; /* 单位字号 */
 }
 
 @keyframes widget-in {

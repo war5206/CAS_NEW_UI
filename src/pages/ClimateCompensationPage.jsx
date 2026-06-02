@@ -28,7 +28,11 @@ import {
   writeRealvalByLongNames,
 } from '../api/modules/settings'
 import { getStoredClimateMode, setStoredClimateMode } from '../utils/climateModeState'
-import { getStoredTemperatureMode } from '../utils/temperatureModeState'
+import {
+  getConstantSetTempLongName,
+  getStoredTemperatureMode,
+  setStoredTemperatureMode,
+} from '../utils/temperatureModeState'
 import { extractRealvalMap, isOnValue } from '../utils/realvalMap'
 import './ClimateCompensationPage.css'
 
@@ -39,12 +43,13 @@ const CLIMATE_LONG_NAME_QHBC = 'Sys\\FinforWorx\\QHBC'
 const CLIMATE_LONG_NAME_MDLD = 'Sys\\FinforWorx\\MDLD'
 const CLIMATE_LONG_NAME_AMBIENT = 'Sys\\FinforWorx\\AmbientTemperature1'
 const CLIMATE_LONG_NAME_BACKWATER = 'Sys\\FinforWorx\\BackwaterTemperature'
-const CLIMATE_LONG_NAME_SET_TEMP = 'Sys\\FinforWorx\\SetTemperature1'
+const CLIMATE_LONG_NAME_HP_TOTAL_RUN_MODE = 'Sys\\FinforWorx\\HPTotalRunMode'
 const CLIMATE_BASE_LONG_NAMES = [
   CLIMATE_LONG_NAME_QHBC,
   CLIMATE_LONG_NAME_MDLD,
   CLIMATE_LONG_NAME_AMBIENT,
   CLIMATE_LONG_NAME_BACKWATER,
+  CLIMATE_LONG_NAME_HP_TOTAL_RUN_MODE,
 ]
 
 const REGULATION_OPTIONS = [
@@ -151,7 +156,7 @@ function ClimateCompensationPage() {
   const [levelValue, setLevelValue] = useState(8)
   const [curvePageIndex, setCurvePageIndex] = useState(0)
   const [advancedCurvePageIndex, setAdvancedCurvePageIndex] = useState(0)
-  const [temperatureMode] = useState(() => getStoredTemperatureMode())
+  const [temperatureMode, setTemperatureMode] = useState(() => getStoredTemperatureMode())
   const isCoolingTemperatureMode = temperatureMode === 'cooling'
   const curveXAxisMin = isCoolingTemperatureMode ? COOLING_CURVE_X_MIN : HEATING_CURVE_X_MIN
   const curveXAxisMax = isCoolingTemperatureMode ? COOLING_CURVE_X_MAX : HEATING_CURVE_X_MAX
@@ -677,24 +682,35 @@ function ClimateCompensationPage() {
     return parsed
   }
 
+  const resolveTemperatureModeFromMap = (map) => {
+    if (!map || !Object.prototype.hasOwnProperty.call(map, CLIMATE_LONG_NAME_HP_TOTAL_RUN_MODE)) {
+      return getStoredTemperatureMode()
+    }
+    return isOnValue(map[CLIMATE_LONG_NAME_HP_TOTAL_RUN_MODE]) ? 'heating' : 'cooling'
+  }
+
   const loadBaseRealvals = async () => {
     const response = await queryRealvalByLongNames(CLIMATE_BASE_LONG_NAMES)
     const map = extractRealvalMap(response)
     if (!map) return null
     const nextMode = isOnValue(map[CLIMATE_LONG_NAME_QHBC]) ? 'climate' : 'constant'
+    const nextTemperatureMode = resolveTemperatureModeFromMap(map)
     const linked = isOnValue(map[CLIMATE_LONG_NAME_MDLD])
     setSelectedMode(nextMode)
+    setTemperatureMode(nextTemperatureMode)
+    setStoredTemperatureMode(nextTemperatureMode)
     setTerminalLinked(linked)
     setOutdoorTemperature(toDisplayTempText(map[CLIMATE_LONG_NAME_AMBIENT]))
-    return nextMode
+    return { nextMode, nextTemperatureMode }
   }
 
-  const loadConstantModeData = async () => {
+  const loadConstantModeData = async (mode = temperatureMode) => {
+    const setTempLongName = getConstantSetTempLongName(mode)
     try {
-      const response = await queryRealvalByLongNames([CLIMATE_LONG_NAME_SET_TEMP])
+      const response = await queryRealvalByLongNames([setTempLongName])
       const map = extractRealvalMap(response)
-      if (map && Object.prototype.hasOwnProperty.call(map, CLIMATE_LONG_NAME_SET_TEMP)) {
-        setConstantReturnTemp(String(map[CLIMATE_LONG_NAME_SET_TEMP] ?? '10'))
+      if (map && Object.prototype.hasOwnProperty.call(map, setTempLongName)) {
+        setConstantReturnTemp(String(map[setTempLongName] ?? '10'))
       }
     } catch {
       // ignore
@@ -706,11 +722,11 @@ function ClimateCompensationPage() {
     const init = async () => {
       isHydratingRef.current = true
       try {
-        const mode = await loadBaseRealvals()
-        if (!cancelled && mode === 'constant') {
-          await loadConstantModeData()
+        const baseState = await loadBaseRealvals()
+        if (!cancelled && baseState?.nextMode === 'constant') {
+          await loadConstantModeData(baseState.nextTemperatureMode)
         }
-        if (!cancelled && mode !== 'constant') {
+        if (!cancelled && baseState?.nextMode !== 'constant') {
           const parsed = await loadWeatherCurve('', '')
           const needsFullWeatherCurve =
             parsed.gearPosition == null || (parsed.nextRegulateType === 'custom' && !parsed.curveValues)
@@ -961,9 +977,9 @@ function ClimateCompensationPage() {
       {
         optimisticApply: () => setSelectedMode(nextMode),
         delayedVerify: async () => {
-          const mode = await loadBaseRealvals()
-          if (mode === 'constant') {
-            await loadConstantModeData()
+          const baseState = await loadBaseRealvals()
+          if (baseState?.nextMode === 'constant') {
+            await loadConstantModeData(baseState.nextTemperatureMode)
           } else {
             await loadWeatherCurve('', '')
             await loadTempTrend()
@@ -987,11 +1003,12 @@ function ClimateCompensationPage() {
   const handleConstantReturnTempChange = (nextValue) => {
     const writeValue = Number(nextValue)
     const payloadValue = Number.isFinite(writeValue) ? writeValue : nextValue
+    const setTempLongName = getConstantSetTempLongName(temperatureMode)
     performWrite(
-      { [CLIMATE_LONG_NAME_SET_TEMP]: payloadValue },
+      { [setTempLongName]: payloadValue },
       {
         optimisticApply: () => setConstantReturnTemp(String(nextValue)),
-        delayedVerify: () => loadConstantModeData(),
+        delayedVerify: () => loadConstantModeData(temperatureMode),
       },
     )
   }

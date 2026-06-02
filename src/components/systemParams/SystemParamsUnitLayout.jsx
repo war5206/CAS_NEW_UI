@@ -9,51 +9,59 @@ import showIcon from '../../assets/icons/show.svg'
 import hideIcon from '../../assets/icons/hide.svg'
 import longArrowDownBlueIcon from '../../assets/long-arrow-down-blue.svg'
 import longArrowDownGrayIcon from '../../assets/long-arrow-down-gray.svg'
-import { HEAT_PUMP_GRID_ITEMS } from '../../config/homeHeatPumps'
+import {
+  buildUnitDeviceIds,
+  buildUnitDeviceIdSet,
+  COUPLE_ENERGY_TYPE_NONE_ID,
+  createFixedUnitLayoutState,
+  getFixedUnitLayoutLabel,
+  getTotalUnitCount,
+  parseUnitDeviceCode,
+  toUnitDeviceCode,
+  toUnitNoLabel,
+  USE_FIXED_UNIT_LAYOUT,
+} from '../../config/projectUnitDevices'
 import { queryDeviceArrange, saveDeviceArrange, scanDeviceState } from '../../api/modules/home'
 
 const UNIT_LAYOUT_COLS = 10
 const UNIT_LAYOUT_ROWS = 10
-const UNIT_TOTAL = 33
 
-const UNIT_PUMP_ITEMS = HEAT_PUMP_GRID_ITEMS.filter((item) => item.id !== null)
-  .sort((a, b) => a.id - b.id)
-  .slice(0, UNIT_TOTAL)
-
-const UNIT_PUMP_ID_SET = new Set(UNIT_PUMP_ITEMS.map((item) => item.id))
-
-const INITIAL_UNIT_LAYOUT_STATE = {
-  slots: Array.from({ length: UNIT_LAYOUT_COLS * UNIT_LAYOUT_ROWS }, () => null),
-  pendingIds: [],
-  layoutLocked: false,
-  numberingDone: false,
-  numberingMap: {},
-  showOriginalNo: false,
+function formatUnitDisplayLabel(id, { showOriginal = false, numberingValue = null } = {}) {
+  if (numberingValue != null) {
+    return String(numberingValue)
+  }
+  if (showOriginal) {
+    return toUnitNoLabel(id)
+  }
+  if (USE_FIXED_UNIT_LAYOUT) {
+    return getFixedUnitLayoutLabel(id)
+  }
+  return toUnitNoLabel(id)
 }
 
-function toNoLabel(id) {
-  return `No${String(id).padStart(2, '0')}`
+function createEmptyUnitLayoutState() {
+  return {
+    slots: Array.from({ length: UNIT_LAYOUT_COLS * UNIT_LAYOUT_ROWS }, () => null),
+    pendingIds: [],
+    layoutLocked: false,
+    numberingDone: false,
+    numberingMap: {},
+    showOriginalNo: false,
+  }
 }
 
-function toDeviceCode(id) {
-  return `No${id}`
+function createAppliedFixedUnitLayoutState() {
+  return {
+    ...createFixedUnitLayoutState(UNIT_LAYOUT_COLS, UNIT_LAYOUT_ROWS),
+    layoutLocked: false,
+    numberingDone: false,
+    numberingMap: {},
+    showOriginalNo: false,
+  }
 }
 
-function parsePumpId(value) {
-  const text = String(value ?? '').trim()
-  if (!text) {
-    return null
-  }
-  if (/^\d+$/.test(text)) {
-    const asNumber = Number(text)
-    return Number.isInteger(asNumber) && UNIT_PUMP_ID_SET.has(asNumber) ? asNumber : null
-  }
-  const matched = text.match(/^No0*(\d+)$/i)
-  if (!matched) {
-    return null
-  }
-  const asNumber = Number(matched[1])
-  return Number.isInteger(asNumber) && UNIT_PUMP_ID_SET.has(asNumber) ? asNumber : null
+function createParsePumpId(allowedIdSet) {
+  return (value) => parseUnitDeviceCode(value, allowedIdSet)
 }
 
 function cloneUnitLayoutState(state) {
@@ -65,14 +73,6 @@ function cloneUnitLayoutState(state) {
     numberingMap: { ...state.numberingMap },
     showOriginalNo: state.showOriginalNo,
   }
-}
-
-function normalizeHeatPumpCount(value) {
-  const count = Number(value)
-  if (!Number.isInteger(count)) {
-    return UNIT_TOTAL
-  }
-  return Math.max(0, Math.min(count, UNIT_TOTAL))
 }
 
 /**
@@ -93,6 +93,8 @@ const SystemParamsUnitLayout = forwardRef(function SystemParamsUnitLayout(
   {
     variant = 'settings',
     heatPumpCount,
+    coupleEnergyTypeId = COUPLE_ENERGY_TYPE_NONE_ID,
+    coupleEnergyNumber = '0',
     settingsHeader = null,
     onDirtyChange,
     onUnitLayoutCommitted,
@@ -103,20 +105,25 @@ const SystemParamsUnitLayout = forwardRef(function SystemParamsUnitLayout(
   },
   ref,
 ) {
-  const [unitSlots, setUnitSlots] = useState(() => [...INITIAL_UNIT_LAYOUT_STATE.slots])
-  const [pendingUnitIds, setPendingUnitIds] = useState(() => [...INITIAL_UNIT_LAYOUT_STATE.pendingIds])
-  const [unitLayoutLocked, setUnitLayoutLocked] = useState(INITIAL_UNIT_LAYOUT_STATE.layoutLocked)
-  const [unitNumberingMap, setUnitNumberingMap] = useState(() => ({ ...INITIAL_UNIT_LAYOUT_STATE.numberingMap }))
-  const [unitNumberingDone, setUnitNumberingDone] = useState(INITIAL_UNIT_LAYOUT_STATE.numberingDone)
-  const [showOriginalNo, setShowOriginalNo] = useState(INITIAL_UNIT_LAYOUT_STATE.showOriginalNo)
+  const [unitSlots, setUnitSlots] = useState(() =>
+    USE_FIXED_UNIT_LAYOUT ? [...createAppliedFixedUnitLayoutState().slots] : [...createEmptyUnitLayoutState().slots],
+  )
+  const [pendingUnitIds, setPendingUnitIds] = useState(() =>
+    USE_FIXED_UNIT_LAYOUT ? [] : [...createEmptyUnitLayoutState().pendingIds],
+  )
+  const [unitLayoutLocked, setUnitLayoutLocked] = useState(false)
+  const [unitNumberingMap, setUnitNumberingMap] = useState(() => ({}))
+  const [unitNumberingDone, setUnitNumberingDone] = useState(false)
+  const [showOriginalNo, setShowOriginalNo] = useState(false)
   const [longPressedPendingIds, setLongPressedPendingIds] = useState(() => ({}))
   const [smartScanEnabled, setSmartScanEnabled] = useState(true)
-  const [hasUnitLayoutReset, setHasUnitLayoutReset] = useState(false)
+  const [hasUnitLayoutReset, setHasUnitLayoutReset] = useState(USE_FIXED_UNIT_LAYOUT)
   const [manualDraggingPumpId, setManualDraggingPumpId] = useState(null)
   const [manualDraggingSource, setManualDraggingSource] = useState(null)
   const [manualDragPointer, setManualDragPointer] = useState({ x: 0, y: 0 })
-  const [savedUnitLayoutState, setSavedUnitLayoutState] = useState(() => cloneUnitLayoutState(INITIAL_UNIT_LAYOUT_STATE))
-  const [detectedHeatPumpCount, setDetectedHeatPumpCount] = useState(0)
+  const [savedUnitLayoutState, setSavedUnitLayoutState] = useState(() =>
+    cloneUnitLayoutState(USE_FIXED_UNIT_LAYOUT ? createAppliedFixedUnitLayoutState() : createEmptyUnitLayoutState()),
+  )
   const [projectId, setProjectId] = useState('')
   const [isOperating, setIsOperating] = useState(false)
   const [alertDialog, setAlertDialog] = useState({ open: false, title: '', message: '' })
@@ -125,6 +132,7 @@ const SystemParamsUnitLayout = forwardRef(function SystemParamsUnitLayout(
   const manualDraggingPumpIdRef = useRef(null)
   const pendingListRef = useRef(null)
   const unitLayoutLockedRef = useRef(unitLayoutLocked)
+  const allowedUnitIdSetRef = useRef(new Set())
   const movePumpToSlotRef = useRef(null)
   const dragStartPointRef = useRef({ x: 0, y: 0 })
   const dragPreviewOffsetRef = useRef({ x: 52, y: 50 })
@@ -139,10 +147,24 @@ const SystemParamsUnitLayout = forwardRef(function SystemParamsUnitLayout(
     setAlertDialog({ open: false, title: '', message: '' })
   }, [])
 
+  const allowedUnitIds = useMemo(
+    () => buildUnitDeviceIds(heatPumpCount, coupleEnergyTypeId, coupleEnergyNumber),
+    [heatPumpCount, coupleEnergyTypeId, coupleEnergyNumber],
+  )
+  const allowedUnitIdSet = useMemo(
+    () => buildUnitDeviceIdSet(heatPumpCount, coupleEnergyTypeId, coupleEnergyNumber),
+    [heatPumpCount, coupleEnergyTypeId, coupleEnergyNumber],
+  )
+  const parsePumpId = useMemo(() => createParsePumpId(allowedUnitIdSet), [allowedUnitIdSet])
+  const totalUnitCount = useMemo(
+    () => getTotalUnitCount(heatPumpCount, coupleEnergyTypeId, coupleEnergyNumber),
+    [heatPumpCount, coupleEnergyTypeId, coupleEnergyNumber],
+  )
+
   const addedUnitIds = useMemo(() => unitSlots.filter((id) => id != null), [unitSlots])
   const nextUnitNumber = useMemo(() => Object.keys(unitNumberingMap).length + 1, [unitNumberingMap])
-  const totalHeatPumpCount = useMemo(() => normalizeHeatPumpCount(detectedHeatPumpCount), [detectedHeatPumpCount])
-  const canFinishLayout = pendingUnitIds.length === 0 && addedUnitIds.length > 0 && !unitLayoutLocked
+  const canFinishLayout =
+    pendingUnitIds.length === 0 && addedUnitIds.length >= totalUnitCount && totalUnitCount > 0 && !unitLayoutLocked
   const canFinishNumbering = unitLayoutLocked && !unitNumberingDone && Object.keys(unitNumberingMap).length === addedUnitIds.length
   const canToggleOriginalNo = unitNumberingDone && !arrangeViewOnly
   const isGuideVariant = variant === 'guide'
@@ -219,7 +241,7 @@ const SystemParamsUnitLayout = forwardRef(function SystemParamsUnitLayout(
         return
       }
 
-      if (UNIT_PUMP_ID_SET.has(dragId)) {
+      if (allowedUnitIdSetRef.current.has(dragId)) {
         movePumpToSlotRef.current?.(dragId, slotIndex)
       }
     }
@@ -316,8 +338,29 @@ const SystemParamsUnitLayout = forwardRef(function SystemParamsUnitLayout(
   }, [unitLayoutLocked])
 
   useEffect(() => {
+    allowedUnitIdSetRef.current = allowedUnitIdSet
+  }, [allowedUnitIdSet])
+
+  useEffect(() => {
     manualDraggingPumpIdRef.current = manualDraggingPumpId
   }, [manualDraggingPumpId])
+
+  const applyFixedUnitLayout = useCallback(() => {
+    const nextState = createAppliedFixedUnitLayoutState()
+    setUnitSlots(nextState.slots)
+    setPendingUnitIds(nextState.pendingIds)
+    setUnitLayoutLocked(nextState.layoutLocked)
+    setUnitNumberingDone(nextState.numberingDone)
+    setUnitNumberingMap(nextState.numberingMap)
+    setShowOriginalNo(nextState.showOriginalNo)
+    setLongPressedPendingIds({})
+    setSmartScanEnabled(true)
+    setHasUnitLayoutReset(true)
+    setManualDraggingPumpId(null)
+    setManualDraggingSource(null)
+    draggingPumpIdRef.current = null
+    setSavedUnitLayoutState(cloneUnitLayoutState(nextState))
+  }, [])
 
   useEffect(() => {
     const shouldLockScroll = Boolean(manualDraggingPumpId)
@@ -363,18 +406,29 @@ const SystemParamsUnitLayout = forwardRef(function SystemParamsUnitLayout(
     const addedIds = nextSlots.filter((id) => id != null)
     const placedCount = addedIds.length
 
-    // 后端无已保存排布时：与首次进入一致，待添加为空，需用户点击「智能扫描」，勿把 1..台数 预填进待添加
+    // 后端无已保存排布时：固定排布项目直接写入网格；否则待添加为空，需用户点击「智能扫描」
     if (placedCount === 0) {
-      const freshState = {
-        slots: Array.from({ length: UNIT_LAYOUT_COLS * UNIT_LAYOUT_ROWS }, () => null),
-        pendingIds: [],
-        layoutLocked: false,
-        numberingDone: false,
-        numberingMap: {},
-        showOriginalNo: false,
+      if (USE_FIXED_UNIT_LAYOUT) {
+        const fixedState = createAppliedFixedUnitLayoutState()
+        setProjectId(nextProjectId)
+        setUnitSlots(fixedState.slots)
+        setPendingUnitIds(fixedState.pendingIds)
+        setUnitLayoutLocked(fixedState.layoutLocked)
+        setUnitNumberingDone(fixedState.numberingDone)
+        setUnitNumberingMap(fixedState.numberingMap)
+        setShowOriginalNo(false)
+        setLongPressedPendingIds({})
+        setSmartScanEnabled(true)
+        setHasUnitLayoutReset(true)
+        setManualDraggingPumpId(null)
+        setManualDraggingSource(null)
+        draggingPumpIdRef.current = null
+        setSavedUnitLayoutState(cloneUnitLayoutState(fixedState))
+        return
       }
+
+      const freshState = createEmptyUnitLayoutState()
       setProjectId(nextProjectId)
-      setDetectedHeatPumpCount(0)
       setUnitSlots(freshState.slots)
       setPendingUnitIds(freshState.pendingIds)
       setUnitLayoutLocked(freshState.layoutLocked)
@@ -391,11 +445,8 @@ const SystemParamsUnitLayout = forwardRef(function SystemParamsUnitLayout(
       return
     }
 
-    const configuredCap = normalizeHeatPumpCount(Number(heatPumpCount))
-    // 与向导「热泵台数」一致，避免出现 待添加(30) / 添加热泵 3/0；无有效配置时用已排布台数
-    const effectiveTotal =
-      configuredCap > 0 ? Math.max(configuredCap, placedCount) : Math.max(placedCount, 1)
-    const pendingIds = Array.from({ length: effectiveTotal }, (_, index) => index + 1).filter((id) => !usedIds.has(id))
+    const expectedUnitIds = buildUnitDeviceIds(heatPumpCount, coupleEnergyTypeId, coupleEnergyNumber)
+    const pendingIds = expectedUnitIds.filter((id) => !usedIds.has(id))
     const hasArrangedPumps = placedCount > 0
     const hasFullNumbering = hasArrangedPumps && Object.keys(nextNumberingMap).length === addedIds.length
 
@@ -409,7 +460,6 @@ const SystemParamsUnitLayout = forwardRef(function SystemParamsUnitLayout(
     }
 
     setProjectId(nextProjectId)
-    setDetectedHeatPumpCount(effectiveTotal)
     setUnitSlots(nextState.slots)
     setPendingUnitIds(nextState.pendingIds)
     setUnitLayoutLocked(nextState.layoutLocked)
@@ -423,9 +473,14 @@ const SystemParamsUnitLayout = forwardRef(function SystemParamsUnitLayout(
     setManualDraggingSource(null)
     draggingPumpIdRef.current = null
     setSavedUnitLayoutState(cloneUnitLayoutState(nextState))
-  }, [heatPumpCount])
+  }, [coupleEnergyNumber, coupleEnergyTypeId, heatPumpCount, parsePumpId])
 
   const queryArrangeFetchedRef = useRef(false)
+  const unitConfigKey = `${heatPumpCount}-${coupleEnergyTypeId}-${coupleEnergyNumber}`
+
+  useEffect(() => {
+    queryArrangeFetchedRef.current = false
+  }, [unitConfigKey])
 
   useEffect(() => {
     if (!queryArrangeOnMount) {
@@ -454,10 +509,17 @@ const SystemParamsUnitLayout = forwardRef(function SystemParamsUnitLayout(
     }
 
     run()
-  }, [applyQueryArrangeData, openAlertDialog, queryArrangeOnMount])
+  }, [applyQueryArrangeData, openAlertDialog, queryArrangeOnMount, unitConfigKey])
 
   const resetUnitLayout = async () => {
     if (isOperating) {
+      return
+    }
+    if (USE_FIXED_UNIT_LAYOUT) {
+      applyFixedUnitLayout()
+      if (arrangeViewOnly) {
+        onArrangeViewOnlyExit?.()
+      }
       return
     }
     setIsOperating(true)
@@ -469,14 +531,11 @@ const SystemParamsUnitLayout = forwardRef(function SystemParamsUnitLayout(
         return
       }
       const scannedDeviceList = Array.isArray(data?.device) ? data.device : []
-      setDetectedHeatPumpCount(data?.heatPump)
       const scannedIds = scannedDeviceList
         .map((item) => parsePumpId(item?.code))
         .filter((id) => id != null)
         .sort((a, b) => a - b)
-      const allCurrentIds = [...new Set(scannedIds)]
-        .filter((id) => UNIT_PUMP_ID_SET.has(id))
-        .sort((a, b) => a - b)
+      const allCurrentIds = [...new Set(scannedIds)].sort((a, b) => a - b)
       setPendingUnitIds(allCurrentIds)
       setUnitSlots(Array.from({ length: UNIT_LAYOUT_COLS * UNIT_LAYOUT_ROWS }, () => null))
       setUnitLayoutLocked(false)
@@ -503,13 +562,15 @@ const SystemParamsUnitLayout = forwardRef(function SystemParamsUnitLayout(
     if (arrangeViewOnly) {
       return
     }
-    const rawTargetCount = Number(heatPumpCount)
     if (!smartScanEnabled || isOperating) {
+      return
+    }
+    if (USE_FIXED_UNIT_LAYOUT) {
+      applyFixedUnitLayout()
       return
     }
     setIsOperating(true)
     let scannedIds = []
-    let scannedHeatPumpCount = null
     try {
       const response = await scanDeviceState('')
       const { ok, msg, data } = parseAlgorithmProcessPayload(response)
@@ -518,7 +579,6 @@ const SystemParamsUnitLayout = forwardRef(function SystemParamsUnitLayout(
         return
       }
       const scannedDeviceList = Array.isArray(data?.device) ? data.device : []
-      scannedHeatPumpCount = data?.heatPump
       scannedIds = scannedDeviceList
         .map((item) => parsePumpId(item?.code))
         .filter((id) => id != null)
@@ -529,13 +589,13 @@ const SystemParamsUnitLayout = forwardRef(function SystemParamsUnitLayout(
       setIsOperating(false)
     }
 
-    const targetCount = Number.isInteger(rawTargetCount) ? Math.max(0, Math.min(rawTargetCount, UNIT_TOTAL)) : UNIT_TOTAL
+    const targetCount = totalUnitCount
     const availableIds = Array.from(new Set(scannedIds))
-      .filter((id) => UNIT_PUMP_ID_SET.has(id))
+      .filter((id) => allowedUnitIdSet.has(id))
       .slice(0, targetCount)
 
-    const currentAddedIds = unitSlots.filter((id) => id != null && UNIT_PUMP_ID_SET.has(id))
-    const currentPendingIds = pendingUnitIds.filter((id) => UNIT_PUMP_ID_SET.has(id))
+    const currentAddedIds = unitSlots.filter((id) => id != null && allowedUnitIdSet.has(id))
+    const currentPendingIds = pendingUnitIds.filter((id) => allowedUnitIdSet.has(id))
     const currentAllIds = [...new Set([...currentAddedIds, ...currentPendingIds])]
 
     let nextPendingIds = [...currentPendingIds]
@@ -571,9 +631,6 @@ const SystemParamsUnitLayout = forwardRef(function SystemParamsUnitLayout(
     nextSlots = nextSlots.map((id) => (id != null && scannedSet.has(id) ? id : null))
 
     const finalPendingIds = Array.from(new Set(nextPendingIds)).sort((a, b) => a - b)
-    if (scannedHeatPumpCount != null) {
-      setDetectedHeatPumpCount(scannedHeatPumpCount)
-    }
 
     setPendingUnitIds(finalPendingIds)
     setUnitSlots(nextSlots)
@@ -718,7 +775,7 @@ const SystemParamsUnitLayout = forwardRef(function SystemParamsUnitLayout(
       deviceArrange.push({
         id: String(index + 1),
         projectId: projectId || '',
-        deviceId: toDeviceCode(pumpId),
+        deviceId: toUnitDeviceCode(pumpId),
         arrangeState: '1',
         codeState: '1',
         rowNumber: String(rowNumber),
@@ -753,13 +810,13 @@ const SystemParamsUnitLayout = forwardRef(function SystemParamsUnitLayout(
     listElement.scrollBy({ left: offset, behavior: 'smooth' })
   }
 
-  const isStep1Done = totalHeatPumpCount > 0 ? addedUnitIds.length >= totalHeatPumpCount : false
+  const isStep1Done = totalUnitCount > 0 ? addedUnitIds.length >= totalUnitCount : false
   const isStep1Active = !isStep1Done
   const isStep2Active = isStep1Done && !unitLayoutLocked
   const isStep2Done = unitLayoutLocked
   const isStep3Active = unitLayoutLocked && !unitNumberingDone
   const isStep3Done = unitNumberingDone
-  const pendingListPoolSize = totalHeatPumpCount > 0 ? totalHeatPumpCount : UNIT_TOTAL
+  const pendingListPoolSize = totalUnitCount > 0 ? totalUnitCount : allowedUnitIds.length
   const pendingDisplayIds =
     pendingUnitIds.length > 0
       ? [...pendingUnitIds, ...Array.from({ length: Math.max(0, pendingListPoolSize - pendingUnitIds.length) }, () => null)]
@@ -806,7 +863,7 @@ const SystemParamsUnitLayout = forwardRef(function SystemParamsUnitLayout(
                   onMouseDown={(event) => startManualDrag(id, 'pending', event)}
                   onTouchStart={(event) => startManualDrag(id, 'pending', event)}
                 >
-                  {id ? <span>{toNoLabel(id)}</span> : <span aria-hidden="true" />}
+                  {id ? <span>{formatUnitDisplayLabel(id)}</span> : <span aria-hidden="true" />}
                   <img src={longPressedPendingIds[id] ? hpRunningIcon : hpNullIcon} alt="" aria-hidden="true" />
                 </button>
               ))}
@@ -843,11 +900,10 @@ const SystemParamsUnitLayout = forwardRef(function SystemParamsUnitLayout(
             <div className="unit-layout-grid">
               {unitSlots.map((pumpId, index) => {
                 const displayLabel = pumpId
-                  ? showOriginalNo
-                    ? toNoLabel(pumpId)
-                    : unitLayoutLocked
-                      ? unitNumberingMap[pumpId] ?? toNoLabel(pumpId)
-                      : toNoLabel(pumpId)
+                  ? formatUnitDisplayLabel(pumpId, {
+                      showOriginal: showOriginalNo,
+                      numberingValue: unitLayoutLocked && !showOriginalNo ? unitNumberingMap[pumpId] : null,
+                    })
                   : ''
 
                 return (
@@ -906,7 +962,7 @@ const SystemParamsUnitLayout = forwardRef(function SystemParamsUnitLayout(
             </div>
             <div className="unit-layout-flow__step">
               <div className="unit-layout-flow__title">
-                添加热泵{addedUnitIds.length}/{totalHeatPumpCount}
+                添加机组{addedUnitIds.length}/{totalUnitCount}
               </div>
               <small>读取处于激活状态的热泵</small>
               <button
@@ -981,7 +1037,7 @@ const SystemParamsUnitLayout = forwardRef(function SystemParamsUnitLayout(
       {manualDraggingPumpId && typeof document !== 'undefined'
         ? createPortal(
             <div className={`unit-layout-drag-preview${longPressedPendingIds[manualDraggingPumpId] ? ' is-long-press' : ''}`} style={{ left: manualDragPointer.x, top: manualDragPointer.y }}>
-              <span>{toNoLabel(manualDraggingPumpId)}</span>
+              <span>{formatUnitDisplayLabel(manualDraggingPumpId)}</span>
               <img src={longPressedPendingIds[manualDraggingPumpId] ? hpRunningIcon : hpNullIcon} alt="" aria-hidden="true" />
             </div>,
             document.body,

@@ -4,13 +4,14 @@ import {
   enumerateMonthRange,
   formatMonthAxisLabel,
   getCurrentDateInfo,
+  getDefaultCalendarMonthValue,
   getMaxAvailableDay,
   getMonthDayCount,
   parseMonthValue,
 } from '../utils/analysisFilterUtils'
 
 function createOverviewDayDataset(range) {
-  const monthValue = range.month || '2026-03'
+  const monthValue = range.month || getDefaultCalendarMonthValue()
   const { year, month } = parseMonthValue(monthValue)
   const pointCount = getMonthDayCount(monthValue)
   const maxAvailableDay = getMaxAvailableDay(monthValue, getCurrentDateInfo())

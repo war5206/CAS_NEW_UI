@@ -15,11 +15,24 @@ export function createDefaultScreenData() {
   }
 }
 
+function extractScreenDataSource(rawData) {
+  const envelope = rawData?.data ?? rawData
+  if (!envelope || typeof envelope !== 'object') {
+    return {}
+  }
+
+  return (
+    envelope?.data?.result ??
+    envelope?.result ??
+    envelope?.data ??
+    envelope ??
+    {}
+  )
+}
+
 export function adaptScreenData(rawData) {
   const fallback = createDefaultScreenData()
-  // 处理统一返回结构 { code, data, msg, success }
-  const responseData = rawData?.data ?? rawData
-  const source = responseData?.data ?? responseData ?? {}
+  const source = extractScreenDataSource(rawData)
 
   return {
     heatPumpCount: toText(source.heatPumpNumber, fallback.heatPumpCount),

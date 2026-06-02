@@ -11,3 +11,8 @@ contextBridge.exposeInMainWorld('casManualApi', {
   get: () => ipcRenderer.invoke('manual:get'),
   replace: (file) => ipcRenderer.invoke('manual:replace', file),
 })
+
+contextBridge.exposeInMainWorld('casFeatureSettingsApi', {
+  get: () => ipcRenderer.invoke('feature-settings:get'),
+  set: (settings) => ipcRenderer.invoke('feature-settings:set', settings),
+})

@@ -1,21 +1,16 @@
 ﻿import { useEffect, useRef, useState } from 'react'
 import * as echarts from 'echarts'
-import { HEAT_PUMP_STATUS_SUMMARY } from '../config/homeHeatPumps'
+import { buildUnitStatusChartData, EMPTY_UNIT_STATUS_SUMMARY } from '@/utils/heatPumpUnitStatusSummary'
 import { useDeferredVisible } from '../hooks/useDeferredVisible'
 
 const DEVICE_TABS_BASE = [
   { id: 'heat-pump', label: '热泵机组' },
-  { id: 'loop-pump', label: '热泵循环水泵' },
+  { id: 'air-cooled-module', label: '风冷模块机组' },
 ]
 
 const DEVICE_TAB_TERMINAL = { id: 'terminal-loop-pump', label: '末端循环水泵' }
 
-const DEFAULT_HEAT_PUMP_DATA = [
-  { name: '运行', value: HEAT_PUMP_STATUS_SUMMARY.running, color: ['#3B9EFF', '#1F5FB8'] },
-  { name: '待机', value: HEAT_PUMP_STATUS_SUMMARY.shutdown, color: ['#9FAABD', '#69778E'] },
-  { name: '化霜', value: HEAT_PUMP_STATUS_SUMMARY.defrosting, color: ['#F4CE52', '#A77A1F'] },
-  { name: '故障', value: HEAT_PUMP_STATUS_SUMMARY.malfunction, color: ['#FF671E', '#A93600'] },
-]
+const DEFAULT_HEAT_PUMP_DATA = buildUnitStatusChartData(EMPTY_UNIT_STATUS_SUMMARY)
 
 const DEFAULT_LOOP_PUMP_DATA = [
   { name: '水泵一', status: '运行中', tone: 'running' },
@@ -135,6 +130,7 @@ function PumpGrid({ items }) {
 
 function DeviceStatusPanel({
   heatPumpData = DEFAULT_HEAT_PUMP_DATA,
+  airCooledModuleData = DEFAULT_HEAT_PUMP_DATA,
   loopPumpData = DEFAULT_LOOP_PUMP_DATA,
   showTerminalLoopPump = false,
   terminalLoopPumpData = [],
@@ -164,6 +160,7 @@ function DeviceStatusPanel({
 
       <div className="home-device-body">
         {activeTab === 'heat-pump' && <HeatPumpStatusChart chartData={heatPumpData} />}
+        {activeTab === 'air-cooled-module' && <HeatPumpStatusChart chartData={airCooledModuleData} />}
         {activeTab === 'loop-pump' && <PumpGrid items={loopPumpData} />}
         {activeTab === 'terminal-loop-pump' && <PumpGrid items={terminalLoopPumpData} />}
       </div>
@@ -172,4 +169,3 @@ function DeviceStatusPanel({
 }
 
 export default DeviceStatusPanel
-

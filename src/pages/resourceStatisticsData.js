@@ -2,6 +2,7 @@ import {
   enumerateMonthRange,
   formatMonthAxisLabel,
   getCurrentDateInfo,
+  getDefaultCalendarMonthValue,
   getMaxAvailableDay,
   getMonthDayCount,
 } from '../utils/analysisFilterUtils'
@@ -257,7 +258,7 @@ function distributeEnergyBySegments(totalEnergy, segments) {
 }
 
 function buildCostDayChart(range, factor, energyPriceState) {
-  const monthValue = range.month || '2026-03'
+  const monthValue = range.month || getDefaultCalendarMonthValue()
   const days = getMonthDayCount(monthValue)
   const labels = Array.from({ length: days }, (_, index) => `${index + 1}日`)
   const tooltipLabels = Array.from({ length: days }, (_, index) => `${monthValue}-${String(index + 1).padStart(2, '0')}`)
@@ -414,7 +415,7 @@ function buildCostYearChart(range, factor, energyPriceState) {
 
 function buildGenericChart(config, period, range, factor) {
   if (period === '日') {
-    const monthValue = range.month || '2026-03'
+    const monthValue = range.month || getDefaultCalendarMonthValue()
     const days = getMonthDayCount(monthValue)
     const labels = Array.from({ length: days }, (_, index) => `${index + 1}日`)
 

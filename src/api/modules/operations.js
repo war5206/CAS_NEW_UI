@@ -31,10 +31,22 @@ export async function querySystemConfigSingle(code = '模式选择') {
   return callAlgorithmProcess(ALGORITHM_PROCESS_IDS.OPS_QUERY_SYSTEM_CONFIG_SINGLE, { code })
 }
 
+/** queryCurveByLongName 脚本使用 yyyy-MM-dd HH:mm:ss，补齐缺失的秒 */
+function normalizeCurveDateTime(value) {
+  const text = String(value ?? '').trim()
+  if (!text) {
+    return text
+  }
+  if (/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}$/.test(text)) {
+    return `${text}:00`
+  }
+  return text
+}
+
 export async function queryCurveByLongName({ start_time, end_time, longName }) {
   return callAlgorithmProcess(ALGORITHM_PROCESS_IDS.OPS_QUERY_CURVE_BY_LONG_NAME, {
-    start_time,
-    end_time,
+    start_time: normalizeCurveDateTime(start_time),
+    end_time: normalizeCurveDateTime(end_time),
     longName,
   })
 }

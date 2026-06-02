@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import SelectDropdown from '../components/SelectDropdown'
 import NumericKeypadModal from '../components/NumericKeypadModal'
 import TimePickerModal from '../components/TimePickerModal'
@@ -14,6 +14,7 @@ import {
   createDefaultLoopPumpForm,
   createDefaultProjectForm,
   findProvinceNameByCode,
+  resolveCouplingEnergyTypeLabel,
   toSaveCoupleEnergyPayload,
   toUpdateMotherboardPayload,
   toSaveCirculationPumpPayload,
@@ -130,7 +131,6 @@ const CARD_ICON_MAP = {
 }
 
 let motherboardDataRequestPromise = null
-let coupleEnergyRequestPromise = null
 
 function queryMotherboardDataOnce() {
   if (!motherboardDataRequestPromise) {
@@ -140,16 +140,6 @@ function queryMotherboardDataOnce() {
     })
   }
   return motherboardDataRequestPromise
-}
-
-function queryCoupleEnergyOnce() {
-  if (!coupleEnergyRequestPromise) {
-    coupleEnergyRequestPromise = queryCoupleEnergy().catch((error) => {
-      coupleEnergyRequestPromise = null
-      throw error
-    })
-  }
-  return coupleEnergyRequestPromise
 }
 
 const initialProjectForm = createDefaultProjectForm()
@@ -239,6 +229,7 @@ function SystemParamsPage({
   const [circulationPumpSaveLoading, setCirculationPumpSaveLoading] = useState(false)
   const [energyPriceDataLoading, setEnergyPriceDataLoading] = useState(false)
   const [energyPriceSaveLoading, setEnergyPriceSaveLoading] = useState(false)
+  const [unitLayoutCouplingReady, setUnitLayoutCouplingReady] = useState(false)
 
   const unitLayoutRef = useRef(null)
   const energyPriceRef = useRef(null)
@@ -259,6 +250,25 @@ function SystemParamsPage({
     }
     return parseMonthDay(projectForm[datePickerField])
   }, [datePickerField, projectForm])
+
+  const loadCouplingEnergy = useCallback(async () => {
+    const response = await queryCoupleEnergy()
+    const next = adaptCoupleEnergyFromQueryResponse(response)
+    if (!next) {
+      return null
+    }
+    const typeLabel = resolveCouplingEnergyTypeLabel({ typeId: next.typeId, typeName: next.typeName })
+    const normalizedCount = typeLabel === '无耦合能源' ? '0' : next.count
+    const nextState = {
+      type: typeLabel,
+      count: normalizedCount,
+    }
+    setCouplingEnergyState(nextState)
+    setSavedCouplingEnergyState(deepClone(nextState))
+    setCouplingEnergyRecordId(next.id)
+    setCouplingEnergyProjectId(next.projectId)
+    return nextState
+  }, [])
 
   useEffect(() => {
     const shouldHideSecondaryNav = activeView !== 'overview'
@@ -303,21 +313,10 @@ function SystemParamsPage({
     let cancelled = false
     ;(async () => {
       try {
-        const response = await queryCoupleEnergyOnce()
-        const next = adaptCoupleEnergyFromQueryResponse(response)
-        if (cancelled || !next) {
+        const nextState = await loadCouplingEnergy()
+        if (cancelled || !nextState) {
           return
         }
-        const typeLabel = COUPLING_ENERGY_ID_TO_LABEL[next.typeId] || '无耦合能源'
-        const normalizedCount = typeLabel === '无耦合能源' ? '0' : next.count
-        const nextState = {
-          type: typeLabel,
-          count: normalizedCount,
-        }
-        setCouplingEnergyState(nextState)
-        setSavedCouplingEnergyState(deepClone(nextState))
-        setCouplingEnergyRecordId(next.id)
-        setCouplingEnergyProjectId(next.projectId)
       } catch {
         // 保持当前耦合能源状态
       }
@@ -325,7 +324,45 @@ function SystemParamsPage({
     return () => {
       cancelled = true
     }
-  }, [])
+  }, [loadCouplingEnergy])
+
+  useEffect(() => {
+    if (activeView !== 'coupling-energy' && activeView !== 'unit-layout') {
+      return
+    }
+    void (async () => {
+      try {
+        await loadCouplingEnergy()
+      } catch {
+        // 保持当前耦合能源状态
+      }
+    })()
+  }, [activeView, loadCouplingEnergy])
+
+  useEffect(() => {
+    if (activeView !== 'unit-layout') {
+      setUnitLayoutCouplingReady(false)
+      return undefined
+    }
+
+    let cancelled = false
+    setUnitLayoutCouplingReady(false)
+    void (async () => {
+      try {
+        await loadCouplingEnergy()
+      } catch {
+        // 保持当前耦合能源状态
+      } finally {
+        if (!cancelled) {
+          setUnitLayoutCouplingReady(true)
+        }
+      }
+    })()
+
+    return () => {
+      cancelled = true
+    }
+  }, [activeView, loadCouplingEnergy])
 
   const handleMainboardChange = (nextValue) => {
     if (mainboardSaveLoading || mainboardDataLoading) {
@@ -759,11 +796,16 @@ function SystemParamsPage({
         setCouplingEnergySaveLoading(true)
         void (async () => {
           try {
+            const selectedTypeId = COUPLING_ENERGY_LABEL_TO_ID[couplingEnergyState.type] || ''
+            const normalizedState = {
+              type: couplingEnergyState.type,
+              count: selectedTypeId === COUPLE_ENERGY_TYPE_NONE_ID ? '0' : String(couplingEnergyState.count ?? '0'),
+            }
             const payload = toSaveCoupleEnergyPayload({
-              coupleEnergyTypeId: COUPLING_ENERGY_LABEL_TO_ID[couplingEnergyState.type] || '',
+              coupleEnergyTypeId: selectedTypeId,
               id: couplingEnergyRecordId,
               projectId: couplingEnergyProjectId,
-              coupleEnergyNumber: couplingEnergyState.count,
+              coupleEnergyNumber: normalizedState.count,
             })
             const saveRes = await saveCoupleEnergy(payload)
             const state = String(saveRes?.data?.data?.state ?? '')
@@ -777,7 +819,9 @@ function SystemParamsPage({
               })
               return
             }
-            setSavedCouplingEnergyState(deepClone(couplingEnergyState))
+            // 保存成功后先本地提交，避免后端读接口短暂延迟导致概览摘要回退为旧值。
+            setCouplingEnergyState(normalizedState)
+            setSavedCouplingEnergyState(deepClone(normalizedState))
             closeConfirmDialog()
             setConfirmDialog({
               open: true,
@@ -1171,11 +1215,14 @@ function SystemParamsPage({
       {activeView === 'overview' ? renderOverview() : null}
       {activeView === 'project-system-type' ? renderProjectSystemTypeForm() : null}
       {activeView === 'loop-pump-count' ? renderLoopPumpCountDetail() : null}
-      {activeView === 'unit-layout' ? (
+      {activeView === 'unit-layout' && unitLayoutCouplingReady ? (
         <SystemParamsUnitLayout
+          key={`unit-layout-${projectForm.heatPumpCount}-${COUPLING_ENERGY_LABEL_TO_ID[couplingEnergyState.type] || COUPLE_ENERGY_TYPE_NONE_ID}-${couplingEnergyState.count}`}
           ref={unitLayoutRef}
           variant="settings"
           heatPumpCount={projectForm.heatPumpCount}
+          coupleEnergyTypeId={COUPLING_ENERGY_LABEL_TO_ID[couplingEnergyState.type] || COUPLE_ENERGY_TYPE_NONE_ID}
+          coupleEnergyNumber={couplingEnergyState.count}
           queryArrangeOnMount
           settingsHeader={renderDetailHeader('机组排布')}
           onDirtyChange={setUnitLayoutDirty}

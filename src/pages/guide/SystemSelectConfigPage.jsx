@@ -36,8 +36,8 @@ const COUPLE_ENERGY_TYPE_OPTIONS = [
   { id: '5', label: '无耦合能源' },
 ]
 
-// 耦合能源设备台数配置
-const COUPLE_ENERGY_NUMBER_OPTIONS = ['0', '1', '2', '3', '4', '5']
+// 耦合能源设备台数配置（风冷模块等项目最多 50 台）
+const COUPLE_ENERGY_NUMBER_MAX = 50
 
 function SystemSelectConfigPage() {
   const navigate = useNavigate()
@@ -238,18 +238,20 @@ function SystemSelectConfigPage() {
           <div className="guide-page__section-header">
             <h2 className="guide-page__section-title">耦合能源设备台数</h2>
             <p className="guide-page__section-desc">
-              耦合能源台数最多支持5台，不限制其功率数据
+              风冷模块等耦合能源台数最多支持50台，不限制其功率数据
             </p>
           </div>
-          <div className="guide-page__option-group">
-            {COUPLE_ENERGY_NUMBER_OPTIONS.map((num) => (
-              <GuideOptionButton
-                key={num}
-                label={num}
-                selected={coupleEnergyNumber === num}
-                onClick={() => setCoupleEnergyNumber(num)}
-              />
-            ))}
+          <div className="guide-page__slider-wrap">
+            <SliderSettingRow
+              label=""
+              value={coupleEnergyNumber}
+              onChange={setCoupleEnergyNumber}
+              min={0}
+              max={COUPLE_ENERGY_NUMBER_MAX}
+              step={1}
+              showInput={false}
+              keypadTitle="耦合能源设备台数"
+            />
           </div>
         </div>
 

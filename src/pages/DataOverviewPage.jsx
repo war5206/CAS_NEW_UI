@@ -3,24 +3,27 @@ import DataOverviewFilterBar from '../components/DataOverviewFilterBar'
 import DataOverviewChart from '../components/DataOverviewChart'
 import upIcon from '../assets/icons/data-up.svg'
 import downIcon from '../assets/icons/data-down.svg'
-import { syncMonthRange } from '../utils/analysisFilterUtils'
+import { syncMonthRange, addCalendarMonths, getDefaultCalendarMonthValue } from '../utils/analysisFilterUtils'
 import {
   useAnalysisOverviewCopChartQuery,
   useAnalysisOverviewSummaryQuery,
 } from '../features/analysis/hooks/useAnalysisOverviewQueries'
 import './DataOverviewPage.css'
 
+const defaultAnalysisMonth = getDefaultCalendarMonthValue()
+const currentCalendarYear = String(new Date().getFullYear())
+
 const DEFAULT_FILTERS = {
   day: {
-    month: '2026-03',
+    month: defaultAnalysisMonth,
   },
   month: {
-    startMonth: '2025-11',
-    endMonth: '2026-03',
+    startMonth: addCalendarMonths(defaultAnalysisMonth, -4),
+    endMonth: defaultAnalysisMonth,
   },
   year: {
-    startYear: '2024',
-    endYear: '2026',
+    startYear: String(Number(currentCalendarYear) - 2),
+    endYear: currentCalendarYear,
   },
 }
 

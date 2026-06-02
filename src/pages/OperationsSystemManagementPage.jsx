@@ -1,15 +1,19 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import * as echarts from 'echarts'
+import AttentionModal from '../components/AttentionModal'
 import SelectDropdown from '../components/SelectDropdown'
 import TimePickerModal from '../components/TimePickerModal'
 import dateIcon from '../assets/icons/date.svg'
 import closeIcon from '../assets/icons/close.svg'
 import {
+  createDefaultOpsAirCooledUnitOptions,
+  createDefaultOpsHeatPumpUnitOptions,
+} from '@/api/adapters/operations'
+import {
   useOpsCurveQuery,
-  useOpsHeatPumpListQuery,
-  useOpsHeatPumpSingleQuery,
   useOpsSystemConfigQuery,
   useOpsSystemStateQuery,
+  useOpsUnitDeviceParamQuery,
 } from '@/features/operations/hooks/useOperationsQueries'
 import { getStoredClimateMode } from '../utils/climateModeState'
 import { getStoredEnergyPriceState } from '../utils/energyPriceState'
@@ -46,11 +50,6 @@ const SETTING_OPTIONS = [
   { value: 'water-meter', label: '水表' },
   { value: 'heat-meter', label: '热表' },
 ]
-const UNIT_OPTIONS = Array.from({ length: 33 }, (_, index) => ({
-  value: `heat-pump-${index + 1}`,
-  label: `热泵${index + 1}`,
-}))
-
 const PROJECT_TYPE_OPTIONS = [
   { value: 'heating', label: '采暖' },
   { value: 'cooling-heating', label: '冷暖' },
@@ -150,29 +149,6 @@ const SYSTEM_STATUS_ITEMS = [
   { key: 'wind-angle', label: '风向角度', value: '0.0 °', unit: '°', chartType: 'angle' },
 ]
 
-const UNIT_ITEMS = [
-  { key: 'communication', label: '通讯状态', value: '开启', unit: 'switch', chartType: 'switch' },
-  { key: 'fault-code', label: '总故障代码', value: '0.0', unit: '', chartType: 'fault' },
-  { key: 'inlet-temp', label: '进水温度', value: '30.0 ℃', unit: '℃', chartType: 'temperature' },
-  { key: 'outlet-temp', label: '出水温度', value: '30.0℃', unit: '℃', chartType: 'temperature' },
-  { key: 'ambient-temp', label: '环境温度', value: '18.0 ℃', unit: '℃', chartType: 'temperature' },
-  { key: 'exhaust-temp-1', label: '排气温度1', value: '24.0℃', unit: '℃', chartType: 'temperature' },
-  { key: 'return-air-temp-1', label: '回气温度1', value: '13.0 ℃', unit: '℃', chartType: 'temperature' },
-  { key: 'outer-coil-temp-1', label: '外盘管温度1', value: '12.0 ℃', unit: '℃', chartType: 'temperature' },
-  { key: 'inner-coil-temp-1', label: '内盘管温度1', value: '21.0 ℃', unit: '℃', chartType: 'temperature' },
-  { key: 'eco-in-temp-1', label: '经济器进口温度1', value: '18.0 ℃', unit: '℃', chartType: 'temperature' },
-  { key: 'eco-out-temp-1', label: '经济器出口温度1', value: '18.0 ℃', unit: '℃', chartType: 'temperature' },
-  { key: 'compressor-current-1', label: '压缩机1电流', value: '0.0 A', unit: 'A', chartType: 'current' },
-  { key: 'main-valve-open-1', label: '主阀1开度', value: '0.0', unit: '', chartType: 'opening' },
-  { key: 'main-valve-open-2', label: '主阀1开度', value: '15.0 ℃', unit: '℃', chartType: 'temperature' },
-  { key: 'aux-valve-open-1', label: '辅阀1开度', value: '0.0', unit: '', chartType: 'opening' },
-  { key: 'exhaust-temp-2', label: '排气温度2', value: '24.0 ℃', unit: '℃', chartType: 'temperature' },
-  { key: 'return-air-temp-2', label: '回气温度2', value: '13.0 ℃', unit: '℃', chartType: 'temperature' },
-  { key: 'outer-coil-temp-2', label: '外盘管温度2', value: '18.0 ℃', unit: '℃', chartType: 'temperature' },
-  { key: 'inner-coil-temp-2', label: '内盘管温度2', value: '23.0 ℃', unit: '℃', chartType: 'temperature' },
-  { key: 'eco-in-temp-2', label: '经济器进口温度2', value: '17.0 ℃', unit: '℃', chartType: 'temperature' },
-]
-
 function padNumber(value) {
   return String(value).padStart(2, '0')
 }
@@ -212,9 +188,10 @@ function formatDateTimeParts(value) {
   return `${year}.${padNumber(month)}.${padNumber(day)} ${padNumber(hour)}:${padNumber(minute)}:00`
 }
 
+/** 运维历史曲线接口要求 yyyy-MM-dd HH:mm:ss */
 function normalizeDateTime(value) {
   const [year, month, day, hour, minute] = parseDateTime(value)
-  return `${year}-${padNumber(month)}-${padNumber(day)} ${padNumber(hour)}:${padNumber(minute)}`
+  return `${year}-${padNumber(month)}-${padNumber(day)} ${padNumber(hour)}:${padNumber(minute)}:00`
 }
 
 function formatSeriesLabel(timestamp, span) {
@@ -750,6 +727,10 @@ function buildChartGeometry(series, presentation) {
   const visualMin = presentation.visualMin ?? presentation.min
   const visualMax = presentation.visualMax ?? presentation.max
 
+  if (!series.length) {
+    return { points: [], linePath: null, areaPath: null, hasPath: false }
+  }
+
   const points = series.map((item, index) => {
     const x = left + (innerWidth * index) / Math.max(1, series.length - 1)
     const y = top + innerHeight - ((item.value - visualMin) / Math.max(1, visualMax - visualMin)) * innerHeight
@@ -757,9 +738,11 @@ function buildChartGeometry(series, presentation) {
   })
 
   const linePath = points.map(([x, y], index) => `${index === 0 ? 'M' : 'L'} ${x} ${y}`).join(' ')
-  const areaPath = `${linePath} L ${points.at(-1)?.[0] ?? 0} ${top + innerHeight} L ${points[0]?.[0] ?? 0} ${top + innerHeight} Z`
+  const areaPath = linePath
+    ? `${linePath} L ${points.at(-1)?.[0] ?? left} ${top + innerHeight} L ${points[0]?.[0] ?? left} ${top + innerHeight} Z`
+    : null
 
-  return { points, linePath, areaPath }
+  return { points, linePath, areaPath, hasPath: Boolean(linePath && areaPath) }
 }
 
 function getChartAxisInterval(metric) {
@@ -810,7 +793,7 @@ function TrendChart({ metric, chartData, presentation }) {
   const chartRef = useRef(null)
 
   useEffect(() => {
-    if (!chartRef.current) {
+    if (!chartRef.current || !chartData.length) {
       return undefined
     }
 
@@ -944,11 +927,40 @@ function TrendChart({ metric, chartData, presentation }) {
   return <div ref={chartRef} className="ops-trend-modal__echart" />
 }
 
-function TrendModal({ metric, startTime, endTime, onStartTimeChange, onEndTimeChange, onSearch, chartData, onClose }) {
+function TrendModal({
+  metric,
+  startTime,
+  endTime,
+  onStartTimeChange,
+  onEndTimeChange,
+  onSearch,
+  chartData,
+  isCurveLoading = false,
+  isCurveError = false,
+  onClose,
+}) {
   const [pickerField, setPickerField] = useState(null)
   const presentation = useMemo(() => getMetricPresentation(metric), [metric])
   const [tooltipIndex, setTooltipIndex] = useState(null)
   const geometry = useMemo(() => buildChartGeometry(chartData, presentation), [chartData, presentation])
+  const chartStatusMessage = useMemo(() => {
+    if (isCurveLoading) {
+      return '正在加载历史数据...'
+    }
+    if (isCurveError) {
+      return '历史数据加载失败，请调整时间后重试'
+    }
+    if (!chartData.length) {
+      return '所选时间范围内暂无历史数据'
+    }
+    return null
+  }, [chartData.length, isCurveError, isCurveLoading])
+  const showChartLayers = !chartStatusMessage
+
+  useEffect(() => {
+    setTooltipIndex(null)
+  }, [chartData, isCurveError, isCurveLoading])
+
   const resolvedTooltipIndex = tooltipIndex !== null && chartData[tooltipIndex] ? tooltipIndex : null
   const tooltipPoint =
     resolvedTooltipIndex === null ? null : geometry.points[resolvedTooltipIndex] ?? geometry.points[0] ?? null
@@ -1026,7 +1038,7 @@ function TrendModal({ metric, startTime, endTime, onStartTimeChange, onEndTimeCh
             <div className="ops-trend-modal__ylabel">{presentation.yAxisLabel}</div>
 
             <div className="ops-trend-modal__chart">
-              <TrendChart metric={metric} chartData={chartData} presentation={presentation} />
+              {showChartLayers ? <TrendChart metric={metric} chartData={chartData} presentation={presentation} /> : null}
               <div className="ops-trend-modal__grid" style={{ '--ops-grid-rows': presentation.ticks.length }}>
                 {presentation.ticks.map((tick) => (
                   <div key={tick} className="ops-trend-modal__grid-row">
@@ -1036,41 +1048,51 @@ function TrendModal({ metric, startTime, endTime, onStartTimeChange, onEndTimeCh
                 ))}
               </div>
 
-              <svg
-                viewBox="0 0 1120 430"
-                className="ops-trend-modal__svg"
-                preserveAspectRatio="none"
-                aria-hidden="true"
-                onPointerMove={(event) => updateTooltipIndex(event.clientX, event.currentTarget)}
-                onPointerDown={(event) => updateTooltipIndex(event.clientX, event.currentTarget)}
-                onClick={(event) => updateTooltipIndex(event.clientX, event.currentTarget)}
-                onPointerLeave={() => setTooltipIndex(null)}
-              >
-                <defs>
-                  <linearGradient id="ops-area-gradient" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="0%" stopColor="rgba(255,95,52,0.42)" />
-                    <stop offset="100%" stopColor="rgba(255,95,52,0.04)" />
-                  </linearGradient>
-                </defs>
-                <path d={geometry.areaPath} fill="url(#ops-area-gradient)" />
-                <path d={geometry.linePath} fill="none" stroke="#ff5c2f" strokeWidth="2.5" />
-                {tooltipPoint && tooltipValue !== null && tooltipPosition ? (
-                  <>
-                    <circle cx={tooltipPoint[0]} cy={tooltipPoint[1]} r="8" fill="#ff5c2f" />
-                    <g transform={`translate(${tooltipPosition.x} ${tooltipPosition.y})`}>
-                      <rect width="236" height="66" rx="10" fill="#1e2734" stroke="rgba(77,110,153,0.45)" />
-                      <circle cx="28" cy="33" r="7" fill="#ff5c2f" />
-                      <text x="54" y="40" fill="#ffffff" fontSize="22">{chartData[resolvedTooltipIndex]?.label ?? chartData[0]?.label ?? '--'}</text>
-                      <text x="138" y="40" fill="#ffffff" fontSize="22">{presentation.tooltipFormatter(tooltipValue)}</text>
-                    </g>
-                  </>
-                ) : null}
-              </svg>
+              {showChartLayers && geometry.hasPath ? (
+                <svg
+                  viewBox="0 0 1120 430"
+                  className="ops-trend-modal__svg"
+                  preserveAspectRatio="none"
+                  aria-hidden="true"
+                  onPointerMove={(event) => updateTooltipIndex(event.clientX, event.currentTarget)}
+                  onPointerDown={(event) => updateTooltipIndex(event.clientX, event.currentTarget)}
+                  onClick={(event) => updateTooltipIndex(event.clientX, event.currentTarget)}
+                  onPointerLeave={() => setTooltipIndex(null)}
+                >
+                  <defs>
+                    <linearGradient id="ops-area-gradient" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="rgba(255,95,52,0.42)" />
+                      <stop offset="100%" stopColor="rgba(255,95,52,0.04)" />
+                    </linearGradient>
+                  </defs>
+                  <path d={geometry.areaPath} fill="url(#ops-area-gradient)" />
+                  <path d={geometry.linePath} fill="none" stroke="#ff5c2f" strokeWidth="2.5" />
+                  {tooltipPoint && tooltipValue !== null && tooltipPosition ? (
+                    <>
+                      <circle cx={tooltipPoint[0]} cy={tooltipPoint[1]} r="8" fill="#ff5c2f" />
+                      <g transform={`translate(${tooltipPosition.x} ${tooltipPosition.y})`}>
+                        <rect width="236" height="66" rx="10" fill="#1e2734" stroke="rgba(77,110,153,0.45)" />
+                        <circle cx="28" cy="33" r="7" fill="#ff5c2f" />
+                        <text x="54" y="40" fill="#ffffff" fontSize="22">{chartData[resolvedTooltipIndex]?.label ?? chartData[0]?.label ?? '--'}</text>
+                        <text x="138" y="40" fill="#ffffff" fontSize="22">{presentation.tooltipFormatter(tooltipValue)}</text>
+                      </g>
+                    </>
+                  ) : null}
+                </svg>
+              ) : null}
+
+              {chartStatusMessage ? (
+                <div className="ops-trend-modal__chart-overlay" role="status">
+                  {chartStatusMessage}
+                </div>
+              ) : null}
 
               <div className="ops-trend-modal__xaxis">
-                {chartData.map((item) => (
-                  <span key={item.label}>{item.label}</span>
-                ))}
+                {showChartLayers
+                  ? chartData.map((item) => (
+                    <span key={`${item.label}-${item.value}`}>{item.label}</span>
+                  ))
+                  : null}
                 <span>时间</span>
               </div>
             </div>
@@ -1101,7 +1123,7 @@ function TrendModal({ metric, startTime, endTime, onStartTimeChange, onEndTimeCh
         showBackdrop={false}
         onClose={() => setPickerField(null)}
         onConfirm={(nextValue) => {
-          const normalized = normalizeDateTime(formatDateTimeParts(nextValue).replace(/\./g, '-').replace(':00', ''))
+          const normalized = normalizeDateTime(formatDateTimeParts(nextValue).replace(/\./g, '-'))
           if (pickerField === 'start') {
             onStartTimeChange(normalized)
           } else {
@@ -1125,11 +1147,20 @@ function MetricCard({ item, onClick }) {
 
 function OperationsSystemManagementPage({ tabId }) {
   const [activeSetting, setActiveSetting] = useState(SETTING_OPTIONS[0].value)
-  const [activeUnit, setActiveUnit] = useState('No1')
+  const [activeHeatPumpUnit, setActiveHeatPumpUnit] = useState('No1')
+  const [activeAirCooledUnit, setActiveAirCooledUnit] = useState('No31')
   const [activeMetric, setActiveMetric] = useState(null)
+  const [curveNoticeMessage, setCurveNoticeMessage] = useState('')
   const defaultTrendTimeRange = useMemo(() => getDefaultTrendTimeRange(), [])
   const [startTime, setStartTime] = useState(defaultTrendTimeRange.startTime)
   const [endTime, setEndTime] = useState(defaultTrendTimeRange.endTime)
+  const isAirCooledUnitTab = tabId === 'unit-data-air-cooled'
+  const isUnitDataTab = tabId === 'unit-data-heat-pump' || isAirCooledUnitTab
+  const heatPumpUnitOptions = useMemo(() => createDefaultOpsHeatPumpUnitOptions(), [])
+  const airCooledUnitOptions = useMemo(() => createDefaultOpsAirCooledUnitOptions(), [])
+  const activeUnit = isAirCooledUnitTab ? activeAirCooledUnit : activeHeatPumpUnit
+  const unitOptions = isAirCooledUnitTab ? airCooledUnitOptions : heatPumpUnitOptions
+  const setActiveUnit = isAirCooledUnitTab ? setActiveAirCooledUnit : setActiveHeatPumpUnit
   const selectedSettingLabel = useMemo(
     () => SETTING_OPTIONS.find((item) => item.value === activeSetting)?.label ?? SETTING_OPTIONS[0].label,
     [activeSetting],
@@ -1140,30 +1171,34 @@ function OperationsSystemManagementPage({ tabId }) {
   const { data: configMetrics = [] } = useOpsSystemConfigQuery(selectedSettingLabel, {
     enabled: tabId === 'setting-data',
   })
-  const { data: heatPumpOptions = [] } = useOpsHeatPumpListQuery({
-    enabled: tabId === 'unit-data',
+  const { data: unitMetrics = [] } = useOpsUnitDeviceParamQuery(activeUnit, {
+    enabled: isUnitDataTab,
   })
-  const { data: unitMetrics = [] } = useOpsHeatPumpSingleQuery(activeUnit, {
-    enabled: tabId === 'unit-data',
-  })
-  const { data: chartData = [], refetch: refetchCurve } = useOpsCurveQuery({
+  const {
+    data: chartData = [],
+    refetch: refetchCurve,
+    isFetching: isCurveFetching,
+    isPending: isCurvePending,
+    isError: isCurveError,
+  } = useOpsCurveQuery({
     longName: activeMetric?.longName,
     startTime,
     endTime,
     enabled: Boolean(activeMetric?.longName),
   })
+  const isCurveLoading = Boolean(activeMetric?.longName) && (isCurveFetching || isCurvePending)
 
   useEffect(() => {
     setActiveMetric(null)
   }, [activeSetting, activeUnit, tabId])
 
   useEffect(() => {
-    if (tabId !== 'unit-data' || !heatPumpOptions.length) return
-    const exists = heatPumpOptions.some((item) => item.value === activeUnit)
+    if (!isUnitDataTab || !unitOptions.length) return
+    const exists = unitOptions.some((item) => item.value === activeUnit)
     if (!exists) {
-      setActiveUnit(heatPumpOptions[0].value)
+      setActiveUnit(unitOptions[0].value)
     }
-  }, [activeUnit, heatPumpOptions, tabId])
+  }, [activeUnit, isUnitDataTab, setActiveUnit, unitOptions])
 
   const viewConfig = useMemo(() => {
     if (tabId === 'status-data') {
@@ -1193,7 +1228,8 @@ function OperationsSystemManagementPage({ tabId }) {
         items: configMetrics,
       }
     }
-    const selectedUnit = heatPumpOptions.find((item) => item.value === activeUnit) ?? heatPumpOptions[0]
+    const selectedUnit = unitOptions.find((item) => item.value === activeUnit) ?? unitOptions[0]
+    const unitSelectorLabel = isAirCooledUnitTab ? '风冷模块' : '热泵机组'
     return {
       selector: (
         <SelectDropdown
@@ -1201,20 +1237,34 @@ function OperationsSystemManagementPage({ tabId }) {
           triggerClassName="ops-system-page__select-trigger"
           dropdownClassName="ops-system-page__select-menu"
           optionClassName="ops-system-page__select-option"
-          options={heatPumpOptions}
+          options={unitOptions}
           value={activeUnit}
           onChange={setActiveUnit}
-          triggerAriaLabel="选择热泵机组"
-          listAriaLabel="热泵机组选项"
+          triggerAriaLabel={`选择${unitSelectorLabel}`}
+          listAriaLabel={`${unitSelectorLabel}选项`}
         />
       ),
       tip: '点击卡片查看历史状态数据曲线图',
       items: unitMetrics,
-      currentTitle: selectedUnit?.label ?? '热泵',
+      currentTitle: selectedUnit?.label ?? unitSelectorLabel,
     }
-  }, [activeSetting, activeUnit, configMetrics, heatPumpOptions, stateMetrics, tabId, unitMetrics])
+  }, [
+    activeSetting,
+    activeUnit,
+    configMetrics,
+    isAirCooledUnitTab,
+    setActiveUnit,
+    stateMetrics,
+    tabId,
+    unitMetrics,
+    unitOptions,
+  ])
 
   const handleOpenMetric = (item) => {
+    if (!String(item?.longName ?? '').trim()) {
+      setCurveNoticeMessage('该数据点暂无历史曲线')
+      return
+    }
     const nextRange = getDefaultTrendTimeRange()
     setStartTime(nextRange.startTime)
     setEndTime(nextRange.endTime)
@@ -1265,9 +1315,22 @@ function OperationsSystemManagementPage({ tabId }) {
           onEndTimeChange={handleEndTimeChange}
           onSearch={handleSearch}
           chartData={chartData}
+          isCurveLoading={isCurveLoading}
+          isCurveError={isCurveError}
           onClose={() => setActiveMetric(null)}
         />
       ) : null}
+
+      <AttentionModal
+        isOpen={Boolean(curveNoticeMessage)}
+        title="提示"
+        message={curveNoticeMessage}
+        confirmText="确认"
+        showCancel={false}
+        onClose={() => setCurveNoticeMessage('')}
+        onConfirm={() => setCurveNoticeMessage('')}
+        zIndex={300}
+      />
     </>
   )
 }

@@ -3,24 +3,20 @@ import { usePollingQuery } from '@/shared/hooks/usePollingQuery'
 import {
   adaptOpsCurveData,
   adaptOpsDeviceRows,
-  adaptOpsHeatPumpOptions,
-  adaptOpsHeatPumpSingleMetrics,
   adaptOpsSystemConfigMetrics,
   adaptOpsSystemStateMetrics,
   adaptOpsSystemType,
-  createDefaultOpsCurveData,
+  adaptOpsUnitDeviceMetrics,
   createDefaultOpsDeviceRows,
-  createDefaultOpsHeatPumpOptions,
-  createDefaultOpsHeatPumpSingleMetrics,
+  createDefaultOpsUnitDeviceMetrics,
   createDefaultOpsSystemConfigMetrics,
   createDefaultOpsSystemStateMetrics,
   createDefaultOpsSystemType,
 } from '@/api/adapters/operations'
+import { queryHeatPumpParam } from '@/api/modules/home'
 import {
   heatPumpOperatingTime,
   queryCurveByLongName,
-  queryHeatPumpList,
-  queryHeatPumpSingle,
   querySystemConfigSingle,
   querySystemStateData,
   querySystemType,
@@ -36,23 +32,13 @@ export function useOpsSystemStateQuery({ enabled = true } = {}) {
   })
 }
 
-export function useOpsHeatPumpListQuery({ enabled = true } = {}) {
+export function useOpsUnitDeviceParamQuery(code, { enabled = true } = {}) {
   return usePollingQuery({
-    queryKey: ['ops', 'heat-pump-list'],
-    queryFn: queryHeatPumpList,
-    enabled,
-    select: (response) => adaptOpsHeatPumpOptions(response?.data ?? response),
-    placeholderData: createDefaultOpsHeatPumpOptions(),
-  })
-}
-
-export function useOpsHeatPumpSingleQuery(code, { enabled = true } = {}) {
-  return usePollingQuery({
-    queryKey: ['ops', 'heat-pump-single', code],
-    queryFn: () => queryHeatPumpSingle(code),
+    queryKey: ['ops', 'unit-device-param', code],
+    queryFn: () => queryHeatPumpParam({ code }),
     enabled: enabled && Boolean(code),
-    select: (response) => adaptOpsHeatPumpSingleMetrics(response?.data ?? response),
-    placeholderData: createDefaultOpsHeatPumpSingleMetrics(),
+    select: (response) => adaptOpsUnitDeviceMetrics(response?.data ?? response, code),
+    placeholderData: createDefaultOpsUnitDeviceMetrics(),
   })
 }
 
@@ -79,7 +65,6 @@ export function useOpsCurveQuery({ longName, startTime, endTime, enabled = true 
     refetchOnWindowFocus: false,
     retry: 1,
     select: (response) => adaptOpsCurveData(response?.data ?? response),
-    placeholderData: createDefaultOpsCurveData(),
   })
 }
 

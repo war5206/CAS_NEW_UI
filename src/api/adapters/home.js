@@ -2,10 +2,11 @@ import {
   HEAT_PUMP_GRID_ITEMS,
   HEAT_PUMP_GRID_COLS,
   HEAT_PUMP_GRID_ROWS,
-  HEAT_PUMP_DETAIL_LABEL,
   HEAT_PUMP_STATUS,
   getHeatPumpStatusSummary,
 } from '@/config/homeHeatPumps'
+import { getUnitDisplayName, parseUnitDeviceCodeLoose, resolveUnitDisplayLabelFromCode } from '@/config/projectUnitDevices'
+import { createUnitDeviceDetailsFromParam } from '@/config/unitDeviceParamPoints'
 
 const DEFAULT_TEMPERATURE_LABELS = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9']
 const DEFAULT_SUPPLY_DATA = [42, 43, 44, 38, 37, 42, 43, 40, 36, 35]
@@ -121,21 +122,8 @@ function toHeatPumpLabelFromName(name, fallbackIndex) {
   return String(fallbackIndex).padStart(2, '0')
 }
 
-function createHeatPumpDetailsFromParam(heatPumpData = {}, stateFallback = '') {
-  return [
-    { label: HEAT_PUMP_DETAIL_LABEL.INLET_TEMP, value: toText(heatPumpData['进水温度'], '--') },
-    { label: HEAT_PUMP_DETAIL_LABEL.OUTLET_TEMP, value: toText(heatPumpData['出水温度'], '--') },
-    { label: HEAT_PUMP_DETAIL_LABEL.AMBIENT_TEMP, value: toText(heatPumpData['环境温度'], '--') },
-    { label: HEAT_PUMP_DETAIL_LABEL.CUMULATIVE_RUNTIME, value: toText(heatPumpData['累积运行时长(H)'], '--') },
-    { label: HEAT_PUMP_DETAIL_LABEL.CONTINUOUS_RUNTIME, value: toText(heatPumpData['持续运行时长(H)'], '--') },
-    { label: HEAT_PUMP_DETAIL_LABEL.COMPRESSOR_1_CURRENT, value: toText(heatPumpData['压缩机1电流(A)'], '--') },
-    { label: HEAT_PUMP_DETAIL_LABEL.COMPRESSOR_2_CURRENT, value: toText(heatPumpData['压缩机2电流(A)'], '--') },
-    { label: HEAT_PUMP_DETAIL_LABEL.ANTI_FREEZE_STATUS, value: toText(heatPumpData['防冻状态'], '--') },
-    { label: HEAT_PUMP_DETAIL_LABEL.MODE_STATUS, value: toText(heatPumpData['模式状态'], toText(stateFallback, '--')) },
-    { label: HEAT_PUMP_DETAIL_LABEL.DEFROST_STATUS, value: toText(heatPumpData['化霜状态'], '--') },
-    { label: HEAT_PUMP_DETAIL_LABEL.MAINBOARD_POWER_SIGNAL_STATUS, value: toText(heatPumpData['主板开机信号状态'], '--') },
-    { label: HEAT_PUMP_DETAIL_LABEL.FAULT_STATUS, value: toText(heatPumpData['故障状态'], '--') },
-  ]
+function createHeatPumpDetailsFromParam(heatPumpData = {}) {
+  return createUnitDeviceDetailsFromParam(heatPumpData)
 }
 
 function buildFallbackLoopPumpItems() {
@@ -192,37 +180,51 @@ function adaptHeatPumpItems(items, fallbackItems) {
     return fallbackItems
   }
 
-  return items.map((item, index) => ({
-    ...fallbackItems[index % fallbackItems.length],
-    ...item,
-    status: normalizeHeatPumpStatus(item?.status),
-    label: toText(item?.label, fallbackItems[index % fallbackItems.length]?.label ?? String(index + 1).padStart(2, '0')),
-    name: toText(item?.name, `热泵${index + 1}`),
-    details: Array.isArray(item?.details) ? item.details : fallbackItems[index % fallbackItems.length]?.details ?? [],
-  }))
+  return items.map((item, index) => {
+    const unitId = parseUnitDeviceCodeLoose(item?.code) ?? parseUnitDeviceCodeLoose(item?.label) ?? item?.id
+    const displayName =
+      unitId != null ? getUnitDisplayName(unitId) : toText(item?.name, `热泵${index + 1}`)
+
+    return {
+      ...fallbackItems[index % fallbackItems.length],
+      ...item,
+      status: normalizeHeatPumpStatus(item?.status),
+      label: displayName,
+      name: displayName,
+      details: Array.isArray(item?.details) ? item.details : fallbackItems[index % fallbackItems.length]?.details ?? [],
+    }
+  })
 }
 
 export function createDefaultSystemConfig() {
   return {
     systemTypeUuid: '1',
     terminalTypeUuid: '5',
+    coupleEnergyTypeUuid: '',
   }
 }
 
 export function adaptSystemConfig(rawData) {
   const responseData = rawData?.data ?? rawData
   const projectData = responseData?.data?.projectData ?? responseData?.projectData ?? {}
+  const coupleEnergyTypeUuid =
+    projectData.couple_energy_type_uuid ??
+    projectData.coupleEnergyTypeUuid ??
+    responseData?.data?.couple_energy_type_uuid ??
+    responseData?.couple_energy_type_uuid ??
+    ''
 
   return {
     systemTypeUuid: String(projectData.system_type_uuid ?? '1'),
     terminalTypeUuid: String(projectData.terminal_type_uuid ?? '5'),
+    coupleEnergyTypeUuid: String(coupleEnergyTypeUuid),
   }
 }
 
 export function createDefaultHomeOverview() {
   const heatPumpItems = HEAT_PUMP_GRID_ITEMS
   const heatPumpSummary = getHeatPumpStatusSummary(heatPumpItems)
-  const loopPumpItems = buildFallbackLoopPumpItems()
+  // const loopPumpItems = buildFallbackLoopPumpItems()
 
   return {
     fetchedAt: null,
@@ -245,23 +247,23 @@ export function createDefaultHomeOverview() {
     system: {
       heatPumpSummary,
       outdoorTemp: '-2.1',
-      condensatePipeTemp: '-2.1',
-      heatTracingEnabled: false,
+      // condensatePipeTemp: '-2.1',
+      // heatTracingEnabled: false,
       couplingEnergyEnabled: true,
       waterPumpEnabled: true,
       supplyTemp: '-2.1',
       supplyPressure: '-2.1',
       returnPressure: '-2.1',
       returnTemp: '-2.1',
-      circulationPumps: loopPumpItems,
+      // circulationPumps: loopPumpItems,
       drainValveOpen: true,
-      pressureTankOpen: true,
-      pressureValveOpen: true,
-      makeupPumps: [
-        { name: '水泵一', status: '运行中', tone: 'running' },
-        { name: '水泵二', status: '待机', tone: 'off' },
-      ],
-      waterTankLevel: '50',
+      // pressureTankOpen: true,
+      // pressureValveOpen: true,
+      // makeupPumps: [
+      //   { name: '水泵一', status: '运行中', tone: 'running' },
+      //   { name: '水泵二', status: '待机', tone: 'off' },
+      // ],
+      // waterTankLevel: '50',
       primarySupplyMainTemp: '',
       indoorTemperatures: [
         { name: '室内温度1', value: '0.0' },
@@ -281,7 +283,8 @@ export function createDefaultHomeOverview() {
     },
     deviceStatus: {
       heatPumpData: buildHeatPumpChartData(heatPumpSummary),
-      loopPumpItems,
+      // loopPumpItems,
+      loopPumpItems: [],
     },
     heatPumpItems,
   }
@@ -331,25 +334,23 @@ export function adaptHeatPumpArrange(rawData) {
     const safeRow = Math.min(Math.max(row, 1), HEAT_PUMP_GRID_ROWS)
     const safeCol = Math.min(Math.max(col, 1), HEAT_PUMP_GRID_COLS)
     const status = resolveHeatPumpStatusFromRuntime(item ?? {})
+    const codeText = toText(item?.code, '')
+    const unitId = parseUnitDeviceCodeLoose(codeText) ?? toNumberOrFallback(item?.id, index + 1)
+    const displayName = getUnitDisplayName(unitId)
 
     arrangedMap.set(`${safeRow}-${safeCol}`, {
-      key: `hp-${toText(item?.code, index + 1)}-${safeRow}-${safeCol}`,
-      id: index + 1,
+      key: `hp-${codeText || unitId}-${safeRow}-${safeCol}`,
+      id: unitId,
       row: safeRow,
       col: safeCol,
       status,
-      label: toHeatPumpLabelFromName(item?.name, index + 1),
-      name: toText(item?.name, `热泵${index + 1}`),
-      code: toText(item?.code, ''),
+      label: displayName,
+      name: displayName,
+      code: codeText,
       alarm: toBoolean(item?.alarm, false),
       run: toBoolean(item?.run, false),
       state: toText(item?.state, ''),
-      details: [
-        {
-          label: HEAT_PUMP_DETAIL_LABEL.MODE_STATUS,
-          value: toText(item?.state, '--'),
-        },
-      ],
+      details: [],
     })
   })
 
@@ -384,7 +385,7 @@ export function adaptHeatPumpParam(rawData, fallbackPump = {}) {
     run,
     state,
     status: resolveHeatPumpStatusFromRuntime({ alarm, run, state }),
-    details: createHeatPumpDetailsFromParam(heatPumpData, state),
+    details: createHeatPumpDetailsFromParam(heatPumpData),
   }
 }
 
@@ -402,7 +403,18 @@ export function adaptHeatPumpOverviewPage(rawData) {
   const fallback = createDefaultHeatPumpOverviewPage()
   const responseData = rawData?.data ?? rawData
   const source = responseData?.data ?? responseData ?? {}
-  const list = Array.isArray(source?.list) ? source.list : []
+  const list = Array.isArray(source?.list)
+    ? source.list.map((item) => {
+        const codeCandidate = item?.heatPumpCode ?? item?.heatPumpNo ?? item?.热泵序号 ?? item?.code
+        const displayName = resolveUnitDisplayLabelFromCode(codeCandidate)
+
+        return {
+          ...item,
+          heatPumpNo: displayName,
+          热泵序号: displayName,
+        }
+      })
+    : []
 
   return {
     list,
@@ -431,14 +443,58 @@ export function adaptHomeTemperatureTrend(rawData) {
   }
 }
 
+function isHomeOverviewPayload(candidate) {
+  if (!candidate || typeof candidate !== 'object' || Array.isArray(candidate)) return false
+  return (
+    candidate.onlineHeatPump !== undefined ||
+    candidate.offlineHeatPump !== undefined ||
+    candidate.userSupplyWaterTemperature !== undefined ||
+    candidate.userBackWaterTemperature !== undefined ||
+    candidate.supplyWaterPressure !== undefined ||
+    candidate.backWaterPressure !== undefined ||
+    candidate.system !== undefined ||
+    candidate.mode !== undefined
+  )
+}
+
+/** 兼容算法编排多种返回结构：data / data.result / data.data 等 */
+function extractHomeOverviewSource(rawData) {
+  const envelope = rawData?.data ?? rawData
+  if (!envelope || typeof envelope !== 'object') return {}
+
+  const candidates = [
+    envelope?.data?.result,
+    envelope?.data?.data,
+    envelope?.data,
+    envelope?.result,
+    envelope,
+  ]
+
+  for (const candidate of candidates) {
+    if (isHomeOverviewPayload(candidate)) {
+      return candidate
+    }
+  }
+
+  return envelope?.data?.result ?? envelope?.data ?? envelope?.result ?? envelope ?? {}
+}
+
+function isNewHomeOverviewApi(source) {
+  return (
+    source.onlineHeatPump !== undefined ||
+    source.offlineHeatPump !== undefined ||
+    source.userSupplyWaterTemperature !== undefined ||
+    source.userBackWaterTemperature !== undefined ||
+    source.supplyWaterPressure !== undefined ||
+    source.backWaterPressure !== undefined
+  )
+}
+
 export function adaptHomeOverview(rawData) {
   const fallback = createDefaultHomeOverview()
-  const responseData = rawData?.data ?? rawData
-  const source = responseData?.data ?? responseData ?? {}
+  const source = extractHomeOverviewSource(rawData)
 
-  const isNewApiFormat = source.onlineHeatPump !== undefined || source.offlineHeatPump !== undefined
-
-  if (isNewApiFormat) {
+  if (isNewHomeOverviewApi(source)) {
     return adaptNewApiResponse(source, fallback)
   }
 
@@ -448,7 +504,7 @@ export function adaptHomeOverview(rawData) {
   const temperatureSource = source.temperature ?? {}
   const heatPumpItems = adaptHeatPumpItems(source.heatPumpItems, fallback.heatPumpItems)
   const summarySource = source.heatPumpSummary ?? systemSource.heatPumpSummary ?? getHeatPumpStatusSummary(heatPumpItems)
-  const loopPumpItems = adaptLoopPumpItems(source.loopPumpItems ?? systemSource.circulationPumps, fallback.deviceStatus.loopPumpItems)
+  // const loopPumpItems = adaptLoopPumpItems(source.loopPumpItems ?? systemSource.circulationPumps, fallback.deviceStatus.loopPumpItems)
 
   const heatPumpSummary = {
     running: toNumberOrFallback(summarySource.running, fallback.system.heatPumpSummary.running),
@@ -478,21 +534,21 @@ export function adaptHomeOverview(rawData) {
     system: {
       heatPumpSummary,
       outdoorTemp: toText(systemSource.outdoorTemp, fallback.system.outdoorTemp),
-      condensatePipeTemp: toText(systemSource.condensatePipeTemp, fallback.system.condensatePipeTemp),
-      heatTracingEnabled: toBoolean(systemSource.heatTracingEnabled, fallback.system.heatTracingEnabled),
+      // condensatePipeTemp: toText(systemSource.condensatePipeTemp, fallback.system.condensatePipeTemp),
+      // heatTracingEnabled: toBoolean(systemSource.heatTracingEnabled, fallback.system.heatTracingEnabled),
       couplingEnergyEnabled: toBoolean(systemSource.couplingEnergyEnabled, fallback.system.couplingEnergyEnabled),
       waterPumpEnabled: toBoolean(systemSource.waterPumpEnabled, fallback.system.waterPumpEnabled),
       supplyTemp: toText(systemSource.supplyTemp, fallback.system.supplyTemp),
       supplyPressure: toText(systemSource.supplyPressure, fallback.system.supplyPressure),
       returnPressure: toText(systemSource.returnPressure, fallback.system.returnPressure),
       returnTemp: toText(systemSource.returnTemp, fallback.system.returnTemp),
-      circulationPumps: loopPumpItems,
+      // circulationPumps: loopPumpItems,
       terminalCirculationPumps: adaptLoopPumpItems(systemSource.terminalCirculationPumps, []),
       drainValveOpen: toBoolean(systemSource.drainValveOpen, fallback.system.drainValveOpen),
-      pressureTankOpen: toBoolean(systemSource.pressureTankOpen, fallback.system.pressureTankOpen),
-      pressureValveOpen: toBoolean(systemSource.pressureValveOpen, fallback.system.pressureValveOpen),
-      makeupPumps: adaptLoopPumpItems(systemSource.makeupPumps, fallback.system.makeupPumps),
-      waterTankLevel: toText(systemSource.waterTankLevel, fallback.system.waterTankLevel),
+      // pressureTankOpen: toBoolean(systemSource.pressureTankOpen, fallback.system.pressureTankOpen),
+      // pressureValveOpen: toBoolean(systemSource.pressureValveOpen, fallback.system.pressureValveOpen),
+      // makeupPumps: adaptLoopPumpItems(systemSource.makeupPumps, fallback.system.makeupPumps),
+      // waterTankLevel: toText(systemSource.waterTankLevel, fallback.system.waterTankLevel),
       primarySupplyMainTemp: toText(systemSource.primarySupplyMainTemp, ''),
       indoorTemperatures: Array.isArray(systemSource.indoorTemperatures) ? systemSource.indoorTemperatures : fallback.system.indoorTemperatures,
       targetBackwaterTemperature: toText(systemSource.targetBackwaterTemperature, fallback.system.targetBackwaterTemperature),
@@ -505,7 +561,8 @@ export function adaptHomeOverview(rawData) {
     },
     deviceStatus: {
       heatPumpData: buildHeatPumpChartData(heatPumpSummary),
-      loopPumpItems,
+      // loopPumpItems,
+      loopPumpItems: [],
     },
     heatPumpItems,
   }
@@ -519,18 +576,18 @@ function adaptNewApiResponse(source, fallback) {
     malfunction: toNumberOrFallback(source.alarmHeatPump, 0),
   }
 
-  const circulationPumps = Array.isArray(source.heatCirculationPump)
-    ? source.heatCirculationPump.map((p) => pumpStateToPumpItem(p.name, p.state))
-    : fallback.system.circulationPumps
+  // const circulationPumps = Array.isArray(source.heatCirculationPump)
+  //   ? source.heatCirculationPump.map((p) => pumpStateToPumpItem(p.name, p.state))
+  //   : fallback.system.circulationPumps
 
   const terminalCirculationPumps = Array.isArray(source.terminalCirculationPump)
     ? source.terminalCirculationPump.map((p) => pumpStateToPumpItem(p.name, p.state))
     : []
 
-  const makeupPumps = [
-    pumpStateToPumpItem('水泵一', source.replenishWaterPump1),
-    pumpStateToPumpItem('水泵二', source.replenishWaterPump2),
-  ]
+  // const makeupPumps = [
+  //   pumpStateToPumpItem('水泵一', source.replenishWaterPump1),
+  //   pumpStateToPumpItem('水泵二', source.replenishWaterPump2),
+  // ]
 
   const indoorTemperatures = Array.isArray(source.terminalTemperature)
     ? source.terminalTemperature.map((t) => ({
@@ -547,7 +604,7 @@ function adaptNewApiResponse(source, fallback) {
   const modePresentation = buildModePresentationFromRunMode(runModeValue, fallback.mode.name)
   const modeIconsPresentation = buildModeIconsPresentation(runModeValue, qhbcValue)
 
-  const loopPumpItems = circulationPumps.length > 0 ? circulationPumps : fallback.deviceStatus.loopPumpItems
+  // const loopPumpItems = circulationPumps.length > 0 ? circulationPumps : fallback.deviceStatus.loopPumpItems
 
   return {
     fetchedAt: Date.now(),
@@ -565,8 +622,8 @@ function adaptNewApiResponse(source, fallback) {
     system: {
       heatPumpSummary,
       outdoorTemp: ambientTemp,
-      condensatePipeTemp: toText(source.condensateWaterTemperature, '0'),
-      heatTracingEnabled: toBoolean(source.tropicalCompanion, false),
+      // condensatePipeTemp: toText(source.condensateWaterTemperature, '0'),
+      // heatTracingEnabled: toBoolean(source.tropicalCompanion, false),
       couplingEnergyEnabled: toBoolean(source.coupleEnergy, false),
       couplingEnergyName: toText(source.coupleEnergyName, ''),
       waterPumpEnabled: fallback.system.waterPumpEnabled,
@@ -574,13 +631,13 @@ function adaptNewApiResponse(source, fallback) {
       supplyPressure: toText(source.supplyWaterPressure, '0'),
       returnPressure: toText(source.backWaterPressure, '0'),
       returnTemp: toText(source.userBackWaterTemperature, '0'),
-      circulationPumps,
+      // circulationPumps,
       terminalCirculationPumps,
       drainValveOpen: toBoolean(source.dirtSeparator, false),
-      pressureTankOpen: fallback.system.pressureTankOpen,
-      pressureValveOpen: toBoolean(source.pressureReliefValve, false),
-      makeupPumps,
-      waterTankLevel: toText(source.softenWaterTank, '0'),
+      // pressureTankOpen: fallback.system.pressureTankOpen,
+      // pressureValveOpen: toBoolean(source.pressureReliefValve, false),
+      // makeupPumps,
+      // waterTankLevel: toText(source.softenWaterTank, '0'),
       primarySupplyMainTemp: toText(source.onceSupplyWaterTemperature, ''),
       indoorTemperatures,
       targetBackwaterTemperature: toText(optional.targetBackwaterTemperature, '0.0℃'),
@@ -588,7 +645,8 @@ function adaptNewApiResponse(source, fallback) {
     temperature: fallback.temperature,
     deviceStatus: {
       heatPumpData: buildHeatPumpChartData(heatPumpSummary),
-      loopPumpItems,
+      // loopPumpItems,
+      loopPumpItems: [],
     },
     heatPumpItems: fallback.heatPumpItems,
   }

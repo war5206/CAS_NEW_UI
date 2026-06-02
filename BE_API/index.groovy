@@ -75,21 +75,6 @@ try {
     selectHeatPumpList = new ArrayList<>();
 }
 
-String onlineHeatPump = "0";
-String onlinePointSql = "SELECT a.taglongname,a.times,a.realval,a.quality FROM psrealdata AS a WHERE a.taglongname IN ('Sys\\FinforWorx\\HPYXTS')";
-DataTable onlinedt = dataService.queryListDataBySql(onlinePointSql);
-if(onlinedt.getRows().size() == 1){
-    for(int c = 0; c < onlinedt.getColumns().size(); c++){
-        if(onlinedt.getColumns().get(c).getColumnName() == "realval"){
-            try {
-                onlineHeatPump = onlinedt.getValue(0,c).toString();
-            } catch (Exception e) {
-                onlineHeatPump = "0";
-            }
-        }
-    }
-}
-
 def getPointRealVal = { String taglongname ->
     String realVal = "";
     String querySql = "SELECT a.taglongname,a.times,a.realval,a.quality FROM psrealdata AS a WHERE a.taglongname IN ('" + taglongname + "')";
@@ -125,31 +110,31 @@ def isPointValue = { String pointValue, int targetValue ->
 int offlineHeatPump = 0;
 int alarmHeatPump = 0;
 int defrostHeatPump = 0;
-for (Map<String,Object> selectHeatPumpMap : selectHeatPumpList) {
-    String heatPumpCode = selectHeatPumpMap.get("device_uuid");
-    String compCur1 = getPointRealVal("HeatPump\\SJMG\\" + heatPumpCode + "\\CompreCur1");
-    String compCur2 = getPointRealVal("HeatPump\\SJMG\\" + heatPumpCode + "\\CompreCur2");
-    String faultState = getPointRealVal("HeatPump\\SJMG\\" + heatPumpCode + "\\RunState1_3");
-    String deviceStatus = getPointRealVal("HeatPump\\SJMG\\" + heatPumpCode + "\\DeviceStatus");
-    String defrostState = getPointRealVal("HeatPump\\SJMG\\" + heatPumpCode + "\\RunState1_8");
+int runningHeatPump = 0;
 
-    // 待机: 电流1=0 且 电流2=0 且 故障=0 且 通讯=1
-    if (isPointValue(compCur1, 0) && isPointValue(compCur2, 0) && isPointValue(faultState, 0) && isPointValue(deviceStatus, 1)) {
+int[] fixedDeviceNos = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42];
+for (int deviceNo : fixedDeviceNos) {
+    String heatPumpCode = "No" + deviceNo;
+    String operationState = getPointRealVal("HeatPump\\SJMG\\" + heatPumpCode + "\\Machine_Operation");
+    String defrostState = getPointRealVal("HeatPump\\SJMG\\" + heatPumpCode + "\\Systematic_Defrosting");
+    String faultState = getPointRealVal("HeatPump\\SJMG\\" + heatPumpCode + "\\Fault_Alarm");
+
+    if (isPointValue(operationState, 1)) {
+        runningHeatPump++;
+    } else {
         offlineHeatPump++;
     }
 
-    // 故障: 故障=1 或 通讯=0
-    if (isPointValue(faultState, 1) || isPointValue(deviceStatus, 0)) {
-        alarmHeatPump++;
-    }
-
-    // 化霜: 化霜点位=1
     if (isPointValue(defrostState, 1)) {
         defrostHeatPump++;
     }
+
+    if (isPointValue(faultState, 1)) {
+        alarmHeatPump++;
+    }
 }
 
-data.put("onlineHeatPump", onlineHeatPump);
+data.put("onlineHeatPump", runningHeatPump);
 data.put("offlineHeatPump", offlineHeatPump);
 data.put("alarmHeatPump", alarmHeatPump);
 data.put("defrostHeatPump", defrostHeatPump);
@@ -688,6 +673,8 @@ optionalMap.put("ZNDS", ZNDS);
 // 目标回水温度
 if (QHBC.equals("开启")) {
     pointSql = "SELECT a.taglongname,a.times,a.realval,a.quality FROM psrealdata AS a WHERE a.taglongname IN ('Sys\\FinforWorx\\TargetBackwaterTemperature')";
+} else if (hpTotalRunMode.equals("0")) {
+    pointSql = "SELECT a.taglongname,a.times,a.realval,a.quality FROM psrealdata AS a WHERE a.taglongname IN ('Sys\\FinforWorx\\SetTemperature2')";
 } else {
     pointSql = "SELECT a.taglongname,a.times,a.realval,a.quality FROM psrealdata AS a WHERE a.taglongname IN ('Sys\\FinforWorx\\SetTemperature1')";
 }

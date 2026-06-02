@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Outlet, useLocation, useNavigate } from 'react-router-dom'
+import { isInitGateSkipped } from '@/api/client/config'
 import { queryInitState } from '@/api/modules/home'
 import { acquireSystemToken } from '@/api/modules/auth'
 import { getStoredToken, setStoredToken } from '@/api/client/auth'
@@ -57,6 +58,7 @@ function InitEntryLayout() {
   const navigate = useNavigate()
   const location = useLocation()
   const { setHomeCacheAllowed } = useHomeRouteCacheControls()
+  const skipInitGate = isInitGateSkipped()
   const [error, setError] = useState(null)
   const [initBody, setInitBody] = useState(null)
   const [fetchVersion, setFetchVersion] = useState(0)
@@ -65,6 +67,26 @@ function InitEntryLayout() {
   const initFetchedRef = useRef(0)
 
   useEffect(() => {
+    if (!skipInitGate) {
+      return
+    }
+
+    const here = normalizePathname(location.pathname)
+    const targetPath = here === '/' ? '/home' : location.pathname
+    const target = normalizePathname(targetPath)
+
+    if (here !== target) {
+      setAligned(false)
+      navigate(targetPath, { replace: true })
+      return
+    }
+    setAligned(true)
+  }, [skipInitGate, location.pathname, navigate])
+
+  useEffect(() => {
+    if (skipInitGate) {
+      return
+    }
     if (initFetchedRef.current > fetchVersion) {
       return
     }
@@ -93,7 +115,7 @@ function InitEntryLayout() {
     }
 
     fetchInit()
-  }, [fetchVersion])
+  }, [fetchVersion, skipInitGate])
 
   useEffect(() => {
     if (error != null || initBody == null) {
@@ -121,13 +143,13 @@ function InitEntryLayout() {
     setFetchVersion((v) => v + 1)
   }, [])
 
-  const ready = error == null && initBody != null && aligned
+  const ready = skipInitGate ? aligned : error == null && initBody != null && aligned
 
   useEffect(() => {
     setHomeCacheAllowed(ready)
   }, [ready, setHomeCacheAllowed])
 
-  if (error) {
+  if (!skipInitGate && error) {
     return (
       <div className="init-entry-page">
         <p className="init-entry-page__message">无法连接服务，请检查网络后重试</p>

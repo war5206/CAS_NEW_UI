@@ -14,6 +14,8 @@ export function useSystemConfigQuery({ enabled = true } = {}) {
     retry: 2,
     staleTime: 5 * 60_000,
     refetchOnWindowFocus: false,
+    refetchInterval: 60_000,
+    refetchIntervalInBackground: true,
   })
 
   if (query.data) {

@@ -8,7 +8,8 @@
     "dev": "vite",
     "dev:desktop": "concurrently -k \"vite\" \"wait-on tcp:5173 && electron .\"",
     "build": "vite build",
-    "build:exe": "set ELECTRON_BUILDER_BINARIES_MIRROR=https://npmmirror.com/mirrors/electron-builder-binaries/ && npm run build && electron-builder --win portable",
+    "clean:release": "node scripts/clean-release.cjs",
+    "build:exe": "set ELECTRON_BUILDER_BINARIES_MIRROR=https://npmmirror.com/mirrors/electron-builder-binaries/ && npm run build && npm run clean:release && electron-builder --win dir",
     "lint": "eslint .",
     "preview": "vite preview",
     "start:desktop": "electron ."
@@ -16,6 +17,7 @@
   "dependencies": {
     "@tanstack/react-query": "^5.95.2",
     "echarts": "^6.0.0",
+    "electron-store": "^8.2.0",
     "jsencrypt": "^3.5.4",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
@@ -52,13 +54,12 @@
       "signAndEditExecutable": false,
       "target": [
         {
-          "target": "portable",
+          "target": "dir",
           "arch": [
             "x64"
           ]
         }
-      ],
-      "artifactName": "CAS智慧控制系统-${version}.exe"
+      ]
     }
   }
 }

@@ -1,6 +1,11 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useLocation } from 'react-router-dom'
-import systemMap from '../assets/home/system.png'
+import systemMap from '../assets/home/dajuyuan-system.png'
+import systemMap2 from '../assets/home/system2.png'
+import coupleGasBoilerIcon from '../assets/home/couple-gasboiler.png'
+import coupleWaterSourceHeatPumpIcon from '../assets/home/couple-wshp.png'
+import coupleAirCooledModuleIcon from '../assets/home/couple-cool.png'
+import coupleElectricBoilerIcon from '../assets/home/couple-elecboiler.png'
 import modeStatusIcon from '../assets/home/modeStatus.svg'
 import costAnalysisIcon from '../assets/home/costAnalysis.svg'
 import temperatureIcon from '../assets/home/temperature.svg'
@@ -20,9 +25,13 @@ import HomeTerminalBuildingOverview from '../components/HomeTerminalBuildingOver
 import SavedCostDisplay from '../components/SavedCostDisplay'
 import RealTimeTemperatureChart from '../components/RealTimeTemperatureChart'
 import DeviceStatusPanel from '../components/DeviceStatusPanel'
+import HomeUnitStatusBlock from '../components/HomeUnitStatusBlock'
+import { useHomeUnitStatusPoll } from '../hooks/useHomeUnitStatusPoll'
+import { COUPLE_ENERGY_TYPE_AIR_COOLED_MODULE_ID } from '@/config/projectUnitDevices'
 import { useHomeOverviewQuery } from '../features/home/hooks/useHomeOverviewQuery'
 import { useSystemConfigQuery } from '../features/home/hooks/useSystemConfigQuery'
 import { useTemp24HourQuery } from '../features/home/hooks/useTemp24HourQuery'
+import { useHomeFeatureSettings } from '@/features/home/store/homeFeatureSettingsStore'
 
 const HOME_PAGE_VIEW = {
   DASHBOARD: 'dashboard',
@@ -39,16 +48,13 @@ const HOME_PAGE_TITLE_MAP = {
 const HOME_TEXT = {
   SYSTEM_IMAGE_ALT: '系统原理图',
   HEAT_PUMP_GROUP: '热泵机组',
-  RUNNING_COUNT: '运行台数',
-  STANDBY_COUNT: '待机台数',
-  DEFROST_COUNT: '化霜台数',
-  FAULT_COUNT: '故障台数',
+  AIR_COOLED_MODULE_GROUP: '风冷模块机组',
   OUTDOOR_TEMP: '室外温度',
   CELSIUS: '℃',
-  CONDENSATE_WATER: '冷凝水',
-  HEAT_TRACING_BELT: '伴热带',
+  // CONDENSATE_WATER: '冷凝水',
+  // HEAT_TRACING_BELT: '伴热带',
   OFF: '已关闭',
-  CONDENSATE_PIPE: '冷凝水管',
+  // CONDENSATE_PIPE: '冷凝水管',
   COUPLING_ENERGY: '耦合能源',
   ON: '已开启',
   SUPPLY_TEMP: '供水温度',
@@ -64,13 +70,13 @@ const HOME_TEXT = {
   RUNNING: '运行中',
   STANDBY: '待机',
   HAS_FAULT: '有故障',
-  DIFFERENTIAL_BYPASS_VALVE: '压差旁通阀',
+  // DIFFERENTIAL_BYPASS_VALVE: '压差旁通阀',
   DRAIN_VALVE: '排污阀',
-  PRESSURE_TANK: '定压罐',
-  PRESSURE_VALVE: '泄压阀',
-  MAKEUP_PUMP: '定压补水泵',
-  WATER_TANK: '水箱',
-  SOFT_WATER: '软化水',
+  // PRESSURE_TANK: '定压罐',
+  // PRESSURE_VALVE: '泄压阀',
+  // MAKEUP_PUMP: '定压补水泵',
+  // WATER_TANK: '水箱',
+  // SOFT_WATER: '软化水',
   TERMINAL_BUILDING: '末端建筑',
   TERMINAL_BUILDING_TIP: '点击查看详情',
   HEAT_PUMP_PAGE_TIP: '点击查看详情',
@@ -95,14 +101,33 @@ const HOME_TEXT = {
   TERMINAL_LOOP_PUMP_TAB: '末端循环水泵',
 }
 
-const TERMINAL_DEVICE_IMAGE_MAP = {
-  '1': { src: null, alt: HOME_TEXT.TERMINAL_DEVICE_ELECTRIC_BOILER },
-  '2': { src: null, alt: HOME_TEXT.TERMINAL_DEVICE_GAS_BOILER },
-  '3': { src: null, alt: HOME_TEXT.TERMINAL_DEVICE_WATER_SOURCE_HEAT_PUMP },
-  '4': { src: null, alt: HOME_TEXT.TERMINAL_DEVICE_AIR_COOLED_MODULE },
+const COUPLE_DEVICE_IMAGE_MAP = {
+  '1': { src: coupleElectricBoilerIcon, alt: HOME_TEXT.TERMINAL_DEVICE_ELECTRIC_BOILER },
+  '2': { src: coupleGasBoilerIcon, alt: HOME_TEXT.TERMINAL_DEVICE_GAS_BOILER },
+  '3': { src: coupleWaterSourceHeatPumpIcon, alt: HOME_TEXT.TERMINAL_DEVICE_WATER_SOURCE_HEAT_PUMP },
+  '4': { src: coupleAirCooledModuleIcon, alt: HOME_TEXT.TERMINAL_DEVICE_AIR_COOLED_MODULE },
 }
 
-const SYSTEM_IMAGE_TYPE2 = null
+const COUPLE_DEVICE_LAYOUT_MAP = {
+  '1': {
+    banner: { top: '130px', left: '750px' },
+    couplingEnergyNode: { left: '76.5%', top: '33%' },
+  },
+  '2': {
+    banner: { top: '280px', left: '750px' },
+    couplingEnergyNode: { left: '73.5%', top: '25%' },
+  },
+  '3': {
+    banner: { top: '255px', left: '750px' },
+    couplingEnergyNode: { left: '73%', top: '23%' },
+  },
+  '4': {
+    banner: { top: '220px', left: '750px' },
+    couplingEnergyNode: { left: '74.5%', top: '19%' },
+  },
+}
+
+const SYSTEM_IMAGE_TYPE2 = systemMap2
 
 function HomePage({ onActivePageChange, committedUnitLayoutSlots }) {
   const location = useLocation()
@@ -111,11 +136,15 @@ function HomePage({ onActivePageChange, committedUnitLayoutSlots }) {
   const isHomeRoute = location.pathname === '/home' || location.pathname === '/home/'
   const isHomeDashboard = activePage === HOME_PAGE_VIEW.DASHBOARD
   const homeOverviewQuery = useHomeOverviewQuery({ enabled: isHomeRoute && isHomeDashboard })
+  const homeUnitStatusPoll = useHomeUnitStatusPoll({ enabled: isHomeRoute && isHomeDashboard })
   const systemConfigQuery = useSystemConfigQuery({ enabled: isHomeRoute })
+  const { refetch: refetchSystemConfig } = systemConfigQuery
   const temp24HourQuery = useTemp24HourQuery({ enabled: isHomeRoute && isHomeDashboard })
   const homeOverview = homeOverviewQuery.data
   const systemConfig = systemConfigQuery.data
   const temp24HourTrend = temp24HourQuery.data
+  const homeFeatureSettings = useHomeFeatureSettings()
+  const wasHomeRouteRef = useRef(isHomeRoute)
   const shouldDelayDashboardRender =
     isHomeRoute &&
     isHomeDashboard &&
@@ -123,7 +152,22 @@ function HomePage({ onActivePageChange, committedUnitLayoutSlots }) {
 
   const isSystemType2 = systemConfig.systemTypeUuid === '2'
   const resolvedSystemImage = isSystemType2 && SYSTEM_IMAGE_TYPE2 ? SYSTEM_IMAGE_TYPE2 : systemMap
-  const terminalDevice = TERMINAL_DEVICE_IMAGE_MAP[systemConfig.terminalTypeUuid] ?? null
+  const coupleEnergyTypeUuid = systemConfig.coupleEnergyTypeUuid
+  const isAirCooledModuleCoupling = coupleEnergyTypeUuid === COUPLE_ENERGY_TYPE_AIR_COOLED_MODULE_ID
+  const coupleDevice = COUPLE_DEVICE_IMAGE_MAP[coupleEnergyTypeUuid] ?? null
+  const coupleDeviceLayout = COUPLE_DEVICE_LAYOUT_MAP[coupleEnergyTypeUuid] ?? null
+  // 风冷模块作为机组纳入热泵布局，不在系统原理图展示耦合能源图标/管道
+  const shouldShowCouplingEnergy = Boolean(coupleDevice && coupleDeviceLayout) && !isAirCooledModuleCoupling
+  const shouldShowAirCooledModuleOnDiagram = !isAirCooledModuleCoupling
+  const coupleDeviceBannerStyle = coupleDeviceLayout
+    ? {
+        ...coupleDeviceLayout.banner,
+        right: 'auto',
+        display: 'block',
+        padding: 0,
+      }
+    : undefined
+  const couplingEnergyNodeStyle = coupleDeviceLayout?.couplingEnergyNode
 
   useEffect(() => {
     onActivePageChange?.(HOME_PAGE_TITLE_MAP[activePage] ?? HOME_PAGE_TITLE_MAP[HOME_PAGE_VIEW.DASHBOARD])
@@ -135,13 +179,43 @@ function HomePage({ onActivePageChange, committedUnitLayoutSlots }) {
     }
   }, [location.pathname])
 
+  useEffect(() => {
+    if (isHomeRoute && !wasHomeRouteRef.current) {
+      refetchSystemConfig()
+    }
+    wasHomeRouteRef.current = isHomeRoute
+  }, [isHomeRoute, refetchSystemConfig])
+
   const goBackHome = () => setActivePage(HOME_PAGE_VIEW.DASHBOARD)
   const goToHeatPumpOverview = () => setActivePage(HOME_PAGE_VIEW.HEAT_PUMP_OVERVIEW)
   const goToTerminalBuilding = () => setActivePage(HOME_PAGE_VIEW.TERMINAL_BUILDING)
-  const statusSummary = homeOverview.system.heatPumpSummary
+  const heatPumpUnitStatus = homeUnitStatusPoll.heatPump.summary
+  const airCooledModuleStatus = homeUnitStatusPoll.airCooledModule.summary
   const indoorTemperatures = homeOverview.system.indoorTemperatures
   const terminalCirculationPumps = homeOverview.system.terminalCirculationPumps
-  const formatStatusCount = (value) => String(Number(value) || 0)
+  const indoorTemperatureVisibility = homeFeatureSettings.indoorTemperatureVisibility ?? [true, true, true, true, true]
+  const visibleIndoorTemperatures = indoorTemperatures.filter((_, index) => indoorTemperatureVisibility[index] !== false)
+  const showModeStatus = homeFeatureSettings.showModeStatus !== false
+  const showModeSavedCost = homeFeatureSettings.showModeSavedCost !== false
+  const showCostAnalysis = homeFeatureSettings.showCostAnalysis !== false
+  const showTargetBackwaterTemperature = homeFeatureSettings.showTargetBackwaterTemperature !== false
+  const showDeviceStatus = homeFeatureSettings.showDeviceStatus !== false
+  const sideWidgetOrder = []
+  if (showModeStatus) sideWidgetOrder.push('mode')
+  if (showCostAnalysis) sideWidgetOrder.push('cost')
+  if (showTargetBackwaterTemperature) sideWidgetOrder.push('temperature')
+  if (showDeviceStatus) sideWidgetOrder.push('deviceStatus')
+  const hasVisibleSideWidgets = sideWidgetOrder.length > 0
+  const sideWidgetRowHeightMap = {
+    mode: showModeSavedCost ? '288px' : '158px',
+    cost: 158,
+    temperature: 228,
+    deviceStatus: 258,
+  }
+  const resolveGridRowSize = (size) => (typeof size === 'number' ? `${size}px` : size)
+  const sidePanelStyle = hasVisibleSideWidgets
+    ? { gridTemplateRows: sideWidgetOrder.map((item) => resolveGridRowSize(sideWidgetRowHeightMap[item])).join(' ') }
+    : undefined
   const isManualModeAvatar = homeOverview.mode.avatarType === 'H'
   const modeAvatar = isManualModeAvatar ? avatarH : avatarA
   const modeAIcon = homeOverview.mode.iconASrc === 'cooling' ? coolingIcon : heatingIcon
@@ -158,15 +232,19 @@ function HomePage({ onActivePageChange, committedUnitLayoutSlots }) {
   return (
     <div className="home-pager">
       <div className="home-pager-track">
-        <div className={`home-page home-screen${activePage === HOME_PAGE_VIEW.DASHBOARD ? ' is-active' : ''}`}>
+        <div
+          className={`home-page home-screen${activePage === HOME_PAGE_VIEW.DASHBOARD ? ' is-active' : ''}${
+            hasVisibleSideWidgets ? '' : ' home-screen--no-side-panel'
+          }`}
+        >
           <section className="home-system-panel">
             <div className="home-system-canvas">
-              {terminalDevice && (
-                <div className="home-terminal-device-banner">
-                  {terminalDevice.src ? (
-                    <img src={terminalDevice.src} alt={terminalDevice.alt} className="home-terminal-device-image" />
+              {shouldShowCouplingEnergy && (
+                <div className="home-terminal-device-banner" style={coupleDeviceBannerStyle}>
+                  {coupleDevice.src ? (
+                    <img src={coupleDevice.src} alt={coupleDevice.alt} className="home-terminal-device-image" />
                   ) : (
-                    <span className="home-terminal-device-placeholder">{terminalDevice.alt}</span>
+                    <span className="home-terminal-device-placeholder">{coupleDevice.alt}</span>
                   )}
                 </div>
               )}
@@ -178,25 +256,18 @@ function HomePage({ onActivePageChange, committedUnitLayoutSlots }) {
                 onError={() => setIsSystemImageLoaded(true)}
               />
               <div className={`home-system-overlay${isSystemImageLoaded ? ' is-ready' : ''}`}>
-                <div className="home-system-node home-system-node--heat-pump">
-                  <div className="home-system-caption home-system-caption--title">{HOME_TEXT.HEAT_PUMP_GROUP}</div>
-                  <div className="home-system-row">
-                    <span className="home-system-caption">{HOME_TEXT.RUNNING_COUNT}</span>
-                    <span className="home-system-value">{formatStatusCount(statusSummary.running)}</span>
-                  </div>
-                  <div className="home-system-row">
-                    <span className="home-system-caption">{HOME_TEXT.STANDBY_COUNT}</span>
-                    <span className="home-system-value">{formatStatusCount(statusSummary.shutdown)}</span>
-                  </div>
-                  <div className="home-system-row">
-                    <span className="home-system-caption">{HOME_TEXT.DEFROST_COUNT}</span>
-                    <span className="home-system-value is-defrost">{formatStatusCount(statusSummary.defrosting)}</span>
-                  </div>
-                  <div className="home-system-row">
-                    <span className="home-system-caption">{HOME_TEXT.FAULT_COUNT}</span>
-                    <span className="home-system-value is-fault">{formatStatusCount(statusSummary.malfunction)}</span>
-                  </div>
-                </div>
+                <HomeUnitStatusBlock
+                  title={HOME_TEXT.HEAT_PUMP_GROUP}
+                  summary={heatPumpUnitStatus}
+                  className="home-system-node--heat-pump"
+                />
+                {shouldShowAirCooledModuleOnDiagram ? (
+                  <HomeUnitStatusBlock
+                    title={HOME_TEXT.AIR_COOLED_MODULE_GROUP}
+                    summary={airCooledModuleStatus}
+                    className="home-system-node--air-cooled-module"
+                  />
+                ) : null}
 
                 <div className="home-system-node home-system-node--outdoor-temperature home-system-inline">
                   <span className="home-system-caption">{HOME_TEXT.OUTDOOR_TEMP}</span>
@@ -204,6 +275,7 @@ function HomePage({ onActivePageChange, committedUnitLayoutSlots }) {
                   <span className="home-system-unit">{HOME_TEXT.CELSIUS}</span>
                 </div>
 
+                {/* 首页 overlay：冷凝水 / 伴热带 / 冷凝水管（已隐藏）
                 <div className="home-system-node home-system-node--condensate">{HOME_TEXT.CONDENSATE_WATER}</div>
 
                 <div className="home-system-node home-system-node--heat-tracing home-system-inline">
@@ -215,16 +287,22 @@ function HomePage({ onActivePageChange, committedUnitLayoutSlots }) {
                   <span className="home-system-value">{homeOverview.system.condensatePipeTemp}</span>
                   <span className="home-system-unit">{HOME_TEXT.CELSIUS}</span>
                 </div>
+                */}
 
-                <div className="home-system-node home-system-node--coupling-energy home-system-inline">
-                  <span className="home-system-caption">{HOME_TEXT.COUPLING_ENERGY}</span>
-                  <span className={`home-system-state ${homeOverview.system.couplingEnergyEnabled ? 'is-on' : 'is-off'}`}>
-                    {homeOverview.system.couplingEnergyEnabled ? HOME_TEXT.ON : HOME_TEXT.OFF}
-                  </span>
-                </div>
+                {shouldShowCouplingEnergy && (
+                  <div
+                    className="home-system-node home-system-node--coupling-energy home-system-inline"
+                    style={couplingEnergyNodeStyle}
+                  >
+                    <span className="home-system-caption">{HOME_TEXT.COUPLING_ENERGY}</span>
+                    <span className={`home-system-state ${homeOverview.system.couplingEnergyEnabled ? 'is-on' : 'is-off'}`}>
+                      {homeOverview.system.couplingEnergyEnabled ? HOME_TEXT.ON : HOME_TEXT.OFF}
+                    </span>
+                  </div>
+                )}
 
                 <div className="home-system-node home-system-node--indoor-temperature-list">
-                  {indoorTemperatures.map((item, index) => (
+                  {visibleIndoorTemperatures.map((item, index) => (
                     <div key={`indoor-temperature-${index}`} className="home-system-row">
                       <span className="home-system-caption">{item.name}</span>
                       <span className="home-system-value">{item.value}</span>
@@ -251,6 +329,8 @@ function HomePage({ onActivePageChange, committedUnitLayoutSlots }) {
                           </span>
                         </div>
                       ))
+                    ) : null}
+                    {/* 热泵循环泵 fallback（已隐藏）
                     ) : (
                       homeOverview.system.circulationPumps.slice(0, 3).map((pump) => (
                         <div key={`terminal-${pump.name}`} className="home-system-row">
@@ -261,6 +341,7 @@ function HomePage({ onActivePageChange, committedUnitLayoutSlots }) {
                         </div>
                       ))
                     )}
+                    */}
                   </div>
                 )}
 
@@ -292,6 +373,7 @@ function HomePage({ onActivePageChange, committedUnitLayoutSlots }) {
 
                 <div className="home-system-node home-system-node--circulation-pump">
                   <div className="home-system-caption home-system-caption--title">{HOME_TEXT.HEAT_PUMP_LOOP_PUMP}</div>
+                  {/* 热泵循环泵状态列表（已隐藏）
                   {homeOverview.system.circulationPumps.slice(0, 3).map((pump) => (
                     <div key={pump.name} className="home-system-row">
                       <span className={`home-system-caption${pump.tone === 'fault' ? ' is-fault' : ''}`}>{pump.name}</span>
@@ -300,9 +382,12 @@ function HomePage({ onActivePageChange, committedUnitLayoutSlots }) {
                       </span>
                     </div>
                   ))}
+                  */}
                 </div>
 
+                {/* 首页 overlay：压差旁通阀（已隐藏）
                 <div className="home-system-node home-system-node--bypass-valve">{HOME_TEXT.DIFFERENTIAL_BYPASS_VALVE}</div>
+                */}
 
                 <div className="home-system-node home-system-node--drain-valve home-system-inline">
                   <span className="home-system-caption">{HOME_TEXT.DRAIN_VALVE}</span>
@@ -311,6 +396,7 @@ function HomePage({ onActivePageChange, committedUnitLayoutSlots }) {
                   </span>
                 </div>
 
+                {/* 首页 overlay：定压罐 / 泄压阀 / 定压补水泵（已隐藏）
                 <div className="home-system-node home-system-node--pressure-tank">{HOME_TEXT.PRESSURE_TANK}</div>
 
                 <div className="home-system-node home-system-node--pressure-valve home-system-inline">
@@ -331,14 +417,19 @@ function HomePage({ onActivePageChange, committedUnitLayoutSlots }) {
                     </div>
                   ))}
                 </div>
+                */}
 
+                {/* 首页 overlay：水箱液位（已隐藏）
                 <div className="home-system-node home-system-node--water-tank home-system-inline">
                   <span className="home-system-caption">{HOME_TEXT.WATER_TANK}</span>
                   <span className="home-system-value">{homeOverview.system.waterTankLevel}</span>
                   <span className="home-system-unit">%</span>
                 </div>
+                */}
 
+                {/* 首页 overlay：软化水（已隐藏）
                 <div className="home-system-node home-system-node--soft-water">{HOME_TEXT.SOFT_WATER}</div>
+                */}
                 <div className="home-system-node home-system-node--terminal-building">{HOME_TEXT.TERMINAL_BUILDING}</div>
                 <div className="home-system-node home-system-node--terminal-building-tip">{HOME_TEXT.TERMINAL_BUILDING_TIP}</div>
                 <div className="home-system-node home-system-node--heat-pump-click-tip">{HOME_TEXT.HEAT_PUMP_PAGE_TIP}</div>
@@ -359,100 +450,112 @@ function HomePage({ onActivePageChange, committedUnitLayoutSlots }) {
             </div>
           </section>
 
-          <aside className="home-side-panel">
-            <HomeWidget title={HOME_TEXT.MODE_STATUS} icon={modeStatusIcon} className="home-widget-mode">
-              <div className="home-mode-card">
-                <div className="home-mode-avatar">
-                  <img
-                    src={modeAvatar}
-                    alt=""
-                    aria-hidden="true"
-                    className={isManualModeAvatar ? 'home-mode-avatar-image is-manual' : 'home-mode-avatar-image'}
-                  />
-                </div>
-                <div className="home-mode-body">
-                  <div className="home-mode-row">
-                    <img src={modeArrowRight} alt="" aria-hidden="true" className="home-mode-row-icon" />
-                    <div className="home-mode-name">{homeOverview.mode.name}</div>
-                  </div>
-                  <img src={modeDivider} alt="" aria-hidden="true" className="home-mode-divider" />
-                  <div className="home-mode-row">
-                    <img src={modeArrowRight} alt="" aria-hidden="true" className="home-mode-row-icon" />
-                    <div className="home-mode-icon-group">
-                      {homeOverview.mode.iconAVisible ? <img src={modeAIcon} alt="" aria-hidden="true" className="home-mode-state-icon" /> : null}
-                      {homeOverview.mode.iconBVisible ? (
-                        <img
-                          src={weatherCompensationIcon}
-                          alt=""
-                          aria-hidden="true"
-                          className={homeOverview.mode.iconBBlue ? 'home-mode-state-icon is-blue' : 'home-mode-state-icon'}
-                        />
-                      ) : null}
+          {hasVisibleSideWidgets ? (
+            <aside className="home-side-panel" style={sidePanelStyle}>
+              {showModeStatus ? (
+                <HomeWidget
+                  title={HOME_TEXT.MODE_STATUS}
+                  icon={modeStatusIcon}
+                  className={`home-widget-mode${showModeSavedCost ? '' : ' home-widget-mode--compact'}`}
+                >
+                  <div className="home-mode-card">
+                    <div className="home-mode-avatar">
+                      <img
+                        src={modeAvatar}
+                        alt=""
+                        aria-hidden="true"
+                        className={isManualModeAvatar ? 'home-mode-avatar-image is-manual' : 'home-mode-avatar-image'}
+                      />
+                    </div>
+                    <div className="home-mode-body">
+                      <div className="home-mode-row">
+                        <img src={modeArrowRight} alt="" aria-hidden="true" className="home-mode-row-icon" />
+                        <div className="home-mode-name">{homeOverview.mode.name}</div>
+                      </div>
+                      <img src={modeDivider} alt="" aria-hidden="true" className="home-mode-divider" />
+                      <div className="home-mode-row">
+                        <img src={modeArrowRight} alt="" aria-hidden="true" className="home-mode-row-icon" />
+                        <div className="home-mode-icon-group">
+                          {homeOverview.mode.iconAVisible ? <img src={modeAIcon} alt="" aria-hidden="true" className="home-mode-state-icon" /> : null}
+                          {homeOverview.mode.iconBVisible ? (
+                            <img
+                              src={weatherCompensationIcon}
+                              alt=""
+                              aria-hidden="true"
+                              className={homeOverview.mode.iconBBlue ? 'home-mode-state-icon is-blue' : 'home-mode-state-icon'}
+                            />
+                          ) : null}
+                        </div>
+                      </div>
                     </div>
                   </div>
-                </div>
-              </div>
 
-              <SavedCostDisplay value={homeOverview.mode.savedCost} />
-              <div className="home-stat-note">{homeOverview.cost.note}</div>
-            </HomeWidget>
+                  {showModeSavedCost ? <SavedCostDisplay value={homeOverview.mode.savedCost} /> : null}
+                  {showModeSavedCost ? <div className="home-stat-note">{homeOverview.cost.note}</div> : null}
+                </HomeWidget>
+              ) : null}
 
-            <HomeWidget title={HOME_TEXT.COST_ANALYSIS} icon={costAnalysisIcon} className="home-widget-cost">
-              <div className="home-cost-grid">
-                <div className="home-cost-item is-month" style={{ height: '44px' }}>
-                  <div className="home-cost-item-label-wrap">
-                    <img src={rmbIcon} alt="" aria-hidden="true" className="home-cost-month-icon" />
-                    <span className="home-cost-item-label">{HOME_TEXT.THIS_MONTH}</span>
+              {showCostAnalysis ? (
+                <HomeWidget title={HOME_TEXT.COST_ANALYSIS} icon={costAnalysisIcon} className="home-widget-cost">
+                  <div className="home-cost-grid">
+                    <div className="home-cost-item is-month" style={{ height: '44px' }}>
+                      <div className="home-cost-item-label-wrap">
+                        <img src={rmbIcon} alt="" aria-hidden="true" className="home-cost-month-icon" />
+                        <span className="home-cost-item-label">{HOME_TEXT.THIS_MONTH}</span>
+                      </div>
+                      <div className="home-cost-item-value">
+                        <span className="home-cost-item-number">{homeOverview.cost.month}</span>
+                        <span className="home-cost-item-unit">{HOME_TEXT.YUAN}</span>
+                      </div>
+                    </div>
+                    <div className="home-cost-item">
+                      <span className="home-cost-item-label">{HOME_TEXT.TODAY}</span>
+                      <div className="home-cost-item-value">
+                        <span className="home-cost-item-number">{homeOverview.cost.today}</span>
+                        <span className="home-cost-item-unit">{HOME_TEXT.YUAN}</span>
+                      </div>
+                    </div>
+                    <div className="home-cost-item">
+                      <span className="home-cost-item-label">{HOME_TEXT.YESTERDAY}</span>
+                      <div className="home-cost-item-value">
+                        <span className="home-cost-item-number">{homeOverview.cost.yesterday}</span>
+                        <span className="home-cost-item-unit">{HOME_TEXT.YUAN}</span>
+                      </div>
+                    </div>
                   </div>
-                  <div className="home-cost-item-value">
-                    <span className="home-cost-item-number">{homeOverview.cost.month}</span>
-                    <span className="home-cost-item-unit">{HOME_TEXT.YUAN}</span>
-                  </div>
-                </div>
-                <div className="home-cost-item">
-                  <span className="home-cost-item-label">{HOME_TEXT.TODAY}</span>
-                  <div className="home-cost-item-value">
-                    <span className="home-cost-item-number">{homeOverview.cost.today}</span>
-                    <span className="home-cost-item-unit">{HOME_TEXT.YUAN}</span>
-                  </div>
-                </div>
-                <div className="home-cost-item">
-                  <span className="home-cost-item-label">{HOME_TEXT.YESTERDAY}</span>
-                  <div className="home-cost-item-value">
-                    <span className="home-cost-item-number">{homeOverview.cost.yesterday}</span>
-                    <span className="home-cost-item-unit">{HOME_TEXT.YUAN}</span>
-                  </div>
-                </div>
-              </div>
-            </HomeWidget>
+                </HomeWidget>
+              ) : null}
 
-            <HomeWidget
-              title={HOME_TEXT.REAL_TIME_TEMP}
-              icon={temperatureIcon}
-              className="home-widget-temp"
-              titleRight={homeOverview.system.targetBackwaterTemperature}
-            >
-              <RealTimeTemperatureChart
-                labels={temp24HourTrend.labels}
-                supplySeries={temp24HourTrend.supplyData}
-                returnSeries={temp24HourTrend.returnData}
-                targetSeries={temp24HourTrend.targetData}
-              />
-            </HomeWidget>
+              {showTargetBackwaterTemperature ? (
+                <HomeWidget
+                  title={HOME_TEXT.REAL_TIME_TEMP}
+                  icon={temperatureIcon}
+                  className="home-widget-temp"
+                  titleRight={homeOverview.system.targetBackwaterTemperature}
+                >
+                  <RealTimeTemperatureChart
+                    labels={temp24HourTrend.labels}
+                    supplySeries={temp24HourTrend.supplyData}
+                    returnSeries={temp24HourTrend.returnData}
+                    targetSeries={temp24HourTrend.targetData}
+                  />
+                </HomeWidget>
+              ) : null}
 
-            <HomeWidget title={HOME_TEXT.DEVICE_STATUS} icon={deviceStatusIcon}>
-              <DeviceStatusPanel
-                heatPumpData={homeOverview.deviceStatus.heatPumpData}
-                loopPumpData={homeOverview.deviceStatus.loopPumpItems}
-                showTerminalLoopPump={isSystemType2}
-                terminalLoopPumpData={
-                  terminalCirculationPumps.length > 0
-                    ? terminalCirculationPumps
-                    : homeOverview.system.circulationPumps.slice(0, 3)
-                }
-              />
-            </HomeWidget>
-          </aside>
+              {showDeviceStatus ? (
+                <HomeWidget title={HOME_TEXT.DEVICE_STATUS} icon={deviceStatusIcon}>
+                  {/* loopPumpData={homeOverview.deviceStatus.loopPumpItems} */}
+                  <DeviceStatusPanel
+                    heatPumpData={homeUnitStatusPoll.heatPump.chartData}
+                    airCooledModuleData={homeUnitStatusPoll.airCooledModule.chartData}
+                    loopPumpData={[]}
+                    showTerminalLoopPump={isSystemType2}
+                    terminalLoopPumpData={terminalCirculationPumps}
+                  />
+                </HomeWidget>
+              ) : null}
+            </aside>
+          ) : null}
         </div>
 
         {activePage === HOME_PAGE_VIEW.HEAT_PUMP_OVERVIEW ? (

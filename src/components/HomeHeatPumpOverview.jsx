@@ -1,4 +1,4 @@
-﻿import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
 import hpRunningIcon from '../assets/heat-pump/hp-running.svg'
 import hpMalfunctionIcon from '../assets/heat-pump/hp-malfunction.svg'
@@ -14,11 +14,12 @@ import micoeInfiniteLogo from '../assets/brand/micoe-infinite.png'
 import backIcon from '../assets/layout/back.svg'
 import {
   HEAT_PUMP_GRID_COLS,
-  HEAT_PUMP_GRID_ITEMS,
   HEAT_PUMP_GRID_ROWS,
   HEAT_PUMP_STATUS,
   HEAT_PUMP_STATUS_LABEL,
 } from '../config/homeHeatPumps'
+import { createUnitGridItem, resolveUnitDisplayLabelFromCode } from '../config/projectUnitDevices'
+import { UNIT_DEVICE_OVERVIEW_METRIC_KEYS } from '../config/unitDeviceParamPoints'
 import { useHeatPumpArrangeQuery } from '../features/home/hooks/useHeatPumpArrangeQuery'
 import { useHeatPumpOverviewQuery } from '../features/home/hooks/useHeatPumpOverviewQuery'
 import { useHeatPumpParamQuery } from '../features/home/hooks/useHeatPumpParamQuery'
@@ -43,19 +44,7 @@ const stopPointerEvent = (event) => {
 }
 
 const HEAT_PUMP_OVERVIEW_PAGE_SIZE = 10
-const OVERVIEW_TABLE_METRIC_LABELS = [
-  '进水温度',
-  '出水温度',
-  '环境温度',
-  '累积运行时长(H)',
-  '持续运行时长(H)',
-  '压缩机1电流(A)',
-  '压缩机2电流(A)',
-  '防冻状态',
-  '化霜状态',
-  '主板开机信号状态',
-  '故障状态',
-]
+const OVERVIEW_TABLE_METRIC_LABELS = UNIT_DEVICE_OVERVIEW_METRIC_KEYS
 const EMPTY_GRID_ITEMS = Array.from({ length: HEAT_PUMP_GRID_ROWS * HEAT_PUMP_GRID_COLS }, (_, index) => {
   const row = Math.floor(index / HEAT_PUMP_GRID_COLS) + 1
   const col = (index % HEAT_PUMP_GRID_COLS) + 1
@@ -72,7 +61,7 @@ const EMPTY_GRID_ITEMS = Array.from({ length: HEAT_PUMP_GRID_ROWS * HEAT_PUMP_GR
 })
 
 const HEAT_PUMP_OVERVIEW_TEXT = {
-  BUTTON: '热泵总览',
+  BUTTON: '机组总览',
   TITLE: '热泵机总览',
   PUMP_NAME: '热泵序号',
   MODE_STATUS: '模式状态',
@@ -165,21 +154,18 @@ function HomeHeatPumpOverview({ onBack, committedUnitLayoutSlots, heatPumpItems:
       return EMPTY_GRID_ITEMS
     }
 
-    const baseById = new Map(
-      HEAT_PUMP_GRID_ITEMS.filter((item) => item.id !== null).map((item) => [item.id, item]),
-    )
-
     return Array.from({ length: HEAT_PUMP_GRID_ROWS * HEAT_PUMP_GRID_COLS }, (_, index) => {
       const row = Math.floor(index / HEAT_PUMP_GRID_COLS) + 1
       const col = (index % HEAT_PUMP_GRID_COLS) + 1
       const pumpId = committedUnitLayoutSlots[index]
-      const mapped = baseById.get(pumpId)
 
-      if (mapped) {
+      if (pumpId) {
+        const mapped = createUnitGridItem(pumpId)
         return {
           ...mapped,
           row,
           col,
+          status: HEAT_PUMP_STATUS.EMPTY,
           key: `hp-layout-${mapped.id}-${row}-${col}`,
         }
       }
@@ -307,7 +293,9 @@ function HomeHeatPumpOverview({ onBack, committedUnitLayoutSlots, heatPumpItems:
           >
             <div className="home-hp-modal" role="dialog" aria-modal="true" onClick={(event) => event.stopPropagation()}>
               <div className="home-hp-modal-header">
-                <div className="home-hp-modal-title">{activePump.name}</div>
+                <div className="home-hp-modal-title">
+                  {activePump.label || activePump.name || resolveUnitDisplayLabelFromCode(activePump.code)}
+                </div>
                 <button
                   type="button"
                   className="home-hp-modal-close"
@@ -326,16 +314,18 @@ function HomeHeatPumpOverview({ onBack, committedUnitLayoutSlots, heatPumpItems:
                     aria-hidden="true"
                     className="home-hp-modal-status-icon"
                   />
-                  <span>{HEAT_PUMP_STATUS_LABEL[activePump.status]}</span>
+                  <span>{activePump.state || HEAT_PUMP_STATUS_LABEL[activePump.status]}</span>
                 </div>
 
-                <div className="home-hp-modal-metrics">
-                  {activePump.details.map((metric) => (
-                    <div key={`${activePump.key}-${metric.label}`} className="home-hp-modal-metric">
-                      <span className="home-hp-modal-metric-label">{metric.label}</span>
-                      <span className="home-hp-modal-metric-value">{metric.value}</span>
-                    </div>
-                  ))}
+                <div className="home-hp-modal-metrics-scroll">
+                  <div className="home-hp-modal-metrics">
+                    {activePump.details.map((metric) => (
+                      <div key={`${activePump.key}-${metric.label}`} className="home-hp-modal-metric">
+                        <span className="home-hp-modal-metric-label">{metric.label}</span>
+                        <span className="home-hp-modal-metric-value">{metric.value}</span>
+                      </div>
+                    ))}
+                  </div>
                 </div>
 
                 <button type="button" className="home-hp-modal-action" onClick={() => setActivePump(null)}>
@@ -382,7 +372,6 @@ function HomeHeatPumpOverview({ onBack, committedUnitLayoutSlots, heatPumpItems:
                     <thead>
                       <tr>
                         <th>{HEAT_PUMP_OVERVIEW_TEXT.PUMP_NAME}</th>
-                        <th>{HEAT_PUMP_OVERVIEW_TEXT.MODE_STATUS}</th>
                         {OVERVIEW_TABLE_METRIC_LABELS.map((label) => (
                           <th key={`summary-head-${label}`}>{label}</th>
                         ))}
@@ -390,13 +379,13 @@ function HomeHeatPumpOverview({ onBack, committedUnitLayoutSlots, heatPumpItems:
                     </thead>
                     <tbody>
                       {pagedHeatPumps.map((pump) => {
-                        const modeStatusValue = pump?.模式状态 ?? '--'
-                        const heatPumpName = pump?.heatPumpNo ?? pump?.热泵序号 ?? '--'
+                        const heatPumpName = resolveUnitDisplayLabelFromCode(
+                          pump?.heatPumpNo ?? pump?.热泵序号 ?? pump?.heatPumpCode ?? pump?.code,
+                        )
 
                         return (
                           <tr key={`summary-row-${pump?.heatPumpCode ?? heatPumpName}`}>
                             <td>{heatPumpName}</td>
-                            <td>{modeStatusValue}</td>
                             {OVERVIEW_TABLE_METRIC_LABELS.map((label) => (
                               <td key={`summary-cell-${pump?.heatPumpCode ?? heatPumpName}-${label}`}>{pump?.[label] ?? '--'}</td>
                             ))}
@@ -406,7 +395,6 @@ function HomeHeatPumpOverview({ onBack, committedUnitLayoutSlots, heatPumpItems:
 
                       {Array.from({length: emptyRowCount}, (_, index) => (
                         <tr key={`summary-empty-row-${index}`} className="is-empty">
-                          <td>&nbsp;</td>
                           <td>&nbsp;</td>
                           {OVERVIEW_TABLE_METRIC_LABELS.map((label) => (
                             <td key={`summary-empty-cell-${index}-${label}`}>&nbsp;</td>

@@ -35,10 +35,10 @@ const ENERGY_PRICE_TABS = [
 
 const DATE_PICKER_MONTHS = Array.from({ length: 12 }, (_, index) => index + 1)
 const DATE_PICKER_DAYS = Array.from({ length: 31 }, (_, index) => index + 1)
-const TIME_PICKER_HOURS = Array.from({ length: 25 }, (_, index) => index)
+const TIME_PICKER_HOURS = Array.from({ length: 24 }, (_, index) => index)
 const TIME_PICKER_MINUTES = Array.from({ length: 60 }, (_, index) => index)
 
-const ENERGY_PRICE_PLAN_TIME_INVALID_MESSAGE = '时段价格设置需覆盖24小时：首段开始时间必须为00:00，末段结束时间必须为24:00。'
+const ENERGY_PRICE_PLAN_TIME_INVALID_MESSAGE = '时段价格设置需覆盖24小时：首段开始时间必须为00:00，末段结束时间必须为00:00。'
 const ENERGY_PRICE_SEGMENT_INVALID_MESSAGE = '时段设置无效：每段结束时间必须晚于开始时间。'
 const ENERGY_PRICE_SEGMENT_MIN_LABEL_WIDTH = 70
 const ENERGY_PRICE_SHORT_SEGMENT_THRESHOLD_MINUTES = 50
@@ -89,6 +89,34 @@ function formatMonthDayText(value) {
   return `${month}月${day}日`
 }
 
+function getMonthDayOrderValue(value) {
+  const [month, day] = parseMonthDay(value)
+  // 2024 闰年，确保 02-29 也可被安全映射
+  const date = new Date(2024, month - 1, day)
+  const start = new Date(2024, 0, 1)
+  return Math.floor((date - start) / (24 * 60 * 60 * 1000)) + 1
+}
+
+function toWrappedDateIntervals(startDate, endDate) {
+  const startOrder = getMonthDayOrderValue(startDate)
+  const endOrder = getMonthDayOrderValue(endDate)
+  if (startOrder <= endOrder) {
+    return [[startOrder, endOrder]]
+  }
+  return [
+    [startOrder, 366],
+    [1, endOrder],
+  ]
+}
+
+function isMonthDayRangeOverlapped(rangeA, rangeB) {
+  const intervalsA = toWrappedDateIntervals(rangeA.startDate, rangeA.endDate)
+  const intervalsB = toWrappedDateIntervals(rangeB.startDate, rangeB.endDate)
+  return intervalsA.some(([startA, endA]) => (
+    intervalsB.some(([startB, endB]) => startA <= endB && startB <= endA)
+  ))
+}
+
 function parseTimeValue(value) {
   if (!value || typeof value !== 'string') return [0, 0]
   const [hourText, minuteText] = value.split(':')
@@ -119,6 +147,20 @@ function normalizeEnergyPlanDraftSegments(segments) {
   }
 
   return normalized
+}
+
+function normalizeDraftEndTimeForModal(time, isLastSegment) {
+  if (isLastSegment && time === '24:00') {
+    return '00:00'
+  }
+  return time
+}
+
+function denormalizeDraftEndTimeForSave(time, isLastSegment) {
+  if (isLastSegment && time === '00:00') {
+    return '24:00'
+  }
+  return time
 }
 
 const SystemParamsEnergyPrice = forwardRef(function SystemParamsEnergyPrice(
@@ -403,6 +445,11 @@ const SystemParamsEnergyPrice = forwardRef(function SystemParamsEnergyPrice(
 
   const openEnergyPriceModal = (plan = null) => {
     if (plan) {
+      const normalizedSegments = normalizeEnergyPlanDraftSegments(deepClone(plan.segments ?? []))
+      const modalSegments = normalizedSegments.map((segment, index) => ({
+        ...segment,
+        end: normalizeDraftEndTimeForModal(segment.end, index === normalizedSegments.length - 1),
+      }))
       setEditingEnergyPlanId(plan.id)
       setEditingPlanRangeBeforeEdit({
         startDate: plan.startDate ?? '01-01',
@@ -411,7 +458,7 @@ const SystemParamsEnergyPrice = forwardRef(function SystemParamsEnergyPrice(
       setEnergyPriceModalDraft({
         startDate: plan.startDate ?? '01-01',
         endDate: plan.endDate ?? '12-31',
-        segments: normalizeEnergyPlanDraftSegments(deepClone(plan.segments ?? [])),
+        segments: modalSegments,
       })
     } else {
       setEditingEnergyPlanId(null)
@@ -419,7 +466,7 @@ const SystemParamsEnergyPrice = forwardRef(function SystemParamsEnergyPrice(
       setEnergyPriceModalDraft({
         startDate: '01-01',
         endDate: '12-31',
-        segments: [{ start: '00:00', end: '24:00', price: '', color: ENERGY_PRICE_SEGMENT_COLORS[0] }],
+        segments: [{ start: '00:00', end: '00:00', price: '', color: ENERGY_PRICE_SEGMENT_COLORS[0] }],
       })
     }
     setEnergyPriceModalOpen(true)
@@ -434,14 +481,16 @@ const SystemParamsEnergyPrice = forwardRef(function SystemParamsEnergyPrice(
 
   const handleAddEnergyPlanDraftSegment = () => {
     const last = energyPriceModalDraft.segments.at(-1)
-    const lastEndMinutes = parseTimeToMinutes(last?.end ?? '00:00')
+    const lastIndex = Math.max(0, energyPriceModalDraft.segments.length - 1)
+    const normalizedLastEnd = denormalizeDraftEndTimeForSave(last?.end ?? '00:00', lastIndex === energyPriceModalDraft.segments.length - 1)
+    const lastEndMinutes = parseTimeToMinutes(normalizedLastEnd)
     if (lastEndMinutes >= 24 * 60) return
     const nextStart = formatMinutesToTime(lastEndMinutes)
     setEnergyPriceModalDraft((previous) => ({
       ...previous,
       segments: [
         ...previous.segments,
-        { start: nextStart, end: '24:00', price: '', color: ENERGY_PRICE_SEGMENT_COLORS[previous.segments.length % ENERGY_PRICE_SEGMENT_COLORS.length] },
+        { start: nextStart, end: '00:00', price: '', color: ENERGY_PRICE_SEGMENT_COLORS[previous.segments.length % ENERGY_PRICE_SEGMENT_COLORS.length] },
       ],
     }))
   }
@@ -453,18 +502,28 @@ const SystemParamsEnergyPrice = forwardRef(function SystemParamsEnergyPrice(
     }))
   }
 
-  const canAddEnergyPriceSegment = parseTimeToMinutes(energyPriceModalDraft.segments.at(-1)?.end ?? '00:00') < 24 * 60
+  const canAddEnergyPriceSegment = (() => {
+    const lastIndex = energyPriceModalDraft.segments.length - 1
+    if (lastIndex < 0) return true
+    const lastEnd = energyPriceModalDraft.segments[lastIndex]?.end ?? '00:00'
+    const normalizedLastEnd = denormalizeDraftEndTimeForSave(lastEnd, true)
+    return parseTimeToMinutes(normalizedLastEnd) < 24 * 60
+  })()
 
   const handleConfirmEnergyPlanModal = async () => {
-    const hasInvalidDraftSegment = energyPriceModalDraft.segments.some(
+    const normalizedDraftSegments = normalizeEnergyPlanDraftSegments(
+      energyPriceModalDraft.segments.map((segment, index, source) => ({
+        ...segment,
+        end: denormalizeDraftEndTimeForSave(segment?.end, index === source.length - 1),
+      })),
+    )
+    const hasInvalidDraftSegment = normalizedDraftSegments.some(
       (segment) => parseTimeToMinutes(segment?.end) <= parseTimeToMinutes(segment?.start),
     )
     if (hasInvalidDraftSegment) {
       openAlertDialog('提示', ENERGY_PRICE_SEGMENT_INVALID_MESSAGE)
       return
     }
-
-    const normalizedDraftSegments = normalizeEnergyPlanDraftSegments(energyPriceModalDraft.segments)
     const hasInvalidSegment = normalizedDraftSegments.some((segment) => parseTimeToMinutes(segment.end) <= parseTimeToMinutes(segment.start))
     if (hasInvalidSegment) {
       openAlertDialog('提示', ENERGY_PRICE_SEGMENT_INVALID_MESSAGE)
@@ -500,6 +559,17 @@ const SystemParamsEnergyPrice = forwardRef(function SystemParamsEnergyPrice(
 
     const startMonth = energyPriceModalDraft.startDate ?? '01-01'
     const endMonth = energyPriceModalDraft.endDate ?? '12-31'
+    const hasDateRangeConflict = energyPriceState.electricPlans
+      .filter((plan) => (editingEnergyPlanId == null ? true : plan.id !== editingEnergyPlanId))
+      .some((plan) => isMonthDayRangeOverlapped(
+        { startDate: plan.startDate ?? '01-01', endDate: plan.endDate ?? '12-31' },
+        { startDate: startMonth, endDate: endMonth },
+      ))
+    if (hasDateRangeConflict) {
+      openAlertDialog('提示', '当前开始/结束时间区间与其他电价方案有交集，无法保存')
+      return
+    }
+
     const segmentsPayload = normalizedSegments.map((segment, index) => ({
       energyPriceName: SEGMENT_ENERGY_NAMES[index % SEGMENT_ENERGY_NAMES.length],
       unitPrice: String(segment.price).trim(),
@@ -711,7 +781,7 @@ const SystemParamsEnergyPrice = forwardRef(function SystemParamsEnergyPrice(
                     </button>
                     <em>-</em>
                     <button type="button" onClick={() => setEnergyPricePickerState({ open: true, type: 'segment-end', segmentIndex: index })}>
-                      {segment.end}
+                      {normalizeDraftEndTimeForModal(segment.end, index === energyPriceModalDraft.segments.length - 1)}
                     </button>
                     <button
                       type="button"

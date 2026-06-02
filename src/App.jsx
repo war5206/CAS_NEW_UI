@@ -24,6 +24,10 @@ import EnergyPriceGuidePage from './pages/guide/EnergyPriceGuidePage'
 import SystemDetectGuidePage from './pages/guide/SystemDetectGuidePage'
 import InitEntryLayout from './pages/InitEntryPage'
 import { useInactivityTimer } from './hooks/useInactivityTimer'
+import { useGlobalInitStateWatcher } from './hooks/useGlobalInitStateWatcher'
+import { useGlobalSystemStatusPoll } from './hooks/useGlobalSystemStatusPoll'
+import { useGlobalRealAlarmPoll } from './hooks/useGlobalRealAlarmPoll'
+import { useGlobalSystemConfigPoll } from './hooks/useGlobalSystemConfigPoll'
 
 const DESIGN_WIDTH = 1920
 const DESIGN_HEIGHT = 1080
@@ -78,6 +82,10 @@ function AppRoutes({ homePageTitle, onHomePageTitleChange }) {
   }, [hasToken])
 
   useInactivityTimer()
+  useGlobalInitStateWatcher()
+  useGlobalSystemStatusPoll()
+  useGlobalRealAlarmPoll()
+  useGlobalSystemConfigPoll()
   const previousPathRef = useRef(window.sessionStorage.getItem(GUIDE_PREVIOUS_PATH_KEY))
 
   const guideTransitionDirection = useMemo(() => {

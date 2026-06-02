@@ -7,7 +7,24 @@ import iconPower from '../assets/layout/boot.svg'
 import iconHasAlert from '../assets/layout/hasAlert.svg'
 import iconNoAlert from '../assets/layout/no-alert.svg'
 import { buildTabPath, getModuleDefaultPath, getSectionDefaultPath, modules } from '../config/navigation'
-import { ignoreAllAlerts, useAlertsStore } from '@/features/alerts/store/alertsStore'
+import { useAlertsStore } from '@/features/alerts/store/alertsStore'
+import {
+  setSystemPowerStatus,
+  setSystemPowerToggling,
+  useSystemStatusStore,
+} from '@/features/system/store/systemStatusStore'
+import { useSystemConfigStore } from '@/features/system/store/systemConfigStore'
+import { suppressSystemStatusPollFor } from '@/hooks/useGlobalSystemStatusPoll'
+import { useAuthStore } from '@/features/auth/store/authStore'
+import { isRestrictedSettingsUser } from '@/features/auth/userRole'
+
+const SYSTEM_STATUS_LONG_NAME = 'Sys\\FinforWorx\\SystemStatus'
+const ALERT_INDICATOR_VISIBLE_COUNT = 5
+const POWER_WRITE_SUPPRESS_MS = 3000
+
+function isWriteRealvalSuccess(response) {
+  return String(response?.data?.data?.state ?? '') === 'success'
+}
 
 const WEEK_LABELS = ['周日', '周一', '周二', '周三', '周四', '周五', '周六']
 const OPS_SYSTEM_TYPE_STORAGE_KEY = 'ops.systemType'
@@ -39,14 +56,17 @@ function CasLayout({
   const [isAlertModalOpen, setIsAlertModalOpen] = useState(false)
   const [opsSystemType, setOpsSystemType] = useState(() => window.localStorage.getItem(OPS_SYSTEM_TYPE_STORAGE_KEY) || '1')
   const [pendingPrimaryNavTarget, setPendingPrimaryNavTarget] = useState(null)
-  const [isSystemPoweredOn, setIsSystemPoweredOn] = useState(true)
   const [pendingPowerAction, setPendingPowerAction] = useState(null)
   const activeModule = routeInfo.module
   const activeSection = routeInfo.section
   const activeTab = routeInfo.tab
   const isHomeLayout = activeModule.id === 'home'
   const isMonitorLayout = activeModule.id === 'monitor'
-  const { liveRows: activeAlerts, ignored: isAlertIgnored } = useAlertsStore()
+  const { liveRows: activeAlerts, liveTotal: alertsTotal, liveMessage: alertsMessage, ignored: isAlertIgnored } = useAlertsStore()
+  const { powerStatus, isToggling: isPowerToggling } = useSystemStatusStore()
+  const { systemTypeUuid, hasFetched: hasFetchedSystemConfig } = useSystemConfigStore()
+  const { userRole } = useAuthStore()
+  const isSystemPoweredOn = powerStatus === '1'
 
   useEffect(() => {
     const updateTime = () => setNow(new Date())
@@ -80,19 +100,38 @@ function CasLayout({
   }, [activeModule, activeSection, activeTab, extraBreadcrumbLabel, homePageTitle, isHomeLayout])
 
   const sectionList = activeModule.sections ?? []
+  const secondarySectionList = useMemo(() => {
+    if (!isRestrictedSettingsUser(userRole)) {
+      return sectionList
+    }
+    return sectionList.filter((item) => item.id !== 'base-setting')
+  }, [sectionList, userRole])
   const tabList = useMemo(() => {
     const source = activeSection?.tabs ?? []
-    if (activeModule.id !== 'operations' || activeSection?.id !== 'device-management') {
-      return source
+    const isSystemType2 = String(systemTypeUuid) === '2'
+
+    if (activeModule.id === 'settings' && activeSection?.id === 'device-params') {
+      if (isSystemType2) {
+        return source
+      }
+      return source.filter((item) => item.id !== 'terminal-loop-pump')
     }
-    if (String(opsSystemType) === '2') {
-      return source
+
+    if (activeModule.id === 'operations' && activeSection?.id === 'device-management') {
+      const resolvedSystemType = hasFetchedSystemConfig ? String(systemTypeUuid) : String(opsSystemType)
+      if (resolvedSystemType === '2') {
+        return source
+      }
+      return source.filter((item) => item.id !== 'ops-terminal-loop-pump')
     }
-    return source.filter((item) => item.id !== 'ops-terminal-loop-pump')
-  }, [activeModule.id, activeSection, opsSystemType])
-  const showSecondaryNav = !hideSecondaryNav && (sectionList.length > 0 || !isHomeLayout)
+
+    return source
+  }, [activeModule.id, activeSection, hasFetchedSystemConfig, opsSystemType, systemTypeUuid])
+  const showSecondaryNav = !hideSecondaryNav && (secondarySectionList.length > 0 || !isHomeLayout)
   const hasTabs = !hideModuleTabs && tabList.length > 0
-  const hasActiveAlerts = activeAlerts.length > 0 && !isAlertIgnored
+  const hasNoAlertMessage = alertsMessage === '没有更多报警数据'
+  const hasActiveAlerts = !hasNoAlertMessage && alertsTotal > 0 && !isAlertIgnored
+  const visibleAlerts = useMemo(() => activeAlerts.slice(0, ALERT_INDICATOR_VISIBLE_COUNT), [activeAlerts])
   const alertIcon = hasActiveAlerts ? iconHasAlert : iconNoAlert
   const alertIconClassName = hasActiveAlerts ? 'is-has-alert' : 'is-no-alert'
   const { dateLabel, timeLabel } = formatDateTime(now)
@@ -134,9 +173,18 @@ function CasLayout({
         <div className="brand">
           <img src={casLogo} alt="CAS" />
         </div>
-        <div className="avatar">
-          <img src={userAvatar} alt="用户头像" />
-        </div>
+        <button
+          type="button"
+          className="avatar"
+          aria-label="重新登录"
+          onClick={() =>
+            navigate('/auth/login', {
+              state: { fromLayoutAvatar: true },
+            })
+          }
+        >
+          <img src={userAvatar} alt="" aria-hidden="true" />
+        </button>
         <nav className="primary-nav">
           {modules.map((module) => (
             <Link
@@ -191,9 +239,9 @@ function CasLayout({
               <aside className={`secondary-nav${isHomeLayout ? '' : ' is-module-layout'}`}>
                 {!isHomeLayout ? <div className="secondary-alert-wrap">{alertIndicator}</div> : null}
                 <div className="secondary-title">{activeModule.breadcrumb ?? activeModule.label}</div>
-                {sectionList.length ? (
+                {secondarySectionList.length ? (
                   <div className="secondary-list">
-                    {sectionList.map((section) => (
+                    {secondarySectionList.map((section) => (
                       <NavLink
                         key={section.id}
                         to={getSectionDefaultPath(activeModule, section)}
@@ -266,16 +314,16 @@ function CasLayout({
             </header>
 
             <div className="alert-preview-modal__body">
-              <div className="alert-preview-modal__title">系统报警（{activeAlerts.length}）</div>
+              <div className="alert-preview-modal__title">系统报警（{hasActiveAlerts ? alertsTotal : 0}）</div>
 
               <div className="alert-preview-modal__list">
-                {activeAlerts.length === 0 ? (
-                  <div className="alert-preview-modal__empty">当前暂无系统报警</div>
+                {!hasActiveAlerts || visibleAlerts.length === 0 ? (
+                  <div className="alert-preview-modal__empty">暂无报警</div>
                 ) : (
-                  activeAlerts.map((item) => (
+                  visibleAlerts.map((item) => (
                     <article key={item.id} className="alert-preview-modal__item">
                       <span className="alert-preview-modal__badge">!</span>
-                      <span>{item.alarmName}</span>
+                      <span>{item.alarmDescription || item.alarmName}</span>
                     </article>
                   ))
                 )}
@@ -283,16 +331,6 @@ function CasLayout({
             </div>
 
             <footer className="alert-preview-modal__footer">
-              <button
-                type="button"
-                className="alert-preview-modal__action is-muted"
-                onClick={() => {
-                  ignoreAllAlerts()
-                  setIsAlertModalOpen(false)
-                }}
-              >
-                全部忽略
-              </button>
               <button
                 type="button"
                 className="alert-preview-modal__action"
@@ -333,11 +371,36 @@ function CasLayout({
         confirmText="确定"
         cancelText="取消"
         showCancel
-        onClose={() => setPendingPowerAction(null)}
-        onCancel={() => setPendingPowerAction(null)}
-        onConfirm={() => {
-          setIsSystemPoweredOn((previous) => !previous)
+        onClose={() => {
+          if (isPowerToggling) return
           setPendingPowerAction(null)
+        }}
+        onCancel={() => {
+          if (isPowerToggling) return
+          setPendingPowerAction(null)
+        }}
+        onConfirm={async () => {
+          if (isPowerToggling) return
+          const action = pendingPowerAction
+          const nextValue = action === 'shutdown' ? '0' : '1'
+          setSystemPowerToggling(true)
+          // 立即压制后续 N 秒内的轮询响应，避免在写入瞬间到达的旧值响应把乐观状态拉回。
+          suppressSystemStatusPollFor(POWER_WRITE_SUPPRESS_MS)
+          try {
+            const response = await writeRealvalByLongNames({
+              [SYSTEM_STATUS_LONG_NAME]: nextValue,
+            })
+            if (isWriteRealvalSuccess(response)) {
+              setSystemPowerStatus(nextValue)
+              // 写成功后再延长一次压制窗口，等下一次自然 10s 轮询拿到 PLC 已生效的值再校正。
+              suppressSystemStatusPollFor(POWER_WRITE_SUPPRESS_MS)
+            }
+          } catch {
+            /* 静默失败：交由下一次轮询纠正显示状态 */
+          } finally {
+            setSystemPowerToggling(false)
+            setPendingPowerAction(null)
+          }
         }}
       />
     </div>

@@ -19,11 +19,6 @@ import couplingStatusIcon from '../assets/mode-select-couple-energy.svg'
 import protectionStatusIcon from '../assets/mode-select-heat-pump-protect.svg'
 import protectionStatusIconActive from '../assets/mode-select-heat-pump-protect-active.svg'
 import heatPumpShutdownIcon from '../assets/heat-pump/hp-shutdown.svg'
-import waterPumpIcon from '../assets/water-pump.svg'
-import heatTracingIcon from '../assets/heat-tracing.svg'
-import constantPressurePumpIcon from '../assets/constant-pressure-pump.svg'
-import pressureReliefValveIcon from '../assets/pressure-relief-valve.svg'
-import drainValveIcon from '../assets/drain-value.svg'
 import { useActionConfirm } from '../hooks/useActionConfirm'
 import { useWriteWithDelayedVerify } from '../hooks/useWriteWithDelayedVerify'
 import { getStoredClimateMode, setStoredClimateMode } from '../utils/climateModeState'
@@ -32,7 +27,6 @@ import {
   hpRunModeSwitch,
   queryRealvalByLongNames,
   writeRealvalByLongNames,
-  queryManualSwitch,
 } from '../api/modules/settings'
 import './ModeSelectPage.css'
 
@@ -123,20 +117,26 @@ const INITIAL_CARD_SWITCH_STATE = {
 
 const MANUAL_TYPE_OPTIONS = [
   { value: 'heat-pump', label: '热泵' },
-  { value: 'heat-pump-loop-pump', label: '热泵循环泵' },
-  { value: 'heating-tape', label: '伴热带' },
-  { value: 'drain-valve', label: '排污阀' },
-  { value: 'relief-valve', label: '泄压阀' },
-  { value: 'constant-pressure-water-pump', label: '定压补水泵' },
+  { value: 'air-cooled-module', label: '风冷模块' },
 ]
 
 const MANUAL_DEVICE_ICON_MAP = {
   'heat-pump': heatPumpShutdownIcon,
-  'heat-pump-loop-pump': waterPumpIcon,
-  'heating-tape': heatTracingIcon,
-  'constant-pressure-water-pump': constantPressurePumpIcon,
-  'relief-valve': pressureReliefValveIcon,
-  'drain-valve': drainValveIcon,
+  'air-cooled-module': heatPumpShutdownIcon,
+}
+
+/** 手动模式 Poweron 控制：热泵 No1–No30，风冷模块 No31–No42 */
+const MANUAL_POWERON_DEVICE_CONFIG = {
+  'heat-pump': {
+    startNo: 1,
+    count: 30,
+    getLabel: (displayIndex) => `No${displayIndex}`,
+  },
+  'air-cooled-module': {
+    startNo: 31,
+    count: 12,
+    getLabel: (displayIndex) => `风冷模块${displayIndex}`,
+  },
 }
 
 // 模式选择页面使用的点位长名
@@ -177,17 +177,6 @@ const MANUAL_MODE_POLL_LONG_NAMES = [
   LONG_NAME_HP_TOTAL_RUN_MODE,
 ]
 
-// 手动设备下拉选项值 → queryManualSwitch 接口的 type 字段
-// 注意：部分设备的接口 type 与下拉显示名不同（如“定压补水泵”→“定压泵”）
-const MANUAL_DEVICE_TYPE_PARAM_MAP = {
-  'heat-pump': '热泵',
-  'heat-pump-loop-pump': '热泵循环泵',
-  'heating-tape': '伴热带',
-  'drain-valve': '排污阀',
-  'relief-valve': '蓄热阀门',
-  'constant-pressure-water-pump': '定压泵',
-}
-
 const POLL_INTERVAL_MS = 10_000
 
 // 相同长名集合的并发 query 合并为单次 HTTP 请求，避免 React 18 StrictMode 下
@@ -198,9 +187,15 @@ function makeRealvalQueryKey(longNames) {
   return JSON.stringify([...longNames].slice().sort())
 }
 
-// 将接口返回的 0/1 或 "0"/"1" 统一为布尔
+// 将接口返回的 0/1、true/false 等统一为布尔
 function isOnValue(value) {
-  return value === 1 || value === '1'
+  if (value === true || value === 1) return true
+  const text = String(value ?? '').trim().toLowerCase()
+  return text === '1' || text === 'true' || text === 'on'
+}
+
+function normalizeDeviceStateToString(value) {
+  return isOnValue(value) ? '1' : '0'
 }
 
 // 从 queryRealvalByLongNames 响应中取出值映射
@@ -212,12 +207,38 @@ function extractRealvalMap(response) {
   return data
 }
 
-// 从 queryManualSwitch 响应中取设备列表
-function extractManualSwitchList(response) {
-  const payload = response?.data
-  if (!payload || payload.success === false) return null
-  const list = payload?.data?.manualSwitch
-  return Array.isArray(list) ? list : null
+const POWERON_CONTROL_SUFFIX = 'Poweron'
+
+function getManualPoweronConfig(deviceTypeValue) {
+  return MANUAL_POWERON_DEVICE_CONFIG[deviceTypeValue] ?? null
+}
+
+function isPoweronManualDeviceType(deviceTypeValue) {
+  return Boolean(getManualPoweronConfig(deviceTypeValue))
+}
+
+function buildPoweronLongName(pointNo) {
+  return `HeatPump\\SJMG\\No${pointNo}\\${POWERON_CONTROL_SUFFIX}`
+}
+
+function getPoweronLongNamesForDeviceType(deviceTypeValue) {
+  const config = getManualPoweronConfig(deviceTypeValue)
+  if (!config) return []
+  return Array.from({ length: config.count }, (_, i) => buildPoweronLongName(config.startNo + i))
+}
+
+function createDefaultManualDeviceList(deviceTypeValue) {
+  const config = getManualPoweronConfig(deviceTypeValue)
+  if (!config) return []
+  return Array.from({ length: config.count }, (_, i) => {
+    const displayIndex = i + 1
+    const pointNo = config.startNo + i
+    return {
+      name: config.getLabel(displayIndex),
+      longName: buildPoweronLongName(pointNo),
+      state: '0',
+    }
+  })
 }
 
 function ModeSettingCard({
@@ -304,6 +325,8 @@ function ModeSelectPage() {
   const [manualDeviceList, setManualDeviceList] = useState([])
   const [attentionMessage, setAttentionMessage] = useState('')
   const [isRunModeSwitching, setIsRunModeSwitching] = useState(false)
+  /** 下置进行中：轮询回读时跳过这些点位，避免用旧实值冲掉刚点的蓝/灰 */
+  const manualTogglePendingRef = useRef(new Set())
 
   const onWriteNotify = useCallback((message) => {
     setAttentionMessage(message)
@@ -381,23 +404,38 @@ function ModeSelectPage() {
     [applyRealvalMap],
   )
 
-  // 查询手动设备开关列表
-  const fetchManualSwitch = useCallback(
+  // 热泵 / 风冷模块：直接读 Poweron 实值（与下置点位一致）
+  const refreshManualPoweronStates = useCallback(async (deviceTypeValue) => {
+    if (!isPoweronManualDeviceType(deviceTypeValue)) return
+    const longNames = getPoweronLongNamesForDeviceType(deviceTypeValue)
+    try {
+      const response = await queryRealvalByLongNames(longNames)
+      const valueMap = extractRealvalMap(response)
+      if (!valueMap || !isMountedRef.current) return
+      setManualDeviceList((prev) => {
+        const base = prev.length > 0 ? prev : createDefaultManualDeviceList(deviceTypeValue)
+        return base.map((item) => {
+          if (manualTogglePendingRef.current.has(item.longName)) return item
+          if (!Object.prototype.hasOwnProperty.call(valueMap, item.longName)) return item
+          return {
+            ...item,
+            state: normalizeDeviceStateToString(valueMap[item.longName]),
+          }
+        })
+      })
+    } catch {
+      // ignore
+    }
+  }, [])
+
+  const fetchManualDeviceList = useCallback(
     async (deviceTypeValue) => {
-      const typeParam = MANUAL_DEVICE_TYPE_PARAM_MAP[deviceTypeValue]
-      if (!typeParam) return null
-      try {
-        const response = await queryManualSwitch(typeParam)
-        const list = extractManualSwitchList(response)
-        if (list && isMountedRef.current) {
-          setManualDeviceList(list)
-        }
-        return list
-      } catch {
-        return null
-      }
+      if (!isPoweronManualDeviceType(deviceTypeValue)) return null
+      setManualDeviceList((prev) => (prev.length > 0 ? prev : createDefaultManualDeviceList(deviceTypeValue)))
+      await refreshManualPoweronStates(deviceTypeValue)
+      return createDefaultManualDeviceList(deviceTypeValue)
     },
-    [],
+    [refreshManualPoweronStates],
   )
 
   // 手动模式下的"当前设备类型"通过 ref 暴露给轮询使用，避免依赖变化导致轮询重置
@@ -416,7 +454,9 @@ function ModeSelectPage() {
       let valueMap = null
       if (fm === 'manual') {
         valueMap = await fetchRealvals(MANUAL_MODE_POLL_LONG_NAMES)
-        await fetchManualSwitch(mt)
+        if (isPoweronManualDeviceType(mt)) {
+          await refreshManualPoweronStates(mt)
+        }
       } else {
         valueMap = await fetchRealvals(SMART_MODE_POLL_LONG_NAMES)
       }
@@ -437,13 +477,14 @@ function ModeSelectPage() {
     return () => {
       window.clearInterval(timerId)
     }
-  }, [fetchRealvals, fetchManualSwitch, isMountedRef])
+  }, [fetchRealvals, refreshManualPoweronStates, isMountedRef])
 
   // 页面进入时，若当前已是手动模式，立即拉取手动设备列表
   useEffect(() => {
-    if (featureMode === 'manual') {
-      fetchManualSwitch(manualDeviceType)
-    }
+    if (featureMode !== 'manual') return
+    if (!isPoweronManualDeviceType(manualDeviceType)) return
+    setManualDeviceList((prev) => (prev.length > 0 ? prev : createDefaultManualDeviceList(manualDeviceType)))
+    refreshManualPoweronStates(manualDeviceType)
     // 仅在 featureMode 从轮询/初始化切到 manual 时触发
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [featureMode])
@@ -470,9 +511,9 @@ function ModeSelectPage() {
           optimisticApply: () => {
             setFeatureMode(nextFeatureId)
             if (nextFeatureId === 'manual') {
-              // 切到手动模式：重置下拉到"热泵"并立即拉一次列表
               setManualDeviceType(MANUAL_TYPE_OPTIONS[0].value)
-              fetchManualSwitch(MANUAL_TYPE_OPTIONS[0].value)
+              setManualDeviceList(createDefaultManualDeviceList('heat-pump'))
+              refreshManualPoweronStates('heat-pump')
             }
           },
           delayedVerify: async () => {
@@ -480,13 +521,13 @@ function ModeSelectPage() {
             if (nextFeatureId === 'smart') {
               await fetchRealvals(SETTING_SWITCH_LONG_NAMES)
             } else {
-              await fetchManualSwitch(MANUAL_TYPE_OPTIONS[0].value)
+              await refreshManualPoweronStates('heat-pump')
             }
           },
         },
       )
     },
-    [featureMode, fetchManualSwitch, fetchRealvals, performWrite],
+    [featureMode, fetchRealvals, performWrite, refreshManualPoweronStates],
   )
 
   // 点击制热/制冷
@@ -542,36 +583,53 @@ function ModeSelectPage() {
     (nextValue) => {
       if (nextValue === manualDeviceType) return
       setManualDeviceType(nextValue)
-      fetchManualSwitch(nextValue)
+      setManualDeviceList(createDefaultManualDeviceList(nextValue))
+      fetchManualDeviceList(nextValue)
     },
-    [fetchManualSwitch, manualDeviceType],
+    [fetchManualDeviceList, manualDeviceType],
   )
 
-  // 点击手动设备：state 取反后下置到对应 longName
-  // 先乐观更新那一行，3s 后整体回读一次 queryManualSwitch(当前类型) 做校正；
-  // 10s 轮询也会在手动模式下刷新整张列表兜底
+  // 点击手动设备：确认后立即变蓝/变灰，再下置 Poweron；回读也用同一批点位
   const handleManualDeviceToggle = useCallback(
     (device) => {
       if (!device?.longName) return
       const currentOn = isOnValue(device.state)
       const nextValue = currentOn ? 0 : 1
       const nextStateText = currentOn ? '0' : '1'
-      const targetType = manualDeviceType
-      performWrite(
-        { [device.longName]: nextValue },
+      const targetLongName = device.longName
+      const previousState = device.state
+
+      manualTogglePendingRef.current.add(targetLongName)
+      setManualDeviceList((prev) =>
+        prev.map((item) =>
+          item.longName === targetLongName ? { ...item, state: nextStateText } : item,
+        ),
+      )
+
+      const verifyAfterWrite = async () => {
+        manualTogglePendingRef.current.delete(targetLongName)
+        await refreshManualPoweronStates(manualDeviceType)
+      }
+
+      void performWrite(
+        { [targetLongName]: nextValue },
         {
-          optimisticApply: () => {
+          delayedVerify: verifyAfterWrite,
+        },
+      ).then((ok) => {
+        if (!ok) {
+          manualTogglePendingRef.current.delete(targetLongName)
+          if (isMountedRef.current) {
             setManualDeviceList((prev) =>
               prev.map((item) =>
-                item.longName === device.longName ? { ...item, state: nextStateText } : item,
+                item.longName === targetLongName ? { ...item, state: previousState } : item,
               ),
             )
-          },
-          delayedVerify: () => fetchManualSwitch(targetType),
-        },
-      )
+          }
+        }
+      })
     },
-    [fetchManualSwitch, manualDeviceType, performWrite],
+    [manualDeviceType, performWrite, refreshManualPoweronStates, isMountedRef],
   )
 
   if (isInitialSyncing) {

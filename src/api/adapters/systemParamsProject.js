@@ -229,6 +229,50 @@ export function toUpdateMotherboardPayload(form) {
 }
 
 /**
+ * 耦合能源类型（与 SystemParamsPage / 向导一致）
+ */
+export const COUPLING_ENERGY_TYPE_OPTIONS = [
+  { id: '1', label: '电锅炉' },
+  { id: '2', label: '燃气锅炉' },
+  { id: '3', label: '水源热泵' },
+  { id: '4', label: '风冷模块' },
+  { id: '5', label: '无耦合能源' },
+]
+
+export const COUPLING_ENERGY_TYPE_NONE_ID = '5'
+
+export function resolveCouplingEnergyTypeLabel({ typeId, typeName }) {
+  const normalizedTypeId = String(typeId ?? '').trim()
+  const matchedById = COUPLING_ENERGY_TYPE_OPTIONS.find((item) => item.id === normalizedTypeId)
+  if (matchedById) {
+    return matchedById.label
+  }
+
+  const normalizedName = String(typeName ?? '').trim()
+  const matchedByName = COUPLING_ENERGY_TYPE_OPTIONS.find((item) => item.label === normalizedName)
+  if (matchedByName) {
+    return matchedByName.label
+  }
+
+  return '无耦合能源'
+}
+
+export function resolveCouplingEnergyTypeId({ typeId, typeName }) {
+  const normalizedTypeId = String(typeId ?? '').trim()
+  if (COUPLING_ENERGY_TYPE_OPTIONS.some((item) => item.id === normalizedTypeId)) {
+    return normalizedTypeId
+  }
+
+  const normalizedName = String(typeName ?? '').trim()
+  const matchedByName = COUPLING_ENERGY_TYPE_OPTIONS.find((item) => item.label === normalizedName)
+  if (matchedByName) {
+    return matchedByName.id
+  }
+
+  return COUPLING_ENERGY_TYPE_NONE_ID
+}
+
+/**
  * 从 queryCoupleEnergy 响应中解析耦合能源
  * @param {unknown} response - axios 响应
  */
@@ -244,6 +288,10 @@ export function adaptCoupleEnergyFromQueryResponse(response) {
   }
   return {
     typeId: coupleEnergy.couple_energy_type_uuid == null ? '' : String(coupleEnergy.couple_energy_type_uuid),
+    typeName: toText(
+      coupleEnergy.couple_energy_type_name ?? coupleEnergy.couple_energy_name ?? coupleEnergy.coupleEnergyTypeName,
+      '',
+    ),
     count: coupleEnergy.couple_energy_number == null ? '0' : String(coupleEnergy.couple_energy_number),
     id: coupleEnergy.id == null ? '' : String(coupleEnergy.id),
     projectId: body?.projectId == null ? '' : String(body.projectId),

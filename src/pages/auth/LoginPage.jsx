@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import './LoginPage.css'
 import PasswordKeypad from '@/components/auth/PasswordKeypad'
-import { loginVerification, deviceUnlock, writeLockStatus } from '@/api/modules/home'
+import { loginVerification, deviceUnlock, writeLockStatus, setInitState } from '@/api/modules/home'
 import {
   useAuthStore,
   incrementLoginFailCount,
@@ -21,6 +21,7 @@ function LoginPage() {
   const [errorKey, setErrorKey] = useState(0)
 
   const fromScreenProtect = location.state?.fromScreenProtect === true
+  const fromLayoutAvatar = location.state?.fromLayoutAvatar === true
   const initiallyLocked = location.state?.deviceLocked === true
   const [screenProtectFailCount, setScreenProtectFailCount] = useState(
     initiallyLocked ? MAX_SCREEN_PROTECT_ATTEMPTS : 0
@@ -45,7 +46,16 @@ function LoginPage() {
       if (response.data.result.state === 'success') {
         resetLoginFailCount()
         setUserRole(response.data.result.message)
-        navigate(fromScreenProtect ? '/home' : '/guide/system-config')
+        if (fromScreenProtect || fromLayoutAvatar) {
+          navigate('/home')
+        } else {
+          try {
+            await setInitState()
+          } catch {
+            // 跳过向导时仍进入首页；initState 写入失败由 InitEntry 兜底
+          }
+          navigate('/home')
+        }
       } else {
         incrementLoginFailCount()
         setErrorKey((k) => k + 1)
@@ -92,7 +102,7 @@ function LoginPage() {
     navigate('/auth/set-password')
   }
 
-  const extraBottomButtons = (fromScreenProtect || initiallyLocked)
+  const extraBottomButtons = fromScreenProtect || fromLayoutAvatar || initiallyLocked
     ? []
     : [
         { label: '忘记密码', onClick: handleForgotPassword },
@@ -103,7 +113,9 @@ function LoginPage() {
     ? '当前系统已锁定，请输入超管密码解锁系统'
     : fromScreenProtect
       ? '密码为4位数字，输入3次错误后将进行锁定。'
-      : '请输入刚才设置的四位密码'
+      : fromLayoutAvatar
+        ? '请输入密码以更新权限并进入首页'
+        : '请输入刚才设置的四位密码'
 
   return (
     <div className="login-page">

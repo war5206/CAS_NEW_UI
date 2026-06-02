@@ -1,22 +1,25 @@
 import { useState } from 'react'
 import DataOverviewFilterBar from '../components/DataOverviewFilterBar'
 import DataOverviewChart from '../components/DataOverviewChart'
-import { syncMonthRange } from '../utils/analysisFilterUtils'
+import { syncMonthRange, addCalendarMonths, getDefaultCalendarMonthValue } from '../utils/analysisFilterUtils'
 import { useAnalysisTrendQuery } from '../features/analysis/hooks/useAnalysisTrendQuery'
 import './DataOverviewPage.css'
 import './PowerStatisticsPage.css'
 
+const defaultAnalysisMonth = getDefaultCalendarMonthValue()
+const currentCalendarYear = String(new Date().getFullYear())
+
 const DEFAULT_FILTERS = {
   day: {
-    month: '2026-03',
+    month: defaultAnalysisMonth,
   },
   month: {
-    startMonth: '2026-01',
-    endMonth: '2026-03',
+    startMonth: addCalendarMonths(defaultAnalysisMonth, -2),
+    endMonth: defaultAnalysisMonth,
   },
   year: {
-    startYear: '2021',
-    endYear: '2026',
+    startYear: String(Number(currentCalendarYear) - 5),
+    endYear: currentCalendarYear,
   },
 }
 

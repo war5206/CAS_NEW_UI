@@ -12,6 +12,13 @@ import {
   writePLCPointEFData,
   writeRealvalByLongNames,
 } from '../api/modules/settings'
+import { clearGuideWizardCache } from '@/utils/guideCache'
+import { notifyFactoryResetTriggered } from '@/hooks/useGlobalInitStateWatcher'
+import {
+  setHomeFeatureSettings,
+  setIndoorTemperatureVisibility,
+  useHomeFeatureSettings,
+} from '@/features/home/store/homeFeatureSettingsStore'
 import dateIcon from '../assets/icons/date.svg'
 import './BasicSettingPage.css'
 
@@ -114,6 +121,71 @@ function LockIcon() {
   )
 }
 
+const FEATURE_SETTING_ITEMS = [
+  { key: 'showModeStatus', title: '模式状态模块', description: '控制首页右侧模式状态卡片显示', enabledLabel: '显示', disabledLabel: '隐藏' },
+  { key: 'showModeSavedCost', title: '模式状态-已节省费用', description: '仅控制模式状态卡片中的已节省费用区域', enabledLabel: '显示', disabledLabel: '隐藏' },
+  { key: 'showCostAnalysis', title: '费用统计模块', description: '控制首页右侧费用统计卡片显示', enabledLabel: '显示', disabledLabel: '隐藏' },
+  { key: 'showTargetBackwaterTemperature', title: '目标回水温度模块', description: '控制首页右侧目标回水温度卡片显示', enabledLabel: '显示', disabledLabel: '隐藏' },
+  { key: 'showDeviceStatus', title: '设备状态模块', description: '控制首页右侧设备状态卡片显示', enabledLabel: '显示', disabledLabel: '隐藏' },
+]
+
+function FeatureSettingView() {
+  const featureSettings = useHomeFeatureSettings()
+  const indoorTemperatureVisibility = featureSettings.indoorTemperatureVisibility ?? [true, true, true, true, true]
+
+  const handleToggle = (key) => {
+    setHomeFeatureSettings({ [key]: !featureSettings[key] })
+  }
+
+  return (
+    <div className="basic-setting-page basic-setting-page--feature-setting">
+      <div className="basic-setting-page__feature-grid">
+        {FEATURE_SETTING_ITEMS.map((item) => {
+          const enabled = Boolean(featureSettings[item.key])
+          return (
+            <div key={item.key} className="basic-setting-page__feature-item">
+              <div className="basic-setting-page__feature-item-main">
+                <h4>{item.title}</h4>
+                <p>{item.description}</p>
+              </div>
+              <button
+                type="button"
+                className={`basic-setting-page__feature-toggle${enabled ? ' is-on' : ''}`}
+                onClick={() => handleToggle(item.key)}
+                aria-pressed={enabled}
+              >
+                <span>{enabled ? item.enabledLabel : item.disabledLabel}</span>
+              </button>
+            </div>
+          )
+        })}
+      </div>
+
+      <div className="basic-setting-page__feature-indoor">
+        <h4>室内温度显示控制</h4>
+        <div className="basic-setting-page__indoor-grid">
+          {indoorTemperatureVisibility.map((visible, index) => (
+            <div key={`indoor-visibility-${index}`} className="basic-setting-page__feature-item basic-setting-page__feature-item--compact">
+              <div className="basic-setting-page__feature-item-main">
+                <h4>{`室内温度${index + 1}`}</h4>
+                <p>控制首页系统图中的单个室内温度点位显示</p>
+              </div>
+              <button
+                type="button"
+                className={`basic-setting-page__feature-toggle${visible ? ' is-on' : ''}`}
+                onClick={() => setIndoorTemperatureVisibility(index, !visible)}
+                aria-pressed={visible}
+              >
+                <span>{visible ? '显示' : '隐藏'}</span>
+              </button>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  )
+}
+
 function SystemResetView() {
   const navigate = useNavigate()
   const [confirmAction, setConfirmAction] = useState(null)
@@ -194,6 +266,8 @@ function SystemResetView() {
       } else if (confirmAction.id === 'factory-reset') {
         const response = await restoreOriginal()
         if (response?.data?.success) {
+          clearGuideWizardCache()
+          notifyFactoryResetTriggered()
           setConfirmAction(null)
           navigate('/auth/set-password')
           return
@@ -670,6 +744,10 @@ function OperationLogView() {
 }
 
 function BasicSettingPage({ tabId }) {
+  if (tabId === 'feature-setting') {
+    return <FeatureSettingView />
+  }
+
   if (tabId === 'system-reset') {
     return <SystemResetView />
   }

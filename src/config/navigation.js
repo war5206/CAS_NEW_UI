@@ -1,4 +1,4 @@
-import iconHome from '../assets/navigation/index.svg'
+﻿import iconHome from '../assets/navigation/index.svg'
 import iconSetting from '../assets/navigation/setting.svg'
 import iconAlert from '../assets/navigation/alert.svg'
 import iconAnalysis from '../assets/navigation/analysis.svg'
@@ -55,9 +55,10 @@ export const modules = [
         label: '设备参数',
         path: 'device-params',
         tabs: [
+          { id: 'heat-pump', label: '热泵', path: 'heat-pump' },
+          { id: 'air-cooled-module', label: '风冷模块', path: 'air-cooled-module' },
           { id: 'hp-loop-pump', label: '热泵循环泵', path: 'heat-pump-loop-pump' },
           { id: 'terminal-loop-pump', label: '末端循环泵', path: 'terminal-loop-pump' },
-          { id: 'heat-pump', label: '热泵', path: 'heat-pump' },
           { id: 'heat-trace', label: '伴热带', path: 'heat-trace' },
           { id: 'constant-pressure-pump', label: '定压泵', path: 'constant-pressure-pump' },
           { id: 'drain-valve', label: '排污阀', path: 'drain-valve' },
@@ -70,6 +71,7 @@ export const modules = [
         path: 'base-setting',
         tabs: [
           { id: 'system-params', label: '系统参数', path: 'system-params' },
+          { id: 'feature-setting', label: '功能设置', path: 'feature-setting' },
           { id: 'system-reset', label: '系统重置', path: 'system-reset' },
           { id: 'device-lock', label: '设备锁定', path: 'device-lock' },
           { id: 'operation-log', label: '操作日志', path: 'operation-log' },
@@ -116,7 +118,8 @@ export const modules = [
         tabs: [
           { id: 'status-data', label: '系统状态数据', path: 'system-status-data' },
           { id: 'setting-data', label: '系统设置数据', path: 'system-setting-data' },
-          { id: 'unit-data', label: '热泵机组数据', path: 'heat-pump-unit-data' },
+          { id: 'unit-data-heat-pump', label: '热泵机组数据', path: 'heat-pump-unit-data' },
+          { id: 'unit-data-air-cooled', label: '风冷模块机组数据', path: 'air-cooled-unit-data' },
         ],
       },
       {
@@ -125,6 +128,7 @@ export const modules = [
         path: 'device-management',
         tabs: [
           { id: 'ops-heat-pump', label: '热泵', path: 'heat-pump' },
+          { id: 'ops-air-cooled-module', label: '风冷模块', path: 'air-cooled-module' },
           { id: 'ops-loop-pump', label: '热泵循环泵', path: 'heat-pump-loop-pump' },
           { id: 'ops-terminal-loop-pump', label: '末端循环泵', path: 'terminal-loop-pump' },
           { id: 'ops-coupling', label: '耦合能源', path: 'coupling-energy' },

@@ -35,6 +35,11 @@ export function getAlgorithmProcessPath() {
   return import.meta.env.VITE_ALGORITHM_PROCESS_PATH || '/FinforWorx/algorithm/process/execute'
 }
 
+/** 开发模式下跳过后端 init 门禁（仅 DEV + VITE_SKIP_INIT_GATE=true 时生效） */
+export function isInitGateSkipped() {
+  return import.meta.env.DEV && import.meta.env.VITE_SKIP_INIT_GATE === 'true'
+}
+
 // 算法过程 ID 常量
 export const ALGORITHM_PROCESS_IDS = {
   HOME_OVERVIEW: 'queryHomePageDataNew',

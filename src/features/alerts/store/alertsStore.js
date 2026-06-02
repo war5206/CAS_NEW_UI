@@ -1,10 +1,12 @@
 import { useSyncExternalStore } from 'react'
-import { HISTORY_ALARM_ROWS, SYSTEM_ALARM_ROWS } from './alertsSharedData'
+import { HISTORY_ALARM_ROWS } from './alertsSharedData'
 
 const listeners = new Set()
 
 let state = {
-  liveRows: SYSTEM_ALARM_ROWS,
+  liveRows: [],
+  liveTotal: 0,
+  liveMessage: '',
   historyRows: HISTORY_ALARM_ROWS,
   ignored: false,
 }
@@ -24,6 +26,20 @@ function getSnapshot() {
 
 export function useAlertsStore() {
   return useSyncExternalStore(subscribe, getSnapshot, getSnapshot)
+}
+
+/**
+ * 由全局轮询调用：将 queryRealAlarm 拉到的实时报警数据写入 store。
+ * @param {{ rows: Array<{ id: string, alarmName: string, alarmDescription: string }>, total: number, message: string }} payload
+ */
+export function setLiveAlarms({ rows = [], total = 0, message = '' } = {}) {
+  state = {
+    ...state,
+    liveRows: rows,
+    liveTotal: total,
+    liveMessage: message,
+  }
+  emitChange()
 }
 
 export function processLiveAlarm(row) {

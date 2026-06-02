@@ -1,5 +1,9 @@
 import { lazy, Suspense } from 'react'
+import { Navigate } from 'react-router-dom'
 import PageTransition from '../components/PageTransition'
+import { useSystemConfigStore } from '@/features/system/store/systemConfigStore'
+import { useAuthStore } from '@/features/auth/store/authStore'
+import { isRestrictedSettingsUser } from '@/features/auth/userRole'
 
 const AlertsModulePage = lazy(() => import('./AlertsModulePage'))
 const ArchiveManagementPage = lazy(() => import('./ArchiveManagementPage'))
@@ -38,6 +42,9 @@ function ModulePage({
   onUnitLayoutCommitted,
 }) {
   const { module, section, tab } = routeInfo
+  const { systemTypeUuid } = useSystemConfigStore()
+  const { userRole } = useAuthStore()
+  const isSystemType2 = String(systemTypeUuid) === '2'
   let content = null
 
   const isModeSelectSection = module.id === 'settings' && section?.id === 'mode-select'
@@ -53,11 +60,15 @@ function ModulePage({
     }
 
     if (tab?.id === 'terminal-loop-pump') {
-      content = <TerminalLoopPumpPage />
+      content = isSystemType2 ? <TerminalLoopPumpPage /> : <Navigate to="/settings/device-params/heat-pump-loop-pump" replace />
     }
 
     if (tab?.id === 'heat-pump') {
-      content = <HeatPumpPage />
+      content = <HeatPumpPage deviceModuleType="heat-pump" />
+    }
+
+    if (tab?.id === 'air-cooled-module') {
+      content = <HeatPumpPage deviceModuleType="air-cooled-module" />
     }
 
     if (tab?.id === 'heat-trace') {
@@ -81,15 +92,19 @@ function ModulePage({
     module.id === 'settings' && section?.id === 'base-setting' && tab?.id === 'system-params'
 
   if (!content && isBaseSettingSystemParamsPage) {
-    content = (
-      <SystemParamsPage
-        onUnsavedGuardChange={onUnsavedGuardChange}
-        onSecondaryNavVisibilityChange={onSecondaryNavVisibilityChange}
-        onModuleTabsVisibilityChange={onModuleTabsVisibilityChange}
-        onDetailBreadcrumbChange={onDetailBreadcrumbChange}
-        onUnitLayoutCommitted={onUnitLayoutCommitted}
-      />
-    )
+    if (isRestrictedSettingsUser(userRole)) {
+      content = <Navigate to="/settings/mode-select" replace />
+    } else {
+      content = (
+        <SystemParamsPage
+          onUnsavedGuardChange={onUnsavedGuardChange}
+          onSecondaryNavVisibilityChange={onSecondaryNavVisibilityChange}
+          onModuleTabsVisibilityChange={onModuleTabsVisibilityChange}
+          onDetailBreadcrumbChange={onDetailBreadcrumbChange}
+          onUnitLayoutCommitted={onUnitLayoutCommitted}
+        />
+      )
+    }
   }
 
   if (!content && module.id === 'settings' && section?.id === 'mode-setting' && tab?.id === 'climate') {
@@ -149,7 +164,11 @@ function ModulePage({
   }
 
   if (!content && module.id === 'operations' && section?.id === 'device-management' && tab) {
-    content = <OperationsDeviceManagementPage tabId={tab.id} />
+    if (tab.id === 'ops-terminal-loop-pump' && !isSystemType2) {
+      content = <Navigate to="/operations/device-management/heat-pump-loop-pump" replace />
+    } else {
+      content = <OperationsDeviceManagementPage tabId={tab.id} />
+    }
   }
 
   if (!content && module.id === 'operations' && section?.id === 'archive') {
@@ -161,7 +180,11 @@ function ModulePage({
   }
 
   if (!content && module.id === 'settings' && section?.id === 'base-setting') {
-    content = <BasicSettingPage tabId={tab?.id} />
+    if (isRestrictedSettingsUser(userRole)) {
+      content = <Navigate to="/settings/mode-select" replace />
+    } else {
+      content = <BasicSettingPage tabId={tab?.id} />
+    }
   }
 
   if (!content) {

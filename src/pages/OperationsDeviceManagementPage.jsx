@@ -1,4 +1,9 @@
 import { useEffect, useMemo, useState } from 'react'
+import { filterOpsDeviceRowsByPointNos } from '@/api/adapters/operations'
+import {
+  getFixedAirCooledModuleDeviceIds,
+  getFixedHeatPumpDeviceIds,
+} from '@/config/projectUnitDevices'
 import useActionConfirm from '../hooks/useActionConfirm'
 import { writeRealvalByLongNames } from '@/api/modules/settings'
 import { useOpsOperatingTimeQuery, useOpsSystemTypeQuery } from '@/features/operations/hooks/useOperationsQueries'
@@ -10,17 +15,30 @@ const OPS_SYSTEM_TYPE_STORAGE_KEY = 'ops.systemType'
 
 const DEVICE_TYPE_MAP = {
   'ops-heat-pump': '热泵',
+  'ops-air-cooled-module': '热泵',
   'ops-loop-pump': '热泵循环泵',
   'ops-terminal-loop-pump': '末端循环泵',
   'ops-coupling': '耦合能源',
+}
+
+const TAB_POINT_NO_FILTER = {
+  'ops-heat-pump': getFixedHeatPumpDeviceIds(),
+  'ops-air-cooled-module': getFixedAirCooledModuleDeviceIds(),
 }
 
 function OperationsDeviceManagementPage({ tabId }) {
   const [currentPageByTab, setCurrentPageByTab] = useState({})
   const { requestConfirm, confirmModal } = useActionConfirm()
   const deviceType = DEVICE_TYPE_MAP[tabId] ?? '热泵'
+  const allowedPointNos = TAB_POINT_NO_FILTER[tabId]
   const { data: systemType = '1' } = useOpsSystemTypeQuery()
-  const { data: rows = [] } = useOpsOperatingTimeQuery(deviceType, { enabled: Boolean(deviceType) })
+  const { data: allRows = [] } = useOpsOperatingTimeQuery(deviceType, { enabled: Boolean(deviceType) })
+  const rows = useMemo(() => {
+    if (!allowedPointNos) {
+      return allRows
+    }
+    return filterOpsDeviceRowsByPointNos(allRows, allowedPointNos)
+  }, [allRows, allowedPointNos])
 
   useEffect(() => {
     window.localStorage.setItem(OPS_SYSTEM_TYPE_STORAGE_KEY, String(systemType))

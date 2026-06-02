@@ -1,5 +1,5 @@
 // 系统选择与配置页面数据
-let state = {
+const INITIAL_GUIDE_STATE = {
   // 系统选择与配置
   projectTypeId: '1',
   heatPump: '7',
@@ -28,6 +28,12 @@ let state = {
   terminalCirculationPumpSpare: '1',
   terminalCirculationPumpMode: '定频',
 }
+
+function createInitialState() {
+  return { ...INITIAL_GUIDE_STATE }
+}
+
+let state = createInitialState()
 
 const listeners = new Set()
 
@@ -69,6 +75,11 @@ function setTerminalLoopPumpConfig(config) {
   setState(config)
 }
 
+function resetGuideState() {
+  state = createInitialState()
+  listeners.forEach((listener) => listener())
+}
+
 export const guideStore = {
   getState,
   setState,
@@ -79,4 +90,5 @@ export const guideStore = {
   setAreaSelection,
   setHeatPumpLoopPumpConfig,
   setTerminalLoopPumpConfig,
+  resetGuideState,
 }

@@ -9,6 +9,20 @@ const ARCHIVE_DIR_NAME = 'archives'
 const ARCHIVE_META_FILE = 'archives.json'
 const MANUAL_DIR_NAME = 'manuals'
 const MANUAL_META_FILE = 'system-manual.json'
+const FEATURE_SETTINGS_STORE_KEY = 'settings'
+
+let featureSettingsStore = null
+
+function getFeatureSettingsStore() {
+  if (!featureSettingsStore) {
+    // eslint-disable-next-line global-require
+    const Store = require('electron-store')
+    featureSettingsStore = new Store({
+      name: 'home-feature-settings',
+    })
+  }
+  return featureSettingsStore
+}
 
 function formatFileSize(size) {
   if (!Number.isFinite(size) || size <= 0) {
@@ -229,6 +243,21 @@ ipcMain.handle('manual:get', async () => {
     ...record,
     fileUrl: pathToFileURL(record.filePath).href,
   }
+})
+
+ipcMain.handle('feature-settings:get', () => {
+  const store = getFeatureSettingsStore()
+  return store.get(FEATURE_SETTINGS_STORE_KEY, null)
+})
+
+ipcMain.handle('feature-settings:set', (_event, settings) => {
+  if (!settings || typeof settings !== 'object') {
+    return { ok: false, message: '设置数据无效' }
+  }
+
+  const store = getFeatureSettingsStore()
+  store.set(FEATURE_SETTINGS_STORE_KEY, settings)
+  return { ok: true }
 })
 
 ipcMain.handle('manual:replace', async (_event, file) => {

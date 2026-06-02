@@ -16,6 +16,35 @@ const LEGEND_ITEMS = [
   { label: '目标回水温度', color: TARGET_COLOR },
 ]
 
+const Y_AXIS_ABS_MIN = 0
+const Y_AXIS_ABS_MAX = 80
+const Y_AXIS_FALLBACK = { min: 0, max: 50, interval: 10 }
+
+function computeTempYAxisRange(...seriesLists) {
+  const values = seriesLists.flat().filter((value) => Number.isFinite(value))
+  if (values.length === 0) {
+    return Y_AXIS_FALLBACK
+  }
+
+  const dataMin = Math.min(...values)
+  const dataMax = Math.max(...values)
+  const span = Math.max(dataMax - dataMin, 4)
+  const padding = Math.max(span * 0.1, 2)
+
+  let min = Math.floor(dataMin - padding)
+  let max = Math.ceil(dataMax + padding)
+
+  min = Math.max(min, Y_AXIS_ABS_MIN)
+  max = Math.min(max, Y_AXIS_ABS_MAX)
+
+  if (min >= max) {
+    return Y_AXIS_FALLBACK
+  }
+
+  const interval = span <= 10 ? 2 : span <= 20 ? 5 : 10
+  return { min, max, interval }
+}
+
 function RealTimeTemperatureChart({
   labels = DEFAULT_X_AXIS_DATA,
   supplySeries = DEFAULT_SUPPLY_DATA,
@@ -34,6 +63,7 @@ function RealTimeTemperatureChart({
     const supplyData = Array.isArray(supplySeries) && supplySeries.length > 0 ? supplySeries : DEFAULT_SUPPLY_DATA
     const returnData = Array.isArray(returnSeries) && returnSeries.length > 0 ? returnSeries : DEFAULT_RETURN_DATA
     const targetData = Array.isArray(targetSeries) && targetSeries.length > 0 ? targetSeries : DEFAULT_TARGET_DATA
+    const yAxisRange = computeTempYAxisRange(supplyData, returnData, targetData)
     const chart = echarts.init(chartRef.current)
     chart.setOption({
       animation: false,
@@ -85,9 +115,9 @@ function RealTimeTemperatureChart({
       },
       yAxis: {
         type: 'value',
-        min: 20,
-        max: 50,
-        interval: 10,
+        min: yAxisRange.min,
+        max: yAxisRange.max,
+        interval: yAxisRange.interval,
         axisLine: { show: false },
         axisTick: { show: false },
         axisLabel: {

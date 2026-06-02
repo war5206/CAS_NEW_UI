@@ -7,6 +7,7 @@
  *
  * Optional input:
  *   data.maxRetry: default 3
+ *   data.dbCode: tenant DB code when invoked by scheduler/cron (no PtUser in ThreadLocal)
  */
 
 import com.alibaba.fastjson.JSON;
@@ -24,8 +25,22 @@ FeignSolAlgorithmProcess sol = ApplicationContextProvider.getBean(FeignSolAlgori
 SnowFlake idWorker = new SnowFlake();
 
 PtUser ptUser = ThreadLocalUtil.getCurrentUser();
-String dbCode = ptUser.dbCode;
-if (dbCode.equals("base")) {
+String dbCode = null;
+if (ptUser != null && ptUser.dbCode != null) {
+    String fromUser = ptUser.dbCode.toString().trim();
+    if (!fromUser.isEmpty()) dbCode = fromUser;
+}
+if (dbCode == null || dbCode.isEmpty()) {
+    Object dc = data.get("dbCode");
+    dbCode = dc != null ? dc.toString().trim() : null;
+}
+if (dbCode == null || dbCode.isEmpty()) {
+    data.put("state", "fail");
+    data.put("message", "missing dbCode: cron/scheduler calls must pass data.dbCode when no login user context exists");
+    data.put("results", new ArrayList<>());
+    return data;
+}
+if ("base".equals(dbCode)) {
     dbCode = "t01";
 }
 
@@ -119,8 +134,19 @@ String executeDate = new java.text.SimpleDateFormat("yyyy-MM-dd").format(now.get
 int maxRetry = data.get("maxRetry") == null ? 3 : Integer.parseInt(data.get("maxRetry").toString());
 
 List<Map<String, Object>> results = new ArrayList<>();
+String constantSetTempLongName = "Sys\\FinforWorx\\SetTemperature1";
 
 try {
+    try {
+        Object runModeResponse = callAlgorithm("queryRealvalByLongNames", ["longNames": "Sys\\FinforWorx\\HPTotalRunMode"]);
+        Map<String, String> runModeMap = extractRealValueMap(runModeResponse, ["Sys\\FinforWorx\\HPTotalRunMode"]);
+        String hpTotalRunMode = runModeMap.get("Sys\\FinforWorx\\HPTotalRunMode");
+        if (hpTotalRunMode != null && hpTotalRunMode.trim().equals("0")) {
+            constantSetTempLongName = "Sys\\FinforWorx\\SetTemperature2";
+        }
+    } catch (Exception ignored) {
+    }
+
     String matchSql = "SELECT p.id AS plan_id,c.id AS cycle_id,pr.id AS period_id,p.plan_name,c.days,pr.start_minute,pr.end_minute,pr.mode,pr.temperature " +
             "FROM smart_timer_plan p " +
             "INNER JOIN smart_timer_cycle c ON c.plan_id=p.id AND c.deleted=0 " +
@@ -185,6 +211,9 @@ try {
         List<String> longNames = new ArrayList<>();
         for (Map<String, Object> action : actions) {
             String longName = action.get("long_name").toString();
+            if (longName.equals("Sys\\FinforWorx\\SetTemperature1") || longName.equals("Sys\\FinforWorx\\SetTemperature2")) {
+                longName = constantSetTempLongName;
+            }
             String writeValue = action.get("write_value").toString();
             writeData.put(longName, writeValue);
             longNames.add(longName);

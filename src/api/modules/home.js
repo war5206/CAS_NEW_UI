@@ -1,6 +1,5 @@
 import { post } from '../client/http'
 import { getApiBaseUrl, getAlgorithmProcessPath, ALGORITHM_PROCESS_IDS } from '../client/config'
-import { adaptScreenData } from '../adapters/screen'
 import { adaptSetOperationPasswordResponse, adaptLoginVerificationResponse } from '../adapters/auth'
 import { adaptGuideResponse } from '../adapters/guide'
 
@@ -37,11 +36,7 @@ export async function queryAllHeatPumpParam(paramData) {
 }
 
 export async function queryScreenData() {
-  const response = await callAlgorithmProcess(ALGORITHM_PROCESS_IDS.SCREEN_DATA, {})
-  return {
-    ...response,
-    data: adaptScreenData(response.data)
-  }
+  return callAlgorithmProcess(ALGORITHM_PROCESS_IDS.SCREEN_DATA, {})
 }
 
 /**
@@ -121,8 +116,11 @@ export async function saveTerminalCirculatingPumpConfig(projectData) {
   }
 }
 
-export async function scanDeviceState(type = '') {
-  return callAlgorithmProcess(ALGORITHM_PROCESS_IDS.SCAN_DEVICE_STATE, { type })
+export async function scanDeviceState(type = '', scanConfig = {}) {
+  return callAlgorithmProcess(ALGORITHM_PROCESS_IDS.SCAN_DEVICE_STATE, {
+    type,
+    ...scanConfig,
+  })
 }
 
 export async function saveDeviceArrange(deviceArrange = []) {

@@ -72,6 +72,17 @@ export function getCurrentDateInfo() {
   }
 }
 
+/** 本地时区当前日历月，`YYYY-MM` */
+export function getDefaultCalendarMonthValue(date = new Date()) {
+  return `${date.getFullYear()}-${padMonthDay(date.getMonth() + 1)}`
+}
+
+export function addCalendarMonths(yyyyMm, deltaMonths) {
+  const { year, month } = parseMonthValue(yyyyMm)
+  const shifted = new Date(year, month - 1 + deltaMonths, 1)
+  return `${shifted.getFullYear()}-${padMonthDay(shifted.getMonth() + 1)}`
+}
+
 export function getMaxAvailableDay(monthValue, currentDateInfo = getCurrentDateInfo()) {
   const { year, month } = parseMonthValue(monthValue)
 

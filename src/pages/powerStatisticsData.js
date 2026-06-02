@@ -2,6 +2,7 @@ import {
   enumerateMonthRange,
   formatMonthAxisLabel,
   getCurrentDateInfo,
+  getDefaultCalendarMonthValue,
   getMaxAvailableDay,
   getMonthDayCount,
 } from '../utils/analysisFilterUtils'
@@ -195,7 +196,7 @@ function buildStackedSeries(labels, distributions, totals, xAxisName) {
 }
 
 function buildDaySeries(range, factor, energyPriceState) {
-  const monthValue = range.month || '2026-03'
+  const monthValue = range.month || getDefaultCalendarMonthValue()
   const days = getMonthDayCount(monthValue)
   const maxAvailableDay = getMaxAvailableDay(monthValue, getCurrentDateInfo())
   const labels = Array.from({ length: days }, (_, index) => `${index + 1}日`)
