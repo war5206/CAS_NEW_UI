@@ -18,8 +18,9 @@ import {
   HEAT_PUMP_STATUS,
   HEAT_PUMP_STATUS_LABEL,
 } from '../config/homeHeatPumps'
-import { createUnitGridItem, resolveUnitDisplayLabelFromCode } from '../config/projectUnitDevices'
+import { createUnitGridItem, resolveUnitDisplayLabelFromCode, toUnitDeviceCode } from '../config/projectUnitDevices'
 import { UNIT_DEVICE_OVERVIEW_METRIC_KEYS } from '../config/unitDeviceParamPoints'
+import { useHeatPumpBoardStatusPoll } from '../hooks/useHeatPumpBoardStatusPoll'
 import { useHeatPumpArrangeQuery } from '../features/home/hooks/useHeatPumpArrangeQuery'
 import { useHeatPumpOverviewQuery } from '../features/home/hooks/useHeatPumpOverviewQuery'
 import { useHeatPumpParamQuery } from '../features/home/hooks/useHeatPumpParamQuery'
@@ -75,12 +76,38 @@ const HEAT_PUMP_OVERVIEW_TEXT = {
   TIP: '蓝色设备运行中，红色设备有故障，灰色设备已待机，黄色设备正在化霜；点击热泵可查看详情。',
 }
 
+function applyLiveStatusToBoardItem(item, liveStatusByCode) {
+  if (item.status === HEAT_PUMP_STATUS.EMPTY) {
+    return item
+  }
+
+  const deviceCode = item.code ?? (item.id != null ? toUnitDeviceCode(item.id) : null)
+  if (!deviceCode) {
+    return item
+  }
+
+  const liveStatus = liveStatusByCode.get(deviceCode)
+  if (!liveStatus) {
+    return { ...item, code: deviceCode }
+  }
+
+  return {
+    ...item,
+    code: deviceCode,
+    alarm: liveStatus.alarm,
+    run: liveStatus.run,
+    state: liveStatus.state,
+    status: liveStatus.status,
+  }
+}
+
 function HomeHeatPumpOverview({ onBack, committedUnitLayoutSlots, heatPumpItems: externalHeatPumpItems = null }) {
   const [activePump, setActivePump] = useState(null)
   const [pendingPump, setPendingPump] = useState(null)
   const [isOverviewModalOpen, setIsOverviewModalOpen] = useState(false)
   const [overviewPage, setOverviewPage] = useState(1)
   const { data: arrangedHeatPumpItems } = useHeatPumpArrangeQuery()
+  const liveStatusByCode = useHeatPumpBoardStatusPoll()
   const { data: pendingPumpWithParam, isError: isPumpParamError } = useHeatPumpParamQuery({
     pump: pendingPump,
     enabled: Boolean(pendingPump),
@@ -146,42 +173,43 @@ function HomeHeatPumpOverview({ onBack, committedUnitLayoutSlots, heatPumpItems:
   )
 
   const boardHeatPumpItems = useMemo(() => {
+    let items = EMPTY_GRID_ITEMS
+
     if (Array.isArray(arrangedHeatPumpItems) && arrangedHeatPumpItems.length > 0) {
-      return arrangedHeatPumpItems
-    }
+      items = arrangedHeatPumpItems
+    } else if (Array.isArray(committedUnitLayoutSlots) && committedUnitLayoutSlots.length > 0) {
+      items = Array.from({ length: HEAT_PUMP_GRID_ROWS * HEAT_PUMP_GRID_COLS }, (_, index) => {
+        const row = Math.floor(index / HEAT_PUMP_GRID_COLS) + 1
+        const col = (index % HEAT_PUMP_GRID_COLS) + 1
+        const pumpId = committedUnitLayoutSlots[index]
 
-    if (!Array.isArray(committedUnitLayoutSlots) || committedUnitLayoutSlots.length === 0) {
-      return EMPTY_GRID_ITEMS
-    }
+        if (pumpId) {
+          const mapped = createUnitGridItem(pumpId)
+          return {
+            ...mapped,
+            row,
+            col,
+            code: toUnitDeviceCode(pumpId),
+            status: HEAT_PUMP_STATUS.EMPTY,
+            key: `hp-layout-${mapped.id}-${row}-${col}`,
+          }
+        }
 
-    return Array.from({ length: HEAT_PUMP_GRID_ROWS * HEAT_PUMP_GRID_COLS }, (_, index) => {
-      const row = Math.floor(index / HEAT_PUMP_GRID_COLS) + 1
-      const col = (index % HEAT_PUMP_GRID_COLS) + 1
-      const pumpId = committedUnitLayoutSlots[index]
-
-      if (pumpId) {
-        const mapped = createUnitGridItem(pumpId)
         return {
-          ...mapped,
+          key: `hp-layout-empty-${row}-${col}`,
+          id: null,
           row,
           col,
           status: HEAT_PUMP_STATUS.EMPTY,
-          key: `hp-layout-${mapped.id}-${row}-${col}`,
+          label: null,
+          name: null,
+          details: [],
         }
-      }
+      })
+    }
 
-      return {
-        key: `hp-layout-empty-${row}-${col}`,
-        id: null,
-        row,
-        col,
-        status: HEAT_PUMP_STATUS.EMPTY,
-        label: null,
-        name: null,
-        details: [],
-      }
-    })
-  }, [arrangedHeatPumpItems, committedUnitLayoutSlots, externalHeatPumpItems])
+    return items.map((item) => applyLiveStatusToBoardItem(item, liveStatusByCode))
+  }, [arrangedHeatPumpItems, committedUnitLayoutSlots, liveStatusByCode])
 
   const totalOverviewPages = Math.max(1, overviewPageData.totalPages || 1)
   const pagedHeatPumps = overviewPageData.list

@@ -670,14 +670,12 @@ if(dt.getRows().size() == 1){
 }
 optionalMap.put("ZNDS", ZNDS);
 
-// 目标回水温度
-if (QHBC.equals("开启")) {
-    pointSql = "SELECT a.taglongname,a.times,a.realval,a.quality FROM psrealdata AS a WHERE a.taglongname IN ('Sys\\FinforWorx\\TargetBackwaterTemperature')";
-} else if (hpTotalRunMode.equals("0")) {
-    pointSql = "SELECT a.taglongname,a.times,a.realval,a.quality FROM psrealdata AS a WHERE a.taglongname IN ('Sys\\FinforWorx\\SetTemperature2')";
-} else {
-    pointSql = "SELECT a.taglongname,a.times,a.realval,a.quality FROM psrealdata AS a WHERE a.taglongname IN ('Sys\\FinforWorx\\SetTemperature1')";
+// 目标回水温度：气候补偿开 → TargetBackwaterTemperature，关（定温）→ SetTemperature1
+String targetBackwaterTempLongName = "Sys\\FinforWorx\\SetTemperature1";
+if (qhbcValue.equals("1")) {
+    targetBackwaterTempLongName = "Sys\\FinforWorx\\TargetBackwaterTemperature";
 }
+pointSql = "SELECT a.taglongname,a.times,a.realval,a.quality FROM psrealdata AS a WHERE a.taglongname IN ('" + targetBackwaterTempLongName + "')";
 
 dt = dataService.queryListDataBySql(pointSql);
 BigDecimal targetBackwaterTemperature = new BigDecimal("-100");
@@ -692,6 +690,7 @@ if(dt.getRows().size() == 1){
         }
     }
 }
+optionalMap.put("targetBackwaterTempLongName", targetBackwaterTempLongName);
 optionalMap.put("targetBackwaterTemperature", targetBackwaterTemperature + "℃");
 
 data.put("optional", optionalMap);

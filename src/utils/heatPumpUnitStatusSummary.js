@@ -1,5 +1,6 @@
 import { getUnitStatusPointLongNames } from '@/config/heatPumpUnitStatusPoints'
 import { isOnValue } from '@/utils/realvalMap'
+import { hasRuntimeFault } from '@/utils/heatPumpRuntimeStatus'
 
 export const EMPTY_UNIT_STATUS_SUMMARY = {
   running: 0,
@@ -20,7 +21,11 @@ export function summarizeUnitRange(valueMap, { startNo, count }) {
     const longNames = getUnitStatusPointLongNames(pointNo)
     const isRunning = isOnValue(valueMap[longNames.operation])
     const isDefrosting = isOnValue(valueMap[longNames.defrosting])
-    const isFault = isOnValue(valueMap[longNames.fault])
+    const isFault = hasRuntimeFault({
+      faultAlarm: valueMap[longNames.fault],
+      commStatus: valueMap[longNames.commStatus],
+      includeCommStatus: true,
+    })
 
     if (isRunning) {
       summary.running += 1

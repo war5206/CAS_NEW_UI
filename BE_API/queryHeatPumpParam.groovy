@@ -77,6 +77,19 @@ def isPointValueOne = { String pointValue ->
     }
 };
 
+def formatPowerOnValue = { String rawVal ->
+    if (rawVal == null || rawVal == "") {
+        return "--";
+    }
+    if ("1".equals(rawVal)) {
+        return "开";
+    }
+    if ("0".equals(rawVal)) {
+        return "关";
+    }
+    return "--";
+};
+
 def formatParamValue = { String key, String rawVal ->
     if (rawVal == null || rawVal == "") {
         return "--";
@@ -91,7 +104,7 @@ def formatParamValue = { String key, String rawVal ->
         return rawVal;
     }
     if ("开关机".equals(key)) {
-        return isPointValueOne(rawVal) ? "开" : "关";
+        return formatPowerOnValue(rawVal);
     }
     return rawVal;
 };
@@ -108,10 +121,13 @@ def buildCombinedState = { boolean run, boolean defrost, boolean fault ->
     return String.join("/", parts);
 };
 
+// Systematic_Defrosting=1 → 化霜；Fault_Alarm=1 → 故障；Comm_Status 不为 1 → 通讯故障
 def readDeviceStatus = { String deviceCode ->
     boolean run = isPointValueOne(getPointRealVal(structure + brand + deviceCode + "\\Machine_Operation"));
     boolean defrost = isPointValueOne(getPointRealVal(structure + brand + deviceCode + "\\Systematic_Defrosting"));
-    boolean fault = isPointValueOne(getPointRealVal(structure + brand + deviceCode + "\\Fault_Alarm"));
+    boolean faultAlarm = isPointValueOne(getPointRealVal(structure + brand + deviceCode + "\\Fault_Alarm"));
+    boolean commNormal = isPointValueOne(getPointRealVal(structure + brand + deviceCode + "\\Comm_Status"));
+    boolean fault = faultAlarm || !commNormal;
     Map statusMap = new HashMap();
     statusMap.put("run", run);
     statusMap.put("defrost", defrost);
@@ -153,6 +169,7 @@ for (String key : dataMap.keySet()) {
 
 data.put("alarm", fault);
 data.put("run", run);
+data.put("defrost", defrost);
 data.put("state", statusMap.get("state"));
 data.put("heatPumpData", heatPumpDataMap);
 data.put("code", deviceCode);

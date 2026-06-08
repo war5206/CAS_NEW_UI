@@ -1,7 +1,7 @@
 const TEMPERATURE_MODE_KEY = 'cas_temperature_mode'
 
 export const CONSTANT_SET_TEMP_LONG_NAME_HEATING = 'Sys\\FinforWorx\\SetTemperature1'
-export const CONSTANT_SET_TEMP_LONG_NAME_COOLING = 'Sys\\FinforWorx\\SetTemperature2'
+export const CONSTANT_SET_TEMP_LONG_NAME_COOLING = 'Sys\\FinforWorx\\SetTemperature1'
 
 export function getConstantSetTempLongName(mode) {
   return mode === 'cooling' ? CONSTANT_SET_TEMP_LONG_NAME_COOLING : CONSTANT_SET_TEMP_LONG_NAME_HEATING

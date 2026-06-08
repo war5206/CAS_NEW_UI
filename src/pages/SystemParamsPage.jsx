@@ -7,31 +7,39 @@ import SystemParamsEnergyPrice from '../components/systemParams/SystemParamsEner
 import SystemParamsUnitLayout from '../components/systemParams/SystemParamsUnitLayout'
 import { CITY_DATA, PROVINCE_ORDER } from '@/shared/constants/areaData'
 import {
-  adaptCoupleEnergyFromQueryResponse,
   adaptCirculationPumpFromQueryResponse,
-  adaptMotherboardFromQueryResponse,
   adaptProjectDataFromQueryResponse,
   createDefaultLoopPumpForm,
   createDefaultProjectForm,
   findProvinceNameByCode,
-  resolveCouplingEnergyTypeLabel,
-  toSaveCoupleEnergyPayload,
-  toUpdateMotherboardPayload,
   toSaveCirculationPumpPayload,
   toSaveProjectDataPayload,
 } from '@/api/adapters/systemParamsProject'
 import {
-  queryCoupleEnergy,
+  COUPLING_ENERGY_LABEL_TO_ID,
+  COUPLING_ENERGY_TYPE_OPTIONS,
+  COUPLE_ENERGY_TYPE_NONE_ID,
+  adaptCouplingEnergyFromRealvalMap,
+  COUPLING_ENERGY_REALVAL_LONG_NAMES,
+  toCouplingEnergyRealvalWriteData,
+} from '@/config/couplingEnergyTypes'
+import {
+  MAINBOARD_OPTIONS,
+  MAINBOARD_OPTIONS_MAP,
+  MAINBOARD_REALVAL_LONG_NAMES,
+  adaptMainboardFromRealvalMap,
+  toMainboardRealvalWriteData,
+} from '@/config/mainboardTypes'
+import {
   queryCirculationPump,
-  queryMotherboardData,
   queryProjectData,
   queryRealvalByLongNames,
   saveCirculationPump,
-  saveCoupleEnergy,
   saveProjectData,
-  updateMotherboardData,
+  writeRealvalByLongNames,
 } from '@/api/modules/settings'
-import { isWriteSuccess } from '@/hooks/useWriteWithDelayedVerify'
+import { extractRealvalMap } from '@/utils/realvalMap'
+import { isWriteSuccess, useWriteWithDelayedVerify } from '@/hooks/useWriteWithDelayedVerify'
 import basicSettingWaterPumpIcon from '../assets/basic-setting-water-pump.svg'
 import basicSettingHpPositionIcon from '../assets/basic-setting-hp-position.svg'
 import basicSettingSystemTypeIcon from '../assets/basic-setting-system-type.svg'
@@ -50,11 +58,6 @@ const MODULE_ITEMS = [
   { key: 'energy-price', label: '能源价格' },
   { key: 'coupling-energy', label: '耦合能源' },
 ]
-
-const MAINBOARD_OPTIONS_MAP = {
-  '1': { value: '1', label: '自制主板' },
-  '2': { value: '2', label: '精创主板' },
-}
 
 const PROJECT_TYPE_OPTIONS = [
   { value: '1', label: '采暖' },
@@ -91,23 +94,6 @@ const TERMINAL_PUMP_MODE_OPTIONS = [
   { value: '变频', label: '变频' },
 ]
 
-const COUPLE_ENERGY_TYPE_NONE_ID = '5'
-const COUPLING_ENERGY_OPTIONS = [
-  { id: '1', label: '电锅炉' },
-  { id: '2', label: '燃气锅炉' },
-  { id: '3', label: '水源热泵' },
-  { id: '4', label: '风冷模块' },
-  { id: '5', label: '无耦合能源' },
-]
-const COUPLING_ENERGY_LABEL_TO_ID = COUPLING_ENERGY_OPTIONS.reduce((acc, item) => {
-  acc[item.label] = item.id
-  return acc
-}, {})
-const COUPLING_ENERGY_ID_TO_LABEL = COUPLING_ENERGY_OPTIONS.reduce((acc, item) => {
-  acc[item.id] = item.label
-  return acc
-}, {})
-
 const PROVINCE_OPTIONS = PROVINCE_ORDER.filter((name) => CITY_DATA[name]?.cities?.length).map((name) => ({
   value: CITY_DATA[name].province_code,
   label: name,
@@ -128,18 +114,6 @@ const CARD_ICON_MAP = {
   'loop-pump-count': basicSettingWaterPumpIcon,
   'unit-layout': basicSettingHpPositionIcon,
   'energy-price': basicSettingEnergyPriceIcon,
-}
-
-let motherboardDataRequestPromise = null
-
-function queryMotherboardDataOnce() {
-  if (!motherboardDataRequestPromise) {
-    motherboardDataRequestPromise = queryMotherboardData().catch((error) => {
-      motherboardDataRequestPromise = null
-      throw error
-    })
-  }
-  return motherboardDataRequestPromise
 }
 
 const initialProjectForm = createDefaultProjectForm()
@@ -203,8 +177,6 @@ function SystemParamsPage({
 }) {
   const [activeView, setActiveView] = useState('overview')
   const [mainboard, setMainboard] = useState('')
-  const [mainboardOptions, setMainboardOptions] = useState(() => Object.values(MAINBOARD_OPTIONS_MAP))
-  const [mainboardRecordId, setMainboardRecordId] = useState('')
   const [mainboardDataLoading, setMainboardDataLoading] = useState(false)
   const [mainboardSaveLoading, setMainboardSaveLoading] = useState(false)
   const [projectForm, setProjectForm] = useState(() => deepClone(initialProjectForm))
@@ -215,12 +187,26 @@ function SystemParamsPage({
   const [savedSimpleForms, setSavedSimpleForms] = useState(() => deepClone(initialSimpleForms))
   const [couplingEnergyState, setCouplingEnergyState] = useState(() => deepClone(initialCouplingEnergyState))
   const [savedCouplingEnergyState, setSavedCouplingEnergyState] = useState(() => deepClone(initialCouplingEnergyState))
-  const [couplingEnergyRecordId, setCouplingEnergyRecordId] = useState('')
-  const [couplingEnergyProjectId, setCouplingEnergyProjectId] = useState('')
   const [couplingEnergySaveLoading, setCouplingEnergySaveLoading] = useState(false)
   const [keypadState, setKeypadState] = useState({ open: false, field: null, moduleKey: null })
   const [datePickerField, setDatePickerField] = useState(null)
   const [confirmDialog, setConfirmDialog] = useState({ open: false, mode: null, targetView: null, title: '', message: '' })
+
+  const notifyMainboardWrite = useCallback((message) => {
+    setConfirmDialog({
+      open: true,
+      mode: 'alert',
+      targetView: null,
+      title: '提示',
+      message,
+    })
+  }, [])
+
+  const { performWrite: performMainboardWrite } = useWriteWithDelayedVerify({
+    write: writeRealvalByLongNames,
+    onNotify: notifyMainboardWrite,
+  })
+
   const [unitLayoutDirty, setUnitLayoutDirty] = useState(false)
   const [energyPriceDirty, setEnergyPriceDirty] = useState(false)
   const [projectDataLoading, setProjectDataLoading] = useState(false)
@@ -252,22 +238,30 @@ function SystemParamsPage({
   }, [datePickerField, projectForm])
 
   const loadCouplingEnergy = useCallback(async () => {
-    const response = await queryCoupleEnergy()
-    const next = adaptCoupleEnergyFromQueryResponse(response)
+    const response = await queryRealvalByLongNames(COUPLING_ENERGY_REALVAL_LONG_NAMES)
+    const valueMap = extractRealvalMap(response)
+    const next = adaptCouplingEnergyFromRealvalMap(valueMap)
     if (!next) {
       return null
     }
-    const typeLabel = resolveCouplingEnergyTypeLabel({ typeId: next.typeId, typeName: next.typeName })
-    const normalizedCount = typeLabel === '无耦合能源' ? '0' : next.count
     const nextState = {
-      type: typeLabel,
-      count: normalizedCount,
+      type: next.type,
+      count: next.count,
     }
     setCouplingEnergyState(nextState)
     setSavedCouplingEnergyState(deepClone(nextState))
-    setCouplingEnergyRecordId(next.id)
-    setCouplingEnergyProjectId(next.projectId)
     return nextState
+  }, [])
+
+  const loadMainboard = useCallback(async () => {
+    const response = await queryRealvalByLongNames(MAINBOARD_REALVAL_LONG_NAMES)
+    const valueMap = extractRealvalMap(response)
+    const next = adaptMainboardFromRealvalMap(valueMap)
+    if (!next) {
+      return null
+    }
+    setMainboard(next.value)
+    return next.value
   }, [])
 
   useEffect(() => {
@@ -284,19 +278,13 @@ function SystemParamsPage({
     ;(async () => {
       setMainboardDataLoading(true)
       try {
-        const response = await queryMotherboardDataOnce()
-        const next = adaptMotherboardFromQueryResponse(response)
-        if (cancelled || !next) {
+        const nextValue = await loadMainboard()
+        if (cancelled || !nextValue) {
           return
         }
-        setMainboard(next.value)
-        setMainboardRecordId(next.id)
-        setMainboardOptions(next.options)
       } catch {
         if (!cancelled) {
           setMainboard('1')
-          setMainboardRecordId('')
-          setMainboardOptions(Object.values(MAINBOARD_OPTIONS_MAP))
         }
       } finally {
         if (!cancelled) {
@@ -307,7 +295,7 @@ function SystemParamsPage({
     return () => {
       cancelled = true
     }
-  }, [])
+  }, [loadMainboard])
 
   useEffect(() => {
     let cancelled = false
@@ -372,44 +360,23 @@ function SystemParamsPage({
     if (!MAINBOARD_OPTIONS_MAP[normalizedValue]) {
       return
     }
+    const previousValue = mainboard
+    setMainboard(normalizedValue)
     setMainboardSaveLoading(true)
-    void (async () => {
-      try {
-        const payload = toUpdateMotherboardPayload({
-          id: mainboardRecordId,
-          motherboardModel: normalizedValue,
-        })
-        const saveRes = await updateMotherboardData(payload)
-        if (isWriteSuccess(saveRes)) {
-          setMainboard(normalizedValue)
-          setConfirmDialog({
-            open: true,
-            mode: 'alert',
-            targetView: null,
-            title: '提示',
-            message: '保存成功',
-          })
-          return
+    void performMainboardWrite(toMainboardRealvalWriteData(normalizedValue), {
+      optimisticApply: () => setMainboard(normalizedValue),
+      delayedVerify: loadMainboard,
+      successMessage: '保存成功',
+      errorMessage: '保存失败，请重试',
+    })
+      .then((ok) => {
+        if (!ok && previousValue) {
+          setMainboard(previousValue)
         }
-        setConfirmDialog({
-          open: true,
-          mode: 'alert',
-          targetView: null,
-          title: '提示',
-          message: '保存失败',
-        })
-      } catch {
-        setConfirmDialog({
-          open: true,
-          mode: 'alert',
-          targetView: null,
-          title: '提示',
-          message: '保存失败，请检查网络',
-        })
-      } finally {
+      })
+      .finally(() => {
         setMainboardSaveLoading(false)
-      }
-    })()
+      })
   }
 
   useEffect(() => {
@@ -796,20 +763,14 @@ function SystemParamsPage({
         setCouplingEnergySaveLoading(true)
         void (async () => {
           try {
-            const selectedTypeId = COUPLING_ENERGY_LABEL_TO_ID[couplingEnergyState.type] || ''
+            const selectedTypeId = COUPLING_ENERGY_LABEL_TO_ID[couplingEnergyState.type] || COUPLE_ENERGY_TYPE_NONE_ID
             const normalizedState = {
               type: couplingEnergyState.type,
               count: selectedTypeId === COUPLE_ENERGY_TYPE_NONE_ID ? '0' : String(couplingEnergyState.count ?? '0'),
             }
-            const payload = toSaveCoupleEnergyPayload({
-              coupleEnergyTypeId: selectedTypeId,
-              id: couplingEnergyRecordId,
-              projectId: couplingEnergyProjectId,
-              coupleEnergyNumber: normalizedState.count,
-            })
-            const saveRes = await saveCoupleEnergy(payload)
-            const state = String(saveRes?.data?.data?.state ?? '')
-            if (state !== 'success') {
+            const writePayload = toCouplingEnergyRealvalWriteData(selectedTypeId, normalizedState.count)
+            const saveRes = await writeRealvalByLongNames(writePayload)
+            if (!isWriteSuccess(saveRes)) {
               setConfirmDialog({
                 open: true,
                 mode: 'alert',
@@ -819,9 +780,13 @@ function SystemParamsPage({
               })
               return
             }
-            // 保存成功后先本地提交，避免后端读接口短暂延迟导致概览摘要回退为旧值。
             setCouplingEnergyState(normalizedState)
             setSavedCouplingEnergyState(deepClone(normalizedState))
+            try {
+              await loadCouplingEnergy()
+            } catch {
+              // 回读失败时保留已下置的本地状态
+            }
             closeConfirmDialog()
             setConfirmDialog({
               open: true,
@@ -944,7 +909,7 @@ function SystemParamsPage({
         </span>
         <SelectDropdown
           value={mainboard}
-          options={mainboardOptions}
+          options={MAINBOARD_OPTIONS}
           onChange={handleMainboardChange}
           triggerAriaLabel="选择主板类型"
           className="system-params-select"
@@ -1160,7 +1125,7 @@ function SystemParamsPage({
       <div className="coupling-energy-detail">
         <div className="coupling-energy-detail__label">能源类型</div>
         <div className="coupling-energy-detail__types">
-          {COUPLING_ENERGY_OPTIONS.map((item) => (
+          {COUPLING_ENERGY_TYPE_OPTIONS.map((item) => (
             <button
               key={item.id}
               type="button"

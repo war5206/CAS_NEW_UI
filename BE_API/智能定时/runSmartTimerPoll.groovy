@@ -137,16 +137,6 @@ List<Map<String, Object>> results = new ArrayList<>();
 String constantSetTempLongName = "Sys\\FinforWorx\\SetTemperature1";
 
 try {
-    try {
-        Object runModeResponse = callAlgorithm("queryRealvalByLongNames", ["longNames": "Sys\\FinforWorx\\HPTotalRunMode"]);
-        Map<String, String> runModeMap = extractRealValueMap(runModeResponse, ["Sys\\FinforWorx\\HPTotalRunMode"]);
-        String hpTotalRunMode = runModeMap.get("Sys\\FinforWorx\\HPTotalRunMode");
-        if (hpTotalRunMode != null && hpTotalRunMode.trim().equals("0")) {
-            constantSetTempLongName = "Sys\\FinforWorx\\SetTemperature2";
-        }
-    } catch (Exception ignored) {
-    }
-
     String matchSql = "SELECT p.id AS plan_id,c.id AS cycle_id,pr.id AS period_id,p.plan_name,c.days,pr.start_minute,pr.end_minute,pr.mode,pr.temperature " +
             "FROM smart_timer_plan p " +
             "INNER JOIN smart_timer_cycle c ON c.plan_id=p.id AND c.deleted=0 " +
@@ -211,6 +201,7 @@ try {
         List<String> longNames = new ArrayList<>();
         for (Map<String, Object> action : actions) {
             String longName = action.get("long_name").toString();
+            // 定温回水温度统一写 SetTemperature1；库内遗留 SetTemperature2 动作也归并到该点
             if (longName.equals("Sys\\FinforWorx\\SetTemperature1") || longName.equals("Sys\\FinforWorx\\SetTemperature2")) {
                 longName = constantSetTempLongName;
             }

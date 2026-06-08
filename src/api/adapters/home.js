@@ -7,6 +7,8 @@ import {
 } from '@/config/homeHeatPumps'
 import { getUnitDisplayName, parseUnitDeviceCodeLoose, resolveUnitDisplayLabelFromCode } from '@/config/projectUnitDevices'
 import { createUnitDeviceDetailsFromParam } from '@/config/unitDeviceParamPoints'
+import { isOnValue } from '@/utils/realvalMap'
+import { resolveHeatPumpStatusFromRuntime } from '@/utils/heatPumpRuntimeStatus'
 
 const DEFAULT_TEMPERATURE_LABELS = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9']
 const DEFAULT_SUPPLY_DATA = [42, 43, 44, 38, 37, 42, 43, 40, 36, 35]
@@ -83,8 +85,16 @@ function toText(value, fallback) {
 
 function toBoolean(value, fallback) {
   if (typeof value === 'boolean') return value
-  if (value === 1 || value === '1' || value === 'true') return true
-  if (value === 0 || value === '0' || value === 'false') return false
+  if (value == null || value === '') return fallback
+  if (isOnValue(value)) return true
+  if (value === 0 || value === false) return false
+
+  const text = String(value).trim().toLowerCase()
+  if (text === '0' || text === 'false' || text === 'off') return false
+
+  const numeric = Number(text)
+  if (Number.isFinite(numeric) && numeric === 0) return false
+
   return fallback
 }
 
@@ -94,23 +104,6 @@ function normalizeHeatPumpStatus(value) {
   if (['running', 'run', '1'].includes(normalizedValue)) return HEAT_PUMP_STATUS.RUNNING
   if (['malfunction', 'fault', 'error', '3'].includes(normalizedValue)) return HEAT_PUMP_STATUS.MALFUNCTION
   if (['defrosting', 'defrost', '2'].includes(normalizedValue)) return HEAT_PUMP_STATUS.DEFROSTING
-  return HEAT_PUMP_STATUS.SHUTDOWN
-}
-
-function resolveHeatPumpStatusFromRuntime({ alarm, run, state }) {
-  if (toBoolean(alarm, false)) {
-    return HEAT_PUMP_STATUS.MALFUNCTION
-  }
-
-  const stateText = String(state ?? '').trim()
-  if (stateText.includes('化霜')) {
-    return HEAT_PUMP_STATUS.DEFROSTING
-  }
-
-  if (toBoolean(run, false)) {
-    return HEAT_PUMP_STATUS.RUNNING
-  }
-
   return HEAT_PUMP_STATUS.SHUTDOWN
 }
 
@@ -377,14 +370,16 @@ export function adaptHeatPumpParam(rawData, fallbackPump = {}) {
 
   const alarm = toBoolean(source?.alarm, fallbackPump?.alarm ?? false)
   const run = toBoolean(source?.run, fallbackPump?.run ?? false)
+  const defrost = toBoolean(source?.defrost, fallbackPump?.defrost ?? false)
   const state = toText(source?.state, fallbackPump?.state ?? '')
 
   return {
     ...fallbackPump,
     alarm,
     run,
+    defrost,
     state,
-    status: resolveHeatPumpStatusFromRuntime({ alarm, run, state }),
+    status: resolveHeatPumpStatusFromRuntime({ alarm, run, state, defrost }),
     details: createHeatPumpDetailsFromParam(heatPumpData),
   }
 }

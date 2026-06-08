@@ -4,7 +4,7 @@ import { queryHeatPumpParam } from '@/api/modules/home'
 
 export function useHeatPumpParamQuery({ pump, enabled = true } = {}) {
   return useQuery({
-    queryKey: ['home-heat-pump-param', pump?.code, pump?.alarm, pump?.run, pump?.state],
+    queryKey: ['home-heat-pump-param', pump?.code],
     enabled: Boolean(enabled && pump?.code),
     queryFn: () =>
       queryHeatPumpParam({

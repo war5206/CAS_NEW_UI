@@ -5,7 +5,7 @@ const INITIAL_GUIDE_STATE = {
   heatPump: '7',
   terminalTypeId: '1',
   systemTypeId: '1',
-  coupleEnergyTypeId: '2',
+  coupleEnergyTypeId: '0',
   coupleEnergyNumber: '1',
 
   // 项目基本信息

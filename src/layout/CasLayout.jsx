@@ -17,6 +17,7 @@ import { useSystemConfigStore } from '@/features/system/store/systemConfigStore'
 import { suppressSystemStatusPollFor } from '@/hooks/useGlobalSystemStatusPoll'
 import { useAuthStore } from '@/features/auth/store/authStore'
 import { isRestrictedSettingsUser } from '@/features/auth/userRole'
+import { writeRealvalByLongNames } from '@/api/modules/settings'
 
 const SYSTEM_STATUS_LONG_NAME = 'Sys\\FinforWorx\\SystemStatus'
 const ALERT_INDICATOR_VISIBLE_COUNT = 5

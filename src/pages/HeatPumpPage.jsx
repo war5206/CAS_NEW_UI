@@ -26,6 +26,7 @@ import {
 } from '../config/projectUnitDevices'
 import { extractRealvalMap } from '../utils/realvalMap'
 import { isWriteSuccess, useWriteWithDelayedVerify } from '../hooks/useWriteWithDelayedVerify'
+import { useUnitDeviceStatusPoll } from '../hooks/useUnitDeviceStatusPoll'
 import groupControlIcon from '../assets/heat-pump/heat-pump-group-control.svg'
 import defrostingIcon from '../assets/heat-pump/hp-modal-defrosting.svg'
 import malfunctionIcon from '../assets/heat-pump/hp-modal-malfunction.svg'
@@ -144,6 +145,7 @@ const DEFAULT_DEVICE_RUNTIME = {
   state: '',
   alarm: false,
   run: false,
+  defrost: false,
 }
 
 const DEVICE_STATUS_ICON_MAP = {
@@ -197,6 +199,11 @@ function HeatPumpPage({ deviceModuleType = 'heat-pump' }) {
   })
   const [detailMetrics, setDetailMetrics] = useState(DEFAULT_METRICS)
   const [deviceRuntime, setDeviceRuntime] = useState(DEFAULT_DEVICE_RUNTIME)
+  const polledDeviceRuntime = useUnitDeviceStatusPoll(selectedHeatPumpCode, {
+    enabled: !isGroupControlEnabled && Boolean(selectedHeatPumpCode),
+    intervalMs: POLL_INTERVAL_MS,
+  })
+  const displayDeviceRuntime = polledDeviceRuntime ?? deviceRuntime
 
   const activeParameterRows = useMemo(
     () => (isGroupControlEnabled ? [...FIXED_DEVICE_PARAM_ROWS, ...PROTECTION_PARAM_ROWS] : FIXED_DEVICE_PARAM_ROWS),
@@ -318,6 +325,7 @@ function HeatPumpPage({ deviceModuleType = 'heat-pump' }) {
       state: adapted.state,
       alarm: adapted.alarm,
       run: adapted.run,
+      defrost: adapted.defrost,
     })
   }, [])
 
@@ -518,8 +526,11 @@ function HeatPumpPage({ deviceModuleType = 'heat-pump' }) {
       : `${config.deviceLabel}状态`
   const parameterTitle =
     !isGroupControlEnabled && selectedHeatPumpLabel ? `${selectedHeatPumpLabel}参数设置` : '参数设置'
-  const stateIcon = DEVICE_STATUS_ICON_MAP[deviceRuntime.status] ?? standbyIcon
-  const stateText = deviceRuntime.state || HEAT_PUMP_STATUS_LABEL[deviceRuntime.status] || HEAT_PUMP_STATUS_LABEL[HEAT_PUMP_STATUS.SHUTDOWN]
+  const stateIcon = DEVICE_STATUS_ICON_MAP[displayDeviceRuntime.status] ?? standbyIcon
+  const stateText =
+    displayDeviceRuntime.state ||
+    HEAT_PUMP_STATUS_LABEL[displayDeviceRuntime.status] ||
+    HEAT_PUMP_STATUS_LABEL[HEAT_PUMP_STATUS.SHUTDOWN]
 
   if (!isInitialAttemptDone) {
     return (

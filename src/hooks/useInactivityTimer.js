@@ -1,7 +1,7 @@
 import { useEffect, useRef, useCallback } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 
-const INACTIVITY_TIMEOUT = 30 * 60 * 1000
+const INACTIVITY_TIMEOUT = 1 * 60 * 1000
 
 const EXCLUDED_PREFIXES = ['/auth', '/guide', '/screen-protect']
 

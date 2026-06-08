@@ -11,7 +11,20 @@ export function extractRealvalMap(response) {
   return data
 }
 
-/** 将接口 0/1 或 "0"/"1" 判为开 */
+/** 将接口 0/1、数字或字符串数字、布尔值等统一判为「开」 */
 export function isOnValue(value) {
-  return value === 1 || value === '1'
+  if (value === true || value === 1) return true
+  if (value === false || value === 0 || value == null) return false
+
+  const text = String(value).trim().toLowerCase()
+  if (!text) return false
+  if (text === '1' || text === 'true' || text === 'on') return true
+  if (text === '0' || text === 'false' || text === 'off') return false
+
+  const numeric = Number(text)
+  if (Number.isFinite(numeric)) {
+    return numeric === 1
+  }
+
+  return false
 }

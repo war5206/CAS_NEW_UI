@@ -4,6 +4,10 @@ import './GuidePage.css'
 import GuideOptionButton from '@/components/GuideOptionButton'
 import SliderSettingRow from '@/components/SliderSettingRow'
 import { saveSystemConfig } from '@/api/modules/home'
+import {
+  COUPLE_ENERGY_TYPE_NONE_ID,
+  COUPLING_ENERGY_TYPE_OPTIONS,
+} from '@/config/couplingEnergyTypes'
 import { useGuideStore } from '@/features/guide/hooks/useGuideStore'
 
 // 项目需求类型配置
@@ -24,16 +28,6 @@ const TERMINAL_TYPE_OPTIONS = [
 const SYSTEM_TYPE_OPTIONS = [
   { id: '1', label: '一次系统' },
   { id: '2', label: '二次系统' },
-]
-
-// 耦合能源类型配置（id '5' 为无耦合能源，台数须为 0）
-const COUPLE_ENERGY_TYPE_NONE_ID = '5'
-const COUPLE_ENERGY_TYPE_OPTIONS = [
-  { id: '1', label: '电锅炉' },
-  { id: '2', label: '燃气锅炉' },
-  { id: '3', label: '水源热泵' },
-  { id: '4', label: '风冷模块' },
-  { id: '5', label: '无耦合能源' },
 ]
 
 // 耦合能源设备台数配置（风冷模块等项目最多 50 台）
@@ -57,8 +51,10 @@ function SystemSelectConfigPage() {
   const [heatPump, setHeatPump] = useState(savedHeatPump || '7')
   const [terminalTypeId, setTerminalTypeId] = useState(savedTerminalTypeId || '1')
   const [systemTypeId, setSystemTypeIdLocal] = useState(savedSystemTypeId || '1')
-  const [coupleEnergyTypeId, setCoupleEnergyTypeId] = useState(savedCoupleEnergyTypeId || '2')
-  const [coupleEnergyNumber, setCoupleEnergyNumber] = useState(savedCoupleEnergyNumber || '1')
+  const [coupleEnergyTypeId, setCoupleEnergyTypeId] = useState(
+    savedCoupleEnergyTypeId ?? COUPLE_ENERGY_TYPE_NONE_ID,
+  )
+  const [coupleEnergyNumber, setCoupleEnergyNumber] = useState(savedCoupleEnergyNumber ?? '0')
   const [isSaving, setIsSaving] = useState(false)
   const [errorMessage, setErrorMessage] = useState('')
 
@@ -197,7 +193,7 @@ function SystemSelectConfigPage() {
             </p>
           </div>
           <div className="guide-page__option-group">
-            {COUPLE_ENERGY_TYPE_OPTIONS.map((option) => (
+            {COUPLING_ENERGY_TYPE_OPTIONS.map((option) => (
               <GuideOptionButton
                 key={option.id}
                 label={option.label}

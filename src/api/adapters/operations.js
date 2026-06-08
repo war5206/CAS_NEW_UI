@@ -66,7 +66,7 @@ function resolveOpsUnitDeviceChartType(def) {
   }
   const label = def.label
   if (label.includes('故障')) return 'fault'
-  if (label.includes('Hz')) return 'gear'
+  if (label.includes('Hz')) return 'frequency'
   if (label.includes('电流')) return 'current'
   if (label.includes('运行时长')) return 'duration'
   if (label.includes('℃')) return 'temperature'

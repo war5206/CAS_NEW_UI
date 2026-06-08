@@ -24,6 +24,7 @@ import {
   useAlarmTrendQuery,
   useHeatPumpSelectOptionsQuery,
 } from '@/features/alerts/hooks/useAlarmAnalysisQueries'
+import { formatAlarmUnitLabelText } from '@/utils/alarmUnitDisplayName'
 import './AlertsModulePage.css'
 
 const LIVE_ALARM_TYPE_OPTIONS = [
@@ -213,7 +214,7 @@ function adaptLiveAlarmRow(item = {}) {
   return {
     id: String(item.alarmid ?? ''),
     deviceName: getLiveAlarmTypeText(item.alarm_type),
-    alarmName: item.alarm_description || '--',
+    alarmName: formatAlarmUnitLabelText(item.alarm_description) || '--',
     levelText: getLiveAlarmLevelText(item.alarm_grade),
     happenedAt: item.alarm_time || '--',
     suggestion: stringifyAlarmMessage(item.alarm_message),
@@ -224,7 +225,7 @@ function adaptHistoryAlarmRow(item = {}) {
   return {
     id: String(item.alarmid ?? ''),
     deviceName: getLiveAlarmTypeText(item.alarm_type),
-    alarmName: item.alarm_description || '--',
+    alarmName: formatAlarmUnitLabelText(item.alarm_description) || '--',
     levelText: getLiveAlarmLevelText(item.alarm_grade),
     happenedAt: item.alarm_time || '--',
     processedAt: item.handle_status || '--',
@@ -1176,7 +1177,7 @@ function SystemAlarmPage({ onDetailBreadcrumbChange }) {
       const detail = response?.data?.data?.realAlarm ?? {}
       const detailRow = {
         id: String(detail.alarmid ?? row.id),
-        alarmName: detail.alarm_description || '--',
+        alarmName: formatAlarmUnitLabelText(detail.alarm_description) || '--',
         levelText: getLiveAlarmLevelText(detail.alarm_grade),
         happenedAt: detail.alarm_time || '--',
         suggestion: stringifyAlarmMessageForDetail(detail.alarm_message),

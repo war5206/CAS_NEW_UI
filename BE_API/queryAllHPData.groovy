@@ -78,6 +78,19 @@ def isPointValueOne = { String pointValue ->
     }
 };
 
+def formatPowerOnValue = { String rawVal ->
+    if (rawVal == null || rawVal == "") {
+        return "--";
+    }
+    if ("1".equals(rawVal)) {
+        return "开";
+    }
+    if ("0".equals(rawVal)) {
+        return "关";
+    }
+    return "--";
+};
+
 def formatParamValue = { String key, String rawVal ->
     if (rawVal == null || rawVal == "") {
         return "--";
@@ -92,7 +105,7 @@ def formatParamValue = { String key, String rawVal ->
         return rawVal;
     }
     if ("开关机".equals(key)) {
-        return isPointValueOne(rawVal) ? "开" : "关";
+        return formatPowerOnValue(rawVal);
     }
     return rawVal;
 };

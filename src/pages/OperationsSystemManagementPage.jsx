@@ -595,6 +595,259 @@ function createRandomSeries(metric, rangeStart, rangeEnd, _revision = 0) {
   return points
 }
 
+const DISCRETE_CHART_TYPES = ['enum', 'state', 'switch', 'mode', 'fault', 'gear']
+
+const CONTINUOUS_CHART_FALLBACK_MAX = {
+  pressure: 300,
+  humidity: 100,
+  noise: 80,
+  current: 30,
+  voltage: 450,
+  energy: 1600,
+  power: 8000,
+  flow: 100,
+  count: 40,
+  price: 2,
+  duration: 180,
+  frequency: 60,
+  percentage: 100,
+  angle: 360,
+  opening: 100,
+  temperature: 50,
+  number: 50,
+}
+
+function isFaultCodeNormal(value) {
+  return Math.round(Number(value)) === -1
+}
+
+function formatFaultCodeTooltip(value) {
+  const code = Math.round(Number(value))
+  if (!Number.isFinite(code)) {
+    return '--'
+  }
+  if (isFaultCodeNormal(code)) {
+    return '正常'
+  }
+  return `故障 ${code}`
+}
+
+function extractChartValues(chartData = []) {
+  return chartData.map((item) => Number(item.value)).filter((value) => Number.isFinite(value))
+}
+
+function getNiceStep(span, targetTicks = 5) {
+  if (span <= 0) {
+    return 1
+  }
+
+  const rough = span / Math.max(1, targetTicks - 1)
+  const magnitude = 10 ** Math.floor(Math.log10(rough))
+  const normalized = rough / magnitude
+  let nice = 10
+
+  if (normalized <= 1) {
+    nice = 1
+  } else if (normalized <= 2) {
+    nice = 2
+  } else if (normalized <= 5) {
+    nice = 5
+  }
+
+  return nice * magnitude
+}
+
+function buildAxisTicks(min, max, interval, maxTicks = 6) {
+  if (!Number.isFinite(min) || !Number.isFinite(max)) {
+    return [max, min]
+  }
+
+  if (!Number.isFinite(interval) || interval <= 0) {
+    return [max, min]
+  }
+
+  const ticks = []
+  for (let value = max; value >= min - interval * 0.001 && ticks.length < maxTicks; value -= interval) {
+    ticks.push(Number(value.toFixed(4)))
+  }
+
+  if (!ticks.length || ticks.at(-1) > min) {
+    ticks.push(min)
+  }
+
+  return [...new Set(ticks)].sort((left, right) => right - left)
+}
+
+function buildContinuousAxisRange(values, { floorAtZero = true, minSpan = 1 } = {}) {
+  if (!values.length) {
+    return null
+  }
+
+  const rawMin = Math.min(...values)
+  const rawMax = Math.max(...values)
+  let dataMin = rawMin
+  let dataMax = rawMax
+
+  if (dataMin === dataMax) {
+    const pad = Math.max(minSpan, Math.abs(dataMin) * 0.1, 1)
+    dataMin -= pad / 2
+    dataMax += pad / 2
+  } else {
+    const padding = (dataMax - dataMin) * 0.08
+    dataMin -= padding
+    dataMax += padding
+  }
+
+  if (floorAtZero && rawMin >= 0 && dataMin > 0) {
+    dataMin = 0
+  }
+
+  const step = getNiceStep(dataMax - dataMin)
+  const min = Math.floor(dataMin / step) * step
+  const max = Math.ceil(dataMax / step) * step
+
+  return {
+    min,
+    max,
+    interval: step,
+  }
+}
+
+function buildFaultAxisRange(values) {
+  if (!values.length) {
+    return { min: -2, max: 2, interval: 1 }
+  }
+
+  const codes = values.map((value) => Math.round(value))
+  const dataMin = Math.min(...codes)
+  const dataMax = Math.max(...codes)
+  const min = dataMin - 1
+  const max = dataMax + 1
+  const span = max - min
+  const interval = span <= 8 ? 1 : getNiceStep(span, 5)
+
+  return { min, max, interval }
+}
+
+function shouldFloorAtZero(chartType) {
+  return [
+    'temperature',
+    'pressure',
+    'humidity',
+    'noise',
+    'current',
+    'voltage',
+    'energy',
+    'power',
+    'flow',
+    'count',
+    'percentage',
+    'opening',
+    'angle',
+    'duration',
+    'frequency',
+    'gear',
+    'number',
+  ].includes(chartType)
+}
+
+function isLikelyContinuousEnum(metric, values) {
+  if (metric.chartType !== 'enum' || metric.chartStates?.length) {
+    return false
+  }
+
+  if (!values.length) {
+    return false
+  }
+
+  const min = Math.min(...values)
+  const max = Math.max(...values)
+  return max - min > 1 || max > 1 || min < 0
+}
+
+function resolveValueDecimals(values, chartType) {
+  if (chartType === 'price') {
+    return 2
+  }
+
+  if (values.every((value) => Number.isInteger(value))) {
+    return 0
+  }
+
+  return 1
+}
+
+function applyDataDrivenPresentation(base, chartData, metric) {
+  const values = extractChartValues(chartData)
+  if (!values.length) {
+    return base
+  }
+
+  if (metric.chartType === 'fault') {
+    const range = buildFaultAxisRange(values)
+    const ticks = buildAxisTicks(range.min, range.max, range.interval)
+
+    return {
+      ...base,
+      min: range.min,
+      max: range.max,
+      visualMin: range.min - range.interval * 0.15,
+      visualMax: range.max + range.interval * 0.15,
+      ticks,
+      yAxisInterval: range.interval,
+      formatter: (value) => `${Math.round(value)}`,
+      tooltipFormatter: formatFaultCodeTooltip,
+    }
+  }
+
+  if (DISCRETE_CHART_TYPES.includes(metric.chartType) && !isLikelyContinuousEnum(metric, values)) {
+    if (metric.chartType === 'gear') {
+      const range = buildContinuousAxisRange(values, { floorAtZero: true, minSpan: 1 })
+      if (range) {
+        const ticks = buildAxisTicks(range.min, range.max, range.interval)
+        return {
+          ...base,
+          min: range.min,
+          max: range.max,
+          visualMin: range.min,
+          visualMax: range.max,
+          ticks,
+          yAxisInterval: range.interval,
+        }
+      }
+    }
+
+    return base
+  }
+
+  const range = buildContinuousAxisRange(values, {
+    floorAtZero: shouldFloorAtZero(metric.chartType),
+    minSpan: metric.chartType === 'price' ? 0.1 : 1,
+  })
+
+  if (!range) {
+    return base
+  }
+
+  const ticks = buildAxisTicks(range.min, range.max, range.interval)
+  const decimals = resolveValueDecimals(values, metric.chartType)
+  const formatter =
+    decimals === 0
+      ? (value) => `${Math.round(value)}`
+      : (value) => `${Number(value).toFixed(decimals)}`
+
+  return {
+    ...base,
+    min: range.min,
+    max: range.max,
+    visualMin: range.min,
+    visualMax: range.max,
+    ticks,
+    yAxisInterval: range.interval,
+    formatter,
+  }
+}
+
 function getMetricPresentation(metric) {
   if (metric.chartType === 'enum') {
     const states = metric.chartStates?.length ? metric.chartStates : ['状态0', '状态1']
@@ -669,47 +922,31 @@ function getMetricPresentation(metric) {
     }
   }
 
+  if (metric.chartType === 'fault') {
+    return {
+      lineLabel: metric.label,
+      yAxisLabel: metric.unit || '故障代码',
+      ticks: [2, 0, -2],
+      min: -2,
+      max: 10,
+      visualMin: -2.2,
+      visualMax: 10.2,
+      yAxisInterval: 1,
+      formatter: (value) => `${Math.round(value)}`,
+      tooltipFormatter: formatFaultCodeTooltip,
+    }
+  }
+
+  const fallbackMax = CONTINUOUS_CHART_FALLBACK_MAX[metric.chartType] ?? 50
+  const fallbackInterval = getChartAxisInterval(metric)
+
   return {
     lineLabel: metric.label,
     yAxisLabel: metric.unit || '数值',
-    ticks: [50, 40, 30, 20, 10, 0],
+    ticks: buildAxisTicks(0, fallbackMax, fallbackInterval),
     min: 0,
-    max:
-      metric.chartType === 'pressure'
-        ? 300
-        : metric.chartType === 'humidity'
-          ? 100
-            : metric.chartType === 'noise'
-              ? 80
-            : metric.chartType === 'current'
-              ? 30
-            : metric.chartType === 'voltage'
-              ? 450
-            : metric.chartType === 'energy'
-              ? 1600
-            : metric.chartType === 'power'
-              ? 8000
-            : metric.chartType === 'flow'
-              ? 100
-            : metric.chartType === 'count'
-              ? 40
-            : metric.chartType === 'price'
-              ? 2
-            : metric.chartType === 'duration'
-              ? 180
-            : metric.chartType === 'frequency'
-              ? 20
-            : metric.chartType === 'percentage'
-              ? 100
-            : metric.chartType === 'angle'
-              ? 360
-                : metric.chartType === 'opening'
-                  ? 100
-                  : metric.chartType === 'fault'
-                    ? 10
-                    : metric.chartType === 'gear'
-                      ? 5
-                      : 50,
+    max: fallbackMax,
+    yAxisInterval: fallbackInterval,
     formatter: (value) => `${value}`,
     tooltipFormatter: (value) => `${value}${metric.unit ? ` ${metric.unit}` : ''}`,
   }
@@ -804,8 +1041,8 @@ function TrendChart({ metric, chartData, presentation }) {
 
     const chart = echarts.init(chartRef.current)
     const axisInterval = chartData.length > 12 ? Math.ceil(chartData.length / 8) - 1 : 0
-    const yAxisInterval = getChartAxisInterval(metric)
-    const isDiscreteChart = ['enum', 'state', 'switch', 'mode', 'fault', 'gear'].includes(metric.chartType)
+    const yAxisInterval = presentation.yAxisInterval ?? getChartAxisInterval(metric)
+    const isDiscreteChart = DISCRETE_CHART_TYPES.includes(metric.chartType)
 
     chart.setOption({
       animation: false,
@@ -940,7 +1177,11 @@ function TrendModal({
   onClose,
 }) {
   const [pickerField, setPickerField] = useState(null)
-  const presentation = useMemo(() => getMetricPresentation(metric), [metric])
+  const basePresentation = useMemo(() => getMetricPresentation(metric), [metric])
+  const presentation = useMemo(
+    () => applyDataDrivenPresentation(basePresentation, chartData, metric),
+    [basePresentation, chartData, metric],
+  )
   const [tooltipIndex, setTooltipIndex] = useState(null)
   const geometry = useMemo(() => buildChartGeometry(chartData, presentation), [chartData, presentation])
   const chartStatusMessage = useMemo(() => {
@@ -1136,11 +1377,26 @@ function TrendModal({
   )
 }
 
+function formatOpsMetricCardValue(item) {
+  const value = item?.value ?? '--'
+  const unit = String(item?.unit ?? '').trim()
+  if (!unit || value === '--') {
+    return value
+  }
+
+  const text = String(value)
+  if (text.endsWith(unit) || text.includes(` ${unit}`)) {
+    return text
+  }
+
+  return `${text} ${unit}`
+}
+
 function MetricCard({ item, onClick }) {
   return (
     <button type="button" className="ops-system-card" onClick={() => onClick(item)}>
       <span className="ops-system-card__label">{item.label}</span>
-      <strong className="ops-system-card__value">{item.value}</strong>
+      <strong className="ops-system-card__value">{formatOpsMetricCardValue(item)}</strong>
     </button>
   )
 }

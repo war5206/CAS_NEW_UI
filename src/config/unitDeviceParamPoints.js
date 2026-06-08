@@ -1,3 +1,4 @@
+import { isOnValue } from '@/utils/realvalMap'
 import { FIXED_UNIT_DEVICE_IDS } from './projectUnitDevices'
 
 /** PLC 长名前缀：HeatPump\SJMG\No{编号}\ */
@@ -7,6 +8,7 @@ export const UNIT_DEVICE_STATUS_SUFFIX = {
   OPERATION: 'Machine_Operation',
   DEFROSTING: 'Systematic_Defrosting',
   FAULT: 'Fault_Alarm',
+  COMM_STATUS: 'Comm_Status',
 }
 
 /** 热泵 / 风冷模块共用 16 项详情（dataKey 与后端 heatPumpData 键一致） */
@@ -44,13 +46,32 @@ export function getUnitDeviceStatusLongNames(pointNo) {
     operation: buildUnitDeviceLongName(pointNo, UNIT_DEVICE_STATUS_SUFFIX.OPERATION),
     defrosting: buildUnitDeviceLongName(pointNo, UNIT_DEVICE_STATUS_SUFFIX.DEFROSTING),
     fault: buildUnitDeviceLongName(pointNo, UNIT_DEVICE_STATUS_SUFFIX.FAULT),
+    commStatus: buildUnitDeviceLongName(pointNo, UNIT_DEVICE_STATUS_SUFFIX.COMM_STATUS),
   }
 }
 
 export function isUnitDeviceOnValue(value) {
-  if (value === true || value === 1) return true
-  const text = String(value ?? '').trim().toLowerCase()
-  return text === '1' || text === 'true' || text === 'on'
+  return isOnValue(value)
+}
+
+/** 指标「开关机」：1/"1"→开，0/"0"→关，空值→-- */
+export function formatUnitDevicePowerOnValue(rawValue) {
+  if (rawValue == null || String(rawValue).trim() === '') {
+    return '--'
+  }
+
+  const text = String(rawValue).trim()
+  if (text === '开' || text === '关') {
+    return text
+  }
+  if (rawValue === 1 || text === '1') {
+    return '开'
+  }
+  if (rawValue === 0 || text === '0') {
+    return '关'
+  }
+
+  return '--'
 }
 
 export function formatUnitDeviceParamValue(valueType, rawValue) {
@@ -65,7 +86,7 @@ export function formatUnitDeviceParamValue(valueType, rawValue) {
       if (text === '1') return '制热'
       return text
     case 'powerOn':
-      return isUnitDeviceOnValue(text) ? '开' : '关'
+      return formatUnitDevicePowerOnValue(rawValue)
     default:
       return text
   }

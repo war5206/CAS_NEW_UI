@@ -70,7 +70,28 @@ String endTime = endDateTime.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:m
 
 String supplyTempTag = "Sys\\FinforWorx\\UserWaterSupplyTemperature";
 String backwaterTempTag = "Sys\\FinforWorx\\BackwaterTemperature";
-String targetBackwaterTempTag = "Sys\\FinforWorx\\TargetBackwaterTemperature";
+
+// 目标回水温度与首页一致：气候补偿开 → TargetBackwaterTemperature，关（定温）→ SetTemperature1
+String qhbcValue = "";
+String qhbcQuerySql = "SELECT a.taglongname,a.times,a.realval,a.quality FROM psrealdata AS a WHERE a.taglongname IN ('Sys\\FinforWorx\\QHBC')";
+try {
+    DataTable qhbcDt = dataService.queryListDataBySql(qhbcQuerySql);
+    if (qhbcDt.getRows().size() == 1) {
+        for (int c = 0; c < qhbcDt.getColumns().size(); c++) {
+            if (qhbcDt.getColumns().get(c).getColumnName() == "realval") {
+                qhbcValue = qhbcDt.getValue(0, c).toString().trim();
+                break;
+            }
+        }
+    }
+} catch (Exception e) {
+    data.put("qhbcQueryError", e.getMessage());
+}
+
+String targetBackwaterTempTag = "Sys\\FinforWorx\\SetTemperature1";
+if (qhbcValue.equals("1")) {
+    targetBackwaterTempTag = "Sys\\FinforWorx\\TargetBackwaterTemperature";
+}
 
 Map<String, Object> result = new LinkedHashMap<>();
 
@@ -84,6 +105,7 @@ result.put("supplyTempData", supplyTempData);
 result.put("backwaterTempData", backwaterTempData);
 result.put("targetBackwaterTempData", targetBackwaterTempData);
 result.put("targetBackwaterTempRawData", targetBackwaterTempRawData);
+result.put("targetBackwaterTempLongName", targetBackwaterTempTag);
 result.put("startTime", startTime);
 result.put("endTime", endTime);
 

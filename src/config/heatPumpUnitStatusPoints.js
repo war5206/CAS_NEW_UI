@@ -26,7 +26,7 @@ export function buildUnitStatusLongNames(startNo, count) {
   for (let index = 0; index < count; index += 1) {
     const pointNo = startNo + index
     const statusLongNames = getUnitDeviceStatusLongNames(pointNo)
-    longNames.push(statusLongNames.operation, statusLongNames.defrosting, statusLongNames.fault)
+    longNames.push(statusLongNames.operation, statusLongNames.defrosting, statusLongNames.fault, statusLongNames.commStatus)
   }
   return longNames
 }

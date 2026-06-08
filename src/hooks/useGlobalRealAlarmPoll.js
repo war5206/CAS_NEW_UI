@@ -3,13 +3,14 @@ import { useQuery } from '@tanstack/react-query'
 import { getStoredToken } from '@/api/client/auth'
 import { queryRealAlarm } from '@/api/modules/home'
 import { setLiveAlarms } from '@/features/alerts/store/alertsStore'
+import { formatAlarmUnitLabelText } from '@/utils/alarmUnitDisplayName'
 
 const POLL_INTERVAL_MS = 30_000
 const NO_ALARM_MESSAGE = '没有更多报警数据'
 
 function adaptIndicatorRow(item = {}, index = 0) {
   const id = item.alarmid != null ? String(item.alarmid) : `realtime-${index}`
-  const description = item.alarm_description ? String(item.alarm_description) : ''
+  const description = item.alarm_description ? formatAlarmUnitLabelText(String(item.alarm_description)) : ''
   return {
     id,
     alarmName: description || '--',

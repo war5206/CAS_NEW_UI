@@ -10,7 +10,7 @@ export function useHeatPumpArrangeQuery({ enabled = true } = {}) {
     enabled,
     staleTime: 5_000,
     retry: 1,
-    refetchInterval: false,
+    refetchInterval: 10_000,
     refetchOnWindowFocus: false,
   })
 }

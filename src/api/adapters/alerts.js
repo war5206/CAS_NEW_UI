@@ -1,3 +1,5 @@
+import { formatAlarmUnitLabelText } from '@/utils/alarmUnitDisplayName'
+
 /** 饼图扇区较多时使用：先走固定高区分色板，超出部分用黄金角色相生成 */
 const PIE_COLORS = [
   '#1f99ea',
@@ -87,7 +89,7 @@ export function adaptAlarmOverview(rawData) {
   return {
     alarmsNumber: toNumberOrFallback(source?.alarmsNumber, fallback.alarmsNumber),
     unhandleAlarmsNumber: toNumberOrFallback(source?.unhandleAlarmsNumber, fallback.unhandleAlarmsNumber),
-    mostHeatPump: toText(source?.mostHeatPump, fallback.mostHeatPump),
+    mostHeatPump: formatAlarmUnitLabelText(toText(source?.mostHeatPump, fallback.mostHeatPump)),
     mostAlarmType: toText(source?.mostAlarmType, fallback.mostAlarmType),
   }
 }
@@ -125,7 +127,7 @@ export function adaptAlarmCategory(rawData) {
   const y = Array.isArray(source?.y) ? source.y : []
 
   return {
-    xAxis: x.map((item) => toText(item, '')),
+    xAxis: x.map((item) => formatAlarmUnitLabelText(toText(item, ''))),
     series: y.map((item) => toNumberOrFallback(item, 0)),
   }
 }
@@ -142,7 +144,7 @@ export function adaptAlarmDistribution(rawData) {
 
   return {
     pieData: pieList.map((item, index) => ({
-      name: toText(item?.name, '--'),
+      name: formatAlarmUnitLabelText(toText(item?.name, '--')),
       value: toNumberOrFallback(item?.value, 0),
       color: pieColorAtIndex(index),
     })),
@@ -164,6 +166,6 @@ export function adaptHeatPumpSelectOptions(rawData) {
 
   return selectList.map((item) => ({
     value: toText(item?.value, ''),
-    label: toText(item?.title, '--'),
+    label: formatAlarmUnitLabelText(toText(item?.title, '--')),
   }))
 }

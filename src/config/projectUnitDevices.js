@@ -1,8 +1,7 @@
-/** 风冷模块耦合能源类型 ID（与向导/系统参数一致） */
-export const COUPLE_ENERGY_TYPE_AIR_COOLED_MODULE_ID = '4'
-
-/** 无耦合能源 */
-export const COUPLE_ENERGY_TYPE_NONE_ID = '5'
+export {
+  COUPLE_ENERGY_TYPE_AIR_COOLED_MODULE_ID,
+  COUPLE_ENERGY_TYPE_NONE_ID,
+} from '@/config/couplingEnergyTypes'
 
 /** 风冷模块点位起始编号 No31 */
 export const AIR_COOLED_MODULE_START_NO = 31
