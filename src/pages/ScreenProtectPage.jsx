@@ -74,11 +74,11 @@ function ScreenProtectPage() {
 
           <div className="screen-protect-info-grid">
             <ScreenInfo
-              title="热泵运行"
+              title="机组运行"
               value={screenData.heatPumpCount}
               unit="台"
               icon={screenProtectHp}
-              iconAlt="热泵运行"
+              iconAlt="机组运行"
               iconWidth={110}
               iconHeight={120}
             />
