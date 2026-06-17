@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useLocation } from 'react-router-dom'
-import systemMap from '../assets/home/dajuyuan-system.png'
+import standardSystemMap from '../assets/home/system.png'
+import dajuyuanSystemMap from '../assets/home/dajuyuan-system.png'
 import systemMap2 from '../assets/home/system2.png'
 import coupleGasBoilerIcon from '../assets/home/couple-gasboiler.png'
 import coupleWaterSourceHeatPumpIcon from '../assets/home/couple-wshp.png'
@@ -28,6 +29,12 @@ import DeviceStatusPanel from '../components/DeviceStatusPanel'
 import HomeUnitStatusBlock from '../components/HomeUnitStatusBlock'
 import { useHomeUnitStatusPoll } from '../hooks/useHomeUnitStatusPoll'
 import { COUPLE_ENERGY_TYPE_AIR_COOLED_MODULE_ID } from '@/config/projectUnitDevices'
+import {
+  isDajuyuanProfile,
+  SHOW_DEVICE_STATUS_LOOP_PUMP_TAB,
+  SHOW_HOME_AIR_COOLED_STATUS_BLOCK,
+  SYSTEM_DIAGRAM_KEY,
+} from '@/config/projectProfile'
 import { useHomeOverviewQuery } from '../features/home/hooks/useHomeOverviewQuery'
 import { useSystemConfigQuery } from '../features/home/hooks/useSystemConfigQuery'
 import { useTemp24HourQuery } from '../features/home/hooks/useTemp24HourQuery'
@@ -51,10 +58,10 @@ const HOME_TEXT = {
   AIR_COOLED_MODULE_GROUP: '风冷模块机组',
   OUTDOOR_TEMP: '室外温度',
   CELSIUS: '℃',
-  // CONDENSATE_WATER: '冷凝水',
-  // HEAT_TRACING_BELT: '伴热带',
+  CONDENSATE_WATER: '冷凝水',
+  HEAT_TRACING_BELT: '伴热带',
   OFF: '已关闭',
-  // CONDENSATE_PIPE: '冷凝水管',
+  CONDENSATE_PIPE: '冷凝水管',
   COUPLING_ENERGY: '耦合能源',
   ON: '已开启',
   SUPPLY_TEMP: '供水温度',
@@ -70,13 +77,13 @@ const HOME_TEXT = {
   RUNNING: '运行中',
   STANDBY: '待机',
   HAS_FAULT: '有故障',
-  // DIFFERENTIAL_BYPASS_VALVE: '压差旁通阀',
+  DIFFERENTIAL_BYPASS_VALVE: '压差旁通阀',
   DRAIN_VALVE: '排污阀',
-  // PRESSURE_TANK: '定压罐',
-  // PRESSURE_VALVE: '泄压阀',
-  // MAKEUP_PUMP: '定压补水泵',
-  // WATER_TANK: '水箱',
-  // SOFT_WATER: '软化水',
+  PRESSURE_TANK: '定压罐',
+  PRESSURE_VALVE: '泄压阀',
+  MAKEUP_PUMP: '定压补水泵',
+  WATER_TANK: '水箱',
+  SOFT_WATER: '软化水',
   TERMINAL_BUILDING: '末端建筑',
   TERMINAL_BUILDING_TIP: '点击查看详情',
   HEAT_PUMP_PAGE_TIP: '点击查看详情',
@@ -127,7 +134,10 @@ const COUPLE_DEVICE_LAYOUT_MAP = {
   },
 }
 
+const SYSTEM_IMAGE_STANDARD = standardSystemMap
+const SYSTEM_IMAGE_DAJUYUAN = dajuyuanSystemMap
 const SYSTEM_IMAGE_TYPE2 = systemMap2
+const SYSTEM_IMAGE_BY_PROFILE = SYSTEM_DIAGRAM_KEY === 'dajuyuan' ? SYSTEM_IMAGE_DAJUYUAN : SYSTEM_IMAGE_STANDARD
 
 function HomePage({ onActivePageChange, committedUnitLayoutSlots }) {
   const location = useLocation()
@@ -136,7 +146,10 @@ function HomePage({ onActivePageChange, committedUnitLayoutSlots }) {
   const isHomeRoute = location.pathname === '/home' || location.pathname === '/home/'
   const isHomeDashboard = activePage === HOME_PAGE_VIEW.DASHBOARD
   const homeOverviewQuery = useHomeOverviewQuery({ enabled: isHomeRoute && isHomeDashboard })
-  const homeUnitStatusPoll = useHomeUnitStatusPoll({ enabled: isHomeRoute && isHomeDashboard })
+  const { refetch: refetchHomeOverview } = homeOverviewQuery
+  const homeUnitStatusPoll = useHomeUnitStatusPoll({
+    enabled: isHomeRoute && isHomeDashboard,
+  })
   const systemConfigQuery = useSystemConfigQuery({ enabled: isHomeRoute })
   const { refetch: refetchSystemConfig } = systemConfigQuery
   const temp24HourQuery = useTemp24HourQuery({ enabled: isHomeRoute && isHomeDashboard })
@@ -151,14 +164,14 @@ function HomePage({ onActivePageChange, committedUnitLayoutSlots }) {
     (!homeOverviewQuery.hasFetchedData || !systemConfigQuery.hasFetchedData || !temp24HourQuery.hasFetchedData)
 
   const isSystemType2 = systemConfig.systemTypeUuid === '2'
-  const resolvedSystemImage = isSystemType2 && SYSTEM_IMAGE_TYPE2 ? SYSTEM_IMAGE_TYPE2 : systemMap
+  const resolvedSystemImage = isSystemType2 && SYSTEM_IMAGE_TYPE2 ? SYSTEM_IMAGE_TYPE2 : SYSTEM_IMAGE_BY_PROFILE
   const coupleEnergyTypeUuid = systemConfig.coupleEnergyTypeUuid
   const isAirCooledModuleCoupling = coupleEnergyTypeUuid === COUPLE_ENERGY_TYPE_AIR_COOLED_MODULE_ID
   const coupleDevice = COUPLE_DEVICE_IMAGE_MAP[coupleEnergyTypeUuid] ?? null
   const coupleDeviceLayout = COUPLE_DEVICE_LAYOUT_MAP[coupleEnergyTypeUuid] ?? null
-  // 风冷模块作为机组纳入热泵布局，不在系统原理图展示耦合能源图标/管道
   const shouldShowCouplingEnergy = Boolean(coupleDevice && coupleDeviceLayout) && !isAirCooledModuleCoupling
-  const shouldShowAirCooledModuleOnDiagram = !isAirCooledModuleCoupling
+  const shouldShowAirCooledModuleOnDiagram =
+    isAirCooledModuleCoupling && SHOW_HOME_AIR_COOLED_STATUS_BLOCK
   const coupleDeviceBannerStyle = coupleDeviceLayout
     ? {
         ...coupleDeviceLayout.banner,
@@ -182,15 +195,17 @@ function HomePage({ onActivePageChange, committedUnitLayoutSlots }) {
   useEffect(() => {
     if (isHomeRoute && !wasHomeRouteRef.current) {
       refetchSystemConfig()
+      void refetchHomeOverview()
     }
     wasHomeRouteRef.current = isHomeRoute
-  }, [isHomeRoute, refetchSystemConfig])
+  }, [isHomeRoute, refetchHomeOverview, refetchSystemConfig])
 
   const goBackHome = () => setActivePage(HOME_PAGE_VIEW.DASHBOARD)
   const goToHeatPumpOverview = () => setActivePage(HOME_PAGE_VIEW.HEAT_PUMP_OVERVIEW)
   const goToTerminalBuilding = () => setActivePage(HOME_PAGE_VIEW.TERMINAL_BUILDING)
-  const heatPumpUnitStatus = homeUnitStatusPoll.heatPump.summary
+  const heatPumpOverlaySummary = homeUnitStatusPoll.heatPump.summary
   const airCooledModuleStatus = homeUnitStatusPoll.airCooledModule.summary
+  const deviceStatusHeatPumpData = homeUnitStatusPoll.heatPump.chartData
   const indoorTemperatures = homeOverview.system.indoorTemperatures
   const terminalCirculationPumps = homeOverview.system.terminalCirculationPumps
   const indoorTemperatureVisibility = homeFeatureSettings.indoorTemperatureVisibility ?? [true, true, true, true, true]
@@ -255,10 +270,12 @@ function HomePage({ onActivePageChange, committedUnitLayoutSlots }) {
                 onLoad={() => setIsSystemImageLoaded(true)}
                 onError={() => setIsSystemImageLoaded(true)}
               />
-              <div className={`home-system-overlay${isSystemImageLoaded ? ' is-ready' : ''}`}>
+              <div
+                className={`home-system-overlay home-system-overlay--${SYSTEM_DIAGRAM_KEY}${isSystemImageLoaded ? ' is-ready' : ''}`}
+              >
                 <HomeUnitStatusBlock
                   title={HOME_TEXT.HEAT_PUMP_GROUP}
-                  summary={heatPumpUnitStatus}
+                  summary={heatPumpOverlaySummary}
                   className="home-system-node--heat-pump"
                 />
                 {shouldShowAirCooledModuleOnDiagram ? (
@@ -275,19 +292,21 @@ function HomePage({ onActivePageChange, committedUnitLayoutSlots }) {
                   <span className="home-system-unit">{HOME_TEXT.CELSIUS}</span>
                 </div>
 
-                {/* 首页 overlay：冷凝水 / 伴热带 / 冷凝水管（已隐藏）
-                <div className="home-system-node home-system-node--condensate">{HOME_TEXT.CONDENSATE_WATER}</div>
+                {!isDajuyuanProfile ? (
+                  <>
+                    <div className="home-system-node home-system-node--condensate">{HOME_TEXT.CONDENSATE_WATER}</div>
 
-                <div className="home-system-node home-system-node--heat-tracing home-system-inline">
-                  <span className="home-system-caption">{HOME_TEXT.HEAT_TRACING_BELT}</span>
-                  <span className={`home-system-state ${homeOverview.system.heatTracingEnabled ? 'is-on' : 'is-off'}`}>
-                    {homeOverview.system.heatTracingEnabled ? HOME_TEXT.ON : HOME_TEXT.OFF}
-                  </span>
-                  <span className="home-system-caption">{HOME_TEXT.CONDENSATE_PIPE}</span>
-                  <span className="home-system-value">{homeOverview.system.condensatePipeTemp}</span>
-                  <span className="home-system-unit">{HOME_TEXT.CELSIUS}</span>
-                </div>
-                */}
+                    <div className="home-system-node home-system-node--heat-tracing home-system-inline">
+                      <span className="home-system-caption">{HOME_TEXT.HEAT_TRACING_BELT}</span>
+                      <span className={`home-system-state ${homeOverview.system.heatTracingEnabled ? 'is-on' : 'is-off'}`}>
+                        {homeOverview.system.heatTracingEnabled ? HOME_TEXT.ON : HOME_TEXT.OFF}
+                      </span>
+                      <span className="home-system-caption">{HOME_TEXT.CONDENSATE_PIPE}</span>
+                      <span className="home-system-value">{homeOverview.system.condensatePipeTemp}</span>
+                      <span className="home-system-unit">{HOME_TEXT.CELSIUS}</span>
+                    </div>
+                  </>
+                ) : null}
 
                 {shouldShowCouplingEnergy && (
                   <div
@@ -329,9 +348,7 @@ function HomePage({ onActivePageChange, committedUnitLayoutSlots }) {
                           </span>
                         </div>
                       ))
-                    ) : null}
-                    {/* 热泵循环泵 fallback（已隐藏）
-                    ) : (
+                    ) : !isDajuyuanProfile ? (
                       homeOverview.system.circulationPumps.slice(0, 3).map((pump) => (
                         <div key={`terminal-${pump.name}`} className="home-system-row">
                           <span className={`home-system-caption${pump.tone === 'fault' ? ' is-fault' : ''}`}>{pump.name}</span>
@@ -340,8 +357,7 @@ function HomePage({ onActivePageChange, committedUnitLayoutSlots }) {
                           </span>
                         </div>
                       ))
-                    )}
-                    */}
+                    ) : null}
                   </div>
                 )}
 
@@ -373,21 +389,21 @@ function HomePage({ onActivePageChange, committedUnitLayoutSlots }) {
 
                 <div className="home-system-node home-system-node--circulation-pump">
                   <div className="home-system-caption home-system-caption--title">{HOME_TEXT.HEAT_PUMP_LOOP_PUMP}</div>
-                  {/* 热泵循环泵状态列表（已隐藏）
-                  {homeOverview.system.circulationPumps.slice(0, 3).map((pump) => (
-                    <div key={pump.name} className="home-system-row">
-                      <span className={`home-system-caption${pump.tone === 'fault' ? ' is-fault' : ''}`}>{pump.name}</span>
-                      <span className={`home-system-state ${pump.tone === 'running' ? 'is-on' : pump.tone === 'fault' ? 'is-fault' : 'is-off'}`}>
-                        {pump.status}
-                      </span>
-                    </div>
-                  ))}
-                  */}
+                  {!isDajuyuanProfile
+                    ? homeOverview.system.circulationPumps.slice(0, 3).map((pump) => (
+                        <div key={pump.name} className="home-system-row">
+                          <span className={`home-system-caption${pump.tone === 'fault' ? ' is-fault' : ''}`}>{pump.name}</span>
+                          <span className={`home-system-state ${pump.tone === 'running' ? 'is-on' : pump.tone === 'fault' ? 'is-fault' : 'is-off'}`}>
+                            {pump.status}
+                          </span>
+                        </div>
+                      ))
+                    : null}
                 </div>
 
-                {/* 首页 overlay：压差旁通阀（已隐藏）
-                <div className="home-system-node home-system-node--bypass-valve">{HOME_TEXT.DIFFERENTIAL_BYPASS_VALVE}</div>
-                */}
+                {!isDajuyuanProfile ? (
+                  <div className="home-system-node home-system-node--bypass-valve">{HOME_TEXT.DIFFERENTIAL_BYPASS_VALVE}</div>
+                ) : null}
 
                 <div className="home-system-node home-system-node--drain-valve home-system-inline">
                   <span className="home-system-caption">{HOME_TEXT.DRAIN_VALVE}</span>
@@ -396,40 +412,38 @@ function HomePage({ onActivePageChange, committedUnitLayoutSlots }) {
                   </span>
                 </div>
 
-                {/* 首页 overlay：定压罐 / 泄压阀 / 定压补水泵（已隐藏）
-                <div className="home-system-node home-system-node--pressure-tank">{HOME_TEXT.PRESSURE_TANK}</div>
+                {!isDajuyuanProfile ? (
+                  <>
+                    <div className="home-system-node home-system-node--pressure-tank">{HOME_TEXT.PRESSURE_TANK}</div>
 
-                <div className="home-system-node home-system-node--pressure-valve home-system-inline">
-                  <span className="home-system-caption">{HOME_TEXT.PRESSURE_VALVE}</span>
-                  <span className={`home-system-state ${homeOverview.system.pressureValveOpen ? 'is-on' : 'is-off'}`}>
-                    {homeOverview.system.pressureValveOpen ? HOME_TEXT.ON : HOME_TEXT.OFF}
-                  </span>
-                </div>
-
-                <div className="home-system-node home-system-node--makeup-pump">
-                  <div className="home-system-caption">{HOME_TEXT.MAKEUP_PUMP}</div>
-                  {homeOverview.system.makeupPumps.slice(0, 2).map((pump) => (
-                    <div key={pump.name} className="home-system-row">
-                      <span className={`home-system-caption${pump.tone === 'fault' ? ' is-fault' : ''}`}>{pump.name}</span>
-                      <span className={`home-system-state ${pump.tone === 'running' ? 'is-on' : pump.tone === 'fault' ? 'is-fault' : 'is-off'}`}>
-                        {pump.status}
+                    <div className="home-system-node home-system-node--pressure-valve home-system-inline">
+                      <span className="home-system-caption">{HOME_TEXT.PRESSURE_VALVE}</span>
+                      <span className={`home-system-state ${homeOverview.system.pressureValveOpen ? 'is-on' : 'is-off'}`}>
+                        {homeOverview.system.pressureValveOpen ? HOME_TEXT.ON : HOME_TEXT.OFF}
                       </span>
                     </div>
-                  ))}
-                </div>
-                */}
 
-                {/* 首页 overlay：水箱液位（已隐藏）
-                <div className="home-system-node home-system-node--water-tank home-system-inline">
-                  <span className="home-system-caption">{HOME_TEXT.WATER_TANK}</span>
-                  <span className="home-system-value">{homeOverview.system.waterTankLevel}</span>
-                  <span className="home-system-unit">%</span>
-                </div>
-                */}
+                    <div className="home-system-node home-system-node--makeup-pump">
+                      <div className="home-system-caption">{HOME_TEXT.MAKEUP_PUMP}</div>
+                      {homeOverview.system.makeupPumps.slice(0, 2).map((pump) => (
+                        <div key={pump.name} className="home-system-row">
+                          <span className={`home-system-caption${pump.tone === 'fault' ? ' is-fault' : ''}`}>{pump.name}</span>
+                          <span className={`home-system-state ${pump.tone === 'running' ? 'is-on' : pump.tone === 'fault' ? 'is-fault' : 'is-off'}`}>
+                            {pump.status}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
 
-                {/* 首页 overlay：软化水（已隐藏）
-                <div className="home-system-node home-system-node--soft-water">{HOME_TEXT.SOFT_WATER}</div>
-                */}
+                    <div className="home-system-node home-system-node--water-tank home-system-inline">
+                      <span className="home-system-caption">{HOME_TEXT.WATER_TANK}</span>
+                      <span className="home-system-value">{homeOverview.system.waterTankLevel}</span>
+                      <span className="home-system-unit">%</span>
+                    </div>
+
+                    <div className="home-system-node home-system-node--soft-water">{HOME_TEXT.SOFT_WATER}</div>
+                  </>
+                ) : null}
                 <div className="home-system-node home-system-node--terminal-building">{HOME_TEXT.TERMINAL_BUILDING}</div>
                 <div className="home-system-node home-system-node--terminal-building-tip">{HOME_TEXT.TERMINAL_BUILDING_TIP}</div>
                 <div className="home-system-node home-system-node--heat-pump-click-tip">{HOME_TEXT.HEAT_PUMP_PAGE_TIP}</div>
@@ -544,11 +558,11 @@ function HomePage({ onActivePageChange, committedUnitLayoutSlots }) {
 
               {showDeviceStatus ? (
                 <HomeWidget title={HOME_TEXT.DEVICE_STATUS} icon={deviceStatusIcon}>
-                  {/* loopPumpData={homeOverview.deviceStatus.loopPumpItems} */}
                   <DeviceStatusPanel
-                    heatPumpData={homeUnitStatusPoll.heatPump.chartData}
-                    airCooledModuleData={homeUnitStatusPoll.airCooledModule.chartData}
-                    loopPumpData={[]}
+                    heatPumpData={deviceStatusHeatPumpData}
+                    airCooledModuleData={homeUnitStatusPoll.airCooledModule?.chartData}
+                    loopPumpData={homeOverview.deviceStatus.loopPumpItems}
+                    showLoopPumpTab={SHOW_DEVICE_STATUS_LOOP_PUMP_TAB}
                     showTerminalLoopPump={isSystemType2}
                     terminalLoopPumpData={terminalCirculationPumps}
                   />
