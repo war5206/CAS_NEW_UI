@@ -10,7 +10,12 @@ import {
   createDefaultOpsHeatPumpUnitOptions,
 } from '@/api/adapters/operations'
 import {
+  USE_SPLIT_OPS_UNIT_DATA_TABS,
+} from '@/config/projectProfile'
+import {
   useOpsCurveQuery,
+  useOpsHeatPumpListQuery,
+  useOpsHeatPumpSingleQuery,
   useOpsSystemConfigQuery,
   useOpsSystemStateQuery,
   useOpsUnitDeviceParamQuery,
@@ -1410,13 +1415,24 @@ function OperationsSystemManagementPage({ tabId }) {
   const defaultTrendTimeRange = useMemo(() => getDefaultTrendTimeRange(), [])
   const [startTime, setStartTime] = useState(defaultTrendTimeRange.startTime)
   const [endTime, setEndTime] = useState(defaultTrendTimeRange.endTime)
-  const isAirCooledUnitTab = tabId === 'unit-data-air-cooled'
-  const isUnitDataTab = tabId === 'unit-data-heat-pump' || isAirCooledUnitTab
+  const isAirCooledUnitTab = USE_SPLIT_OPS_UNIT_DATA_TABS && tabId === 'unit-data-air-cooled'
+  const isUnitDataTab = tabId === 'unit-data' || tabId === 'unit-data-heat-pump' || isAirCooledUnitTab
   const heatPumpUnitOptions = useMemo(() => createDefaultOpsHeatPumpUnitOptions(), [])
   const airCooledUnitOptions = useMemo(() => createDefaultOpsAirCooledUnitOptions(), [])
+  const { data: standardHeatPumpOptions = [] } = useOpsHeatPumpListQuery({
+    enabled: isUnitDataTab && !USE_SPLIT_OPS_UNIT_DATA_TABS,
+  })
+  const legacyUnitOptions = isAirCooledUnitTab ? airCooledUnitOptions : heatPumpUnitOptions
+  const unitOptions = USE_SPLIT_OPS_UNIT_DATA_TABS ? legacyUnitOptions : standardHeatPumpOptions
   const activeUnit = isAirCooledUnitTab ? activeAirCooledUnit : activeHeatPumpUnit
-  const unitOptions = isAirCooledUnitTab ? airCooledUnitOptions : heatPumpUnitOptions
   const setActiveUnit = isAirCooledUnitTab ? setActiveAirCooledUnit : setActiveHeatPumpUnit
+  const { data: legacyUnitMetrics = [] } = useOpsUnitDeviceParamQuery(activeUnit, {
+    enabled: isUnitDataTab && USE_SPLIT_OPS_UNIT_DATA_TABS,
+  })
+  const { data: standardUnitMetrics = [] } = useOpsHeatPumpSingleQuery(activeUnit, {
+    enabled: isUnitDataTab && !USE_SPLIT_OPS_UNIT_DATA_TABS,
+  })
+  const unitMetrics = USE_SPLIT_OPS_UNIT_DATA_TABS ? legacyUnitMetrics : standardUnitMetrics
   const selectedSettingLabel = useMemo(
     () => SETTING_OPTIONS.find((item) => item.value === activeSetting)?.label ?? SETTING_OPTIONS[0].label,
     [activeSetting],
@@ -1426,9 +1442,6 @@ function OperationsSystemManagementPage({ tabId }) {
   })
   const { data: configMetrics = [] } = useOpsSystemConfigQuery(selectedSettingLabel, {
     enabled: tabId === 'setting-data',
-  })
-  const { data: unitMetrics = [] } = useOpsUnitDeviceParamQuery(activeUnit, {
-    enabled: isUnitDataTab,
   })
   const {
     data: chartData = [],

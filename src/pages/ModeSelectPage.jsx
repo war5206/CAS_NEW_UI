@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
 import FeatureInfoCard from '../components/FeatureInfoCard'
 import ModeOptionCard from '../components/ModeOptionCard'
@@ -19,15 +20,19 @@ import couplingStatusIcon from '../assets/mode-select-couple-energy.svg'
 import protectionStatusIcon from '../assets/mode-select-heat-pump-protect.svg'
 import protectionStatusIconActive from '../assets/mode-select-heat-pump-protect-active.svg'
 import heatPumpShutdownIcon from '../assets/heat-pump/hp-shutdown.svg'
+import waterPumpIcon from '../assets/water-pump.svg'
 import { useActionConfirm } from '../hooks/useActionConfirm'
+import { SHOW_MANUAL_AIR_COOLED_CONTROL } from '@/config/projectProfile'
 import { useWriteWithDelayedVerify } from '../hooks/useWriteWithDelayedVerify'
 import { getStoredClimateMode, setStoredClimateMode } from '../utils/climateModeState'
 import { getStoredTemperatureMode, setStoredTemperatureMode } from '../utils/temperatureModeState'
 import {
   hpRunModeSwitch,
+  queryManualSwitch,
   queryRealvalByLongNames,
   writeRealvalByLongNames,
 } from '../api/modules/settings'
+import { HOME_OVERVIEW_QUERY_KEY } from '@/features/home/hooks/useHomeOverviewQuery'
 import './ModeSelectPage.css'
 
 function SmartModeIcon() {
@@ -115,13 +120,40 @@ const INITIAL_CARD_SWITCH_STATE = {
   protection: true,
 }
 
-const MANUAL_TYPE_OPTIONS = [
+const STANDARD_MANUAL_TYPE_OPTIONS = [
+  { value: 'heat-pump', label: '热泵' },
+  { value: 'heat-pump-loop-pump', label: '热泵循环泵' },
+  { value: 'heating-tape', label: '伴热带' },
+  { value: 'drain-valve', label: '排污阀' },
+  { value: 'relief-valve', label: '泄压阀' },
+  { value: 'constant-pressure-water-pump', label: '定压补水泵' },
+]
+
+const DAJUYUAN_MANUAL_TYPE_OPTIONS = [
   { value: 'heat-pump', label: '热泵' },
   { value: 'air-cooled-module', label: '风冷模块' },
 ]
 
+const MANUAL_TYPE_OPTIONS = SHOW_MANUAL_AIR_COOLED_CONTROL
+  ? DAJUYUAN_MANUAL_TYPE_OPTIONS
+  : STANDARD_MANUAL_TYPE_OPTIONS
+
+const STANDARD_MANUAL_DEVICE_TYPE_PARAM_MAP = {
+  'heat-pump': '热泵',
+  'heat-pump-loop-pump': '热泵循环泵',
+  'heating-tape': '伴热带',
+  'drain-valve': '排污阀',
+  'relief-valve': '蓄热阀门',
+  'constant-pressure-water-pump': '定压泵',
+}
+
 const MANUAL_DEVICE_ICON_MAP = {
   'heat-pump': heatPumpShutdownIcon,
+  'heat-pump-loop-pump': waterPumpIcon,
+  'heating-tape': heatPumpShutdownIcon,
+  'drain-valve': heatPumpShutdownIcon,
+  'relief-valve': heatPumpShutdownIcon,
+  'constant-pressure-water-pump': waterPumpIcon,
   'air-cooled-module': heatPumpShutdownIcon,
 }
 
@@ -241,6 +273,17 @@ function createDefaultManualDeviceList(deviceTypeValue) {
   })
 }
 
+function extractManualSwitchList(response) {
+  const payload = response?.data
+  if (!payload || payload.success === false) return null
+  const list = payload?.data?.manualSwitch
+  return Array.isArray(list) ? list : null
+}
+
+function usesManualSwitchApi(deviceTypeValue) {
+  return !SHOW_MANUAL_AIR_COOLED_CONTROL && Boolean(STANDARD_MANUAL_DEVICE_TYPE_PARAM_MAP[deviceTypeValue])
+}
+
 function ModeSettingCard({
   id,
   title,
@@ -313,6 +356,7 @@ function ModeSettingCard({
 
 function ModeSelectPage() {
   const { requestConfirm, confirmModal } = useActionConfirm()
+  const queryClient = useQueryClient()
   const navigate = useNavigate()
   const [isInitialSyncing, setIsInitialSyncing] = useState(true)
   const [featureMode, setFeatureMode] = useState('smart')
@@ -331,6 +375,10 @@ function ModeSelectPage() {
   const onWriteNotify = useCallback((message) => {
     setAttentionMessage(message)
   }, [])
+
+  const invalidateHomeOverview = useCallback(() => {
+    queryClient.invalidateQueries({ queryKey: HOME_OVERVIEW_QUERY_KEY })
+  }, [queryClient])
 
   const { performWrite, isMountedRef } = useWriteWithDelayedVerify({
     write: writeRealvalByLongNames,
@@ -404,6 +452,20 @@ function ModeSelectPage() {
     [applyRealvalMap],
   )
 
+  const fetchManualSwitch = useCallback(async (deviceTypeValue) => {
+    const deviceTypeParam = STANDARD_MANUAL_DEVICE_TYPE_PARAM_MAP[deviceTypeValue]
+    if (!deviceTypeParam) return null
+    try {
+      const response = await queryManualSwitch(deviceTypeParam)
+      const list = extractManualSwitchList(response)
+      if (!isMountedRef.current) return list
+      setManualDeviceList(list)
+      return list
+    } catch {
+      return null
+    }
+  }, [])
+
   // 热泵 / 风冷模块：直接读 Poweron 实值（与下置点位一致）
   const refreshManualPoweronStates = useCallback(async (deviceTypeValue) => {
     if (!isPoweronManualDeviceType(deviceTypeValue)) return
@@ -430,12 +492,15 @@ function ModeSelectPage() {
 
   const fetchManualDeviceList = useCallback(
     async (deviceTypeValue) => {
+      if (usesManualSwitchApi(deviceTypeValue)) {
+        return fetchManualSwitch(deviceTypeValue)
+      }
       if (!isPoweronManualDeviceType(deviceTypeValue)) return null
       setManualDeviceList((prev) => (prev.length > 0 ? prev : createDefaultManualDeviceList(deviceTypeValue)))
       await refreshManualPoweronStates(deviceTypeValue)
       return createDefaultManualDeviceList(deviceTypeValue)
     },
-    [refreshManualPoweronStates],
+    [fetchManualSwitch, refreshManualPoweronStates],
   )
 
   // 手动模式下的"当前设备类型"通过 ref 暴露给轮询使用，避免依赖变化导致轮询重置
@@ -454,7 +519,9 @@ function ModeSelectPage() {
       let valueMap = null
       if (fm === 'manual') {
         valueMap = await fetchRealvals(MANUAL_MODE_POLL_LONG_NAMES)
-        if (isPoweronManualDeviceType(mt)) {
+        if (usesManualSwitchApi(mt)) {
+          await fetchManualSwitch(mt)
+        } else {
           await refreshManualPoweronStates(mt)
         }
       } else {
@@ -477,15 +544,12 @@ function ModeSelectPage() {
     return () => {
       window.clearInterval(timerId)
     }
-  }, [fetchRealvals, refreshManualPoweronStates, isMountedRef])
+  }, [fetchManualSwitch, fetchRealvals, refreshManualPoweronStates, isMountedRef])
 
   // 页面进入时，若当前已是手动模式，立即拉取手动设备列表
   useEffect(() => {
     if (featureMode !== 'manual') return
-    if (!isPoweronManualDeviceType(manualDeviceType)) return
-    setManualDeviceList((prev) => (prev.length > 0 ? prev : createDefaultManualDeviceList(manualDeviceType)))
-    refreshManualPoweronStates(manualDeviceType)
-    // 仅在 featureMode 从轮询/初始化切到 manual 时触发
+    fetchManualDeviceList(manualDeviceType)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [featureMode])
 
@@ -510,10 +574,17 @@ function ModeSelectPage() {
         {
           optimisticApply: () => {
             setFeatureMode(nextFeatureId)
+            invalidateHomeOverview()
             if (nextFeatureId === 'manual') {
-              setManualDeviceType(MANUAL_TYPE_OPTIONS[0].value)
-              setManualDeviceList(createDefaultManualDeviceList('heat-pump'))
-              refreshManualPoweronStates('heat-pump')
+              const initialManualType = MANUAL_TYPE_OPTIONS[0].value
+              setManualDeviceType(initialManualType)
+              if (SHOW_MANUAL_AIR_COOLED_CONTROL) {
+                setManualDeviceList(createDefaultManualDeviceList(initialManualType))
+                refreshManualPoweronStates(initialManualType)
+              } else {
+                setManualDeviceList([])
+                fetchManualSwitch(initialManualType)
+              }
             }
           },
           delayedVerify: async () => {
@@ -521,13 +592,18 @@ function ModeSelectPage() {
             if (nextFeatureId === 'smart') {
               await fetchRealvals(SETTING_SWITCH_LONG_NAMES)
             } else {
-              await refreshManualPoweronStates('heat-pump')
+              const initialManualType = MANUAL_TYPE_OPTIONS[0].value
+              if (usesManualSwitchApi(initialManualType)) {
+                await fetchManualSwitch(initialManualType)
+              } else {
+                await refreshManualPoweronStates(initialManualType)
+              }
             }
           },
         },
       )
     },
-    [featureMode, fetchRealvals, performWrite, refreshManualPoweronStates],
+    [featureMode, fetchManualSwitch, fetchRealvals, invalidateHomeOverview, performWrite, refreshManualPoweronStates],
   )
 
   // 点击制热/制冷
@@ -540,13 +616,14 @@ function ModeSelectPage() {
         optimisticApply: () => {
           setTemperatureMode(nextTemperatureId)
           setStoredTemperatureMode(nextTemperatureId)
+          invalidateHomeOverview()
         },
         delayedVerify: () => fetchRealvals([LONG_NAME_HP_TOTAL_RUN_MODE]),
       })
       setIsRunModeSwitching(false)
       setAttentionMessage(success ? '切换模式成功' : '切换模式失败')
     },
-    [fetchRealvals, isRunModeSwitching, performRunModeSwitch, temperatureMode],
+    [fetchRealvals, invalidateHomeOverview, isRunModeSwitching, performRunModeSwitch, temperatureMode],
   )
 
   // 点击模式调节里的开关
@@ -583,7 +660,11 @@ function ModeSelectPage() {
     (nextValue) => {
       if (nextValue === manualDeviceType) return
       setManualDeviceType(nextValue)
-      setManualDeviceList(createDefaultManualDeviceList(nextValue))
+      if (SHOW_MANUAL_AIR_COOLED_CONTROL) {
+        setManualDeviceList(createDefaultManualDeviceList(nextValue))
+      } else {
+        setManualDeviceList([])
+      }
       fetchManualDeviceList(nextValue)
     },
     [fetchManualDeviceList, manualDeviceType],
@@ -608,7 +689,11 @@ function ModeSelectPage() {
 
       const verifyAfterWrite = async () => {
         manualTogglePendingRef.current.delete(targetLongName)
-        await refreshManualPoweronStates(manualDeviceType)
+        if (usesManualSwitchApi(manualDeviceType)) {
+          await fetchManualSwitch(manualDeviceType)
+        } else {
+          await refreshManualPoweronStates(manualDeviceType)
+        }
       }
 
       void performWrite(
@@ -629,7 +714,7 @@ function ModeSelectPage() {
         }
       })
     },
-    [manualDeviceType, performWrite, refreshManualPoweronStates, isMountedRef],
+    [fetchManualSwitch, manualDeviceType, performWrite, refreshManualPoweronStates, isMountedRef],
   )
 
   if (isInitialSyncing) {

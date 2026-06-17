@@ -12,6 +12,7 @@ import {
   remapAirCooledModuleDeviceCode,
   toUnitDeviceCode,
 } from '@/config/projectUnitDevices'
+import { STANDARD_DEFAULT_HEAT_PUMP_COUNT, USE_FIXED_UNIT_LAYOUT } from '@/config/projectProfile'
 
 function toText(value, fallback = '') {
   if (value == null || value === '') return fallback
@@ -80,22 +81,61 @@ function buildFixedOpsUnitOptions(deviceIds) {
   }))
 }
 
+function resolveOpsHeatPumpDeviceIds() {
+  if (USE_FIXED_UNIT_LAYOUT) {
+    return getFixedHeatPumpDeviceIds()
+  }
+  return Array.from({ length: STANDARD_DEFAULT_HEAT_PUMP_COUNT }, (_, index) => index + 1)
+}
+
 export function createDefaultOpsHeatPumpUnitOptions() {
-  return buildFixedOpsUnitOptions(getFixedHeatPumpDeviceIds())
+  return buildFixedOpsUnitOptions(resolveOpsHeatPumpDeviceIds())
 }
 
 export function createDefaultOpsAirCooledUnitOptions() {
   return buildFixedOpsUnitOptions(getFixedAirCooledModuleDeviceIds())
 }
 
-/** @deprecated 运维机组数据已改用固定设备列表 */
 export function createDefaultOpsHeatPumpOptions() {
-  return createDefaultOpsHeatPumpUnitOptions()
+  return [{ value: 'No1', label: '热泵1' }]
 }
 
-/** @deprecated 运维机组数据已改用固定设备列表 */
 export function adaptOpsHeatPumpOptions(rawData) {
-  return createDefaultOpsHeatPumpUnitOptions()
+  if (USE_FIXED_UNIT_LAYOUT) {
+    return createDefaultOpsHeatPumpUnitOptions()
+  }
+
+  const source = rawData?.data ?? rawData
+  const list = Array.isArray(source?.heatPump) ? source.heatPump : []
+  if (!list.length) {
+    return createDefaultOpsHeatPumpOptions()
+  }
+
+  return list
+    .map((item, index) => {
+      const codeText = toText(item?.code, `No${index + 1}`)
+      const unitId = parseUnitDeviceCodeLoose(codeText) ?? index + 1
+      if (unitId >= AIR_COOLED_MODULE_START_NO) {
+        return null
+      }
+      return {
+        value: codeText,
+        label: toText(item?.name, `热泵${unitId}`),
+        row: toNumberOrFallback(item?.row, 1),
+        column: toNumberOrFallback(item?.column, 1),
+      }
+    })
+    .filter(Boolean)
+}
+
+export function createDefaultOpsHeatPumpSingleMetrics() {
+  return []
+}
+
+export function adaptOpsHeatPumpSingleMetrics(rawData) {
+  const source = rawData?.data ?? rawData
+  const list = Array.isArray(source?.heatPumpData) ? source.heatPumpData : []
+  return adaptMetricList(list)
 }
 
 export function createDefaultOpsUnitDeviceMetrics() {
@@ -125,15 +165,6 @@ export function adaptOpsUnitDeviceMetrics(rawData, deviceCode) {
   })
 }
 
-/** @deprecated 请使用 adaptOpsUnitDeviceMetrics */
-export function createDefaultOpsHeatPumpSingleMetrics() {
-  return createDefaultOpsUnitDeviceMetrics()
-}
-
-/** @deprecated 请使用 adaptOpsUnitDeviceMetrics */
-export function adaptOpsHeatPumpSingleMetrics(rawData, deviceCode = 'No1') {
-  return adaptOpsUnitDeviceMetrics(rawData, deviceCode)
-}
 
 export function createDefaultOpsSystemConfigMetrics() {
   return []

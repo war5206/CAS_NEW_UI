@@ -1,7 +1,18 @@
-export {
+import {
   COUPLE_ENERGY_TYPE_AIR_COOLED_MODULE_ID,
   COUPLE_ENERGY_TYPE_NONE_ID,
 } from '@/config/couplingEnergyTypes'
+
+export { COUPLE_ENERGY_TYPE_AIR_COOLED_MODULE_ID, COUPLE_ENERGY_TYPE_NONE_ID }
+export { USE_FIXED_UNIT_LAYOUT } from '@/config/projectProfile'
+import {
+  DAJUYUAN_AIR_COOLED_MODULE_COUNT,
+  DAJUYUAN_HEAT_PUMP_COUNT,
+  SHOW_AIR_COOLED_AS_STANDALONE_UNITS,
+  STANDARD_DEFAULT_HEAT_PUMP_COUNT,
+  USE_AIR_COOLED_DEVICE_CODE_REMAP,
+  USE_FIXED_UNIT_LAYOUT,
+} from '@/config/projectProfile'
 
 /** 风冷模块点位起始编号 No31 */
 export const AIR_COOLED_MODULE_START_NO = 31
@@ -12,10 +23,10 @@ export const AIR_COOLED_MODULE_MAX_COUNT = 50
 /** 热泵最大台数 */
 export const HEAT_PUMP_MAX_COUNT = 50
 
-/** 非标项目：机组排布固定写死（不依赖耦合能源配置 / 智能扫描） */
-export const USE_FIXED_UNIT_LAYOUT = true
+/** PLC 热泵总台数（Sys\\FinforWorx\\HPTotalNumber），标准款首页/总览状态轮询范围依据 */
+export const LONG_NAME_HP_TOTAL_NUMBER = 'Sys\\FinforWorx\\HPTotalNumber'
 
-/** 第一排热泵6台；第二排热泵7台；第三/四排风冷各6台（点位 No31-42） */
+/** 大剧院固定排布：第一排热泵6台；第二排热泵7台；第三/四排风冷各6台（点位 No31-42） */
 export const FIXED_UNIT_LAYOUT_ROWS = [
   { row: 1, ids: [1, 2, 3, 4, 5, 6] },
   { row: 2, ids: [7, 8, 9, 10, 11, 12, 13] },
@@ -55,7 +66,10 @@ export function isHeatPumpModuleDeviceCode(value) {
   if (id == null || id >= AIR_COOLED_MODULE_START_NO) {
     return false
   }
-  return FIXED_HEAT_PUMP_DEVICE_IDS.includes(id)
+  if (USE_FIXED_UNIT_LAYOUT) {
+    return FIXED_HEAT_PUMP_DEVICE_IDS.includes(id)
+  }
+  return id >= 1 && id <= HEAT_PUMP_MAX_COUNT
 }
 
 export function isAirCooledModuleDeviceCode(value) {
@@ -63,7 +77,10 @@ export function isAirCooledModuleDeviceCode(value) {
   if (id == null || id < AIR_COOLED_MODULE_START_NO) {
     return false
   }
-  return FIXED_AIR_COOLED_MODULE_DEVICE_IDS.includes(id)
+  if (USE_FIXED_UNIT_LAYOUT) {
+    return FIXED_AIR_COOLED_MODULE_DEVICE_IDS.includes(id)
+  }
+  return id >= AIR_COOLED_MODULE_START_NO && id < AIR_COOLED_MODULE_START_NO + AIR_COOLED_MODULE_MAX_COUNT
 }
 
 export function buildFixedUnitLayoutSlots(cols, rows = 10) {
@@ -105,6 +122,22 @@ function clampInt(value, min, max, fallback = min) {
     return fallback
   }
   return Math.max(min, Math.min(parsed, max))
+}
+
+/** 从 HPTotalNumber 点位解析热泵总台数；无效时回退 fallback */
+export function parseHeatPumpTotalCount(value, fallback = STANDARD_DEFAULT_HEAT_PUMP_COUNT) {
+  return clampInt(value, 1, HEAT_PUMP_MAX_COUNT, fallback)
+}
+
+/** 标准款从实时值映射读取热泵总台数；大剧院固定台数 */
+export function resolveHeatPumpCountFromValueMap(valueMap, fallback = STANDARD_DEFAULT_HEAT_PUMP_COUNT) {
+  if (USE_FIXED_UNIT_LAYOUT) {
+    return DAJUYUAN_HEAT_PUMP_COUNT
+  }
+  if (!valueMap || typeof valueMap !== 'object') {
+    return fallback
+  }
+  return parseHeatPumpTotalCount(valueMap[LONG_NAME_HP_TOTAL_NUMBER], fallback)
 }
 
 /**
@@ -205,6 +238,17 @@ export function getUnitCompactDisplayName(id) {
  * 风冷模块点位 No31–No42；后端下拉偶发用 No14–No25（热泵台数后的连续序号）表示同一批设备。
  */
 export function remapAirCooledModuleDeviceCode(value) {
+  if (!USE_AIR_COOLED_DEVICE_CODE_REMAP) {
+    const id = parseUnitDeviceCodeLoose(value)
+    if (id == null) {
+      return null
+    }
+    if (id >= AIR_COOLED_MODULE_START_NO && id <= AIR_COOLED_MODULE_START_NO + AIR_COOLED_MODULE_MAX_COUNT) {
+      return toUnitDeviceCode(id)
+    }
+    return null
+  }
+
   const id = parseUnitDeviceCodeLoose(value)
   if (id == null) {
     return null
@@ -249,5 +293,38 @@ export function buildUnitGridItemMap(heatPumpCount, coupleEnergyTypeId, coupleEn
       id,
       createUnitGridItem(id),
     ]),
+  )
+}
+
+/** 首页 / 状态轮询：按 project profile 决定热泵、风冷模块分组 */
+export function getHomeUnitStatusGroups({ heatPumpCount: heatPumpCountOverride } = {}) {
+  const heatPumpCount = USE_FIXED_UNIT_LAYOUT
+    ? DAJUYUAN_HEAT_PUMP_COUNT
+    : parseHeatPumpTotalCount(heatPumpCountOverride, STANDARD_DEFAULT_HEAT_PUMP_COUNT)
+  const groups = {
+    heatPump: {
+      id: 'heat-pump',
+      label: '热泵机组',
+      startNo: 1,
+      count: heatPumpCount,
+    },
+  }
+
+  if (SHOW_AIR_COOLED_AS_STANDALONE_UNITS) {
+    groups.airCooledModule = {
+      id: 'air-cooled-module',
+      label: '风冷模块机组',
+      startNo: AIR_COOLED_MODULE_START_NO,
+      count: DAJUYUAN_AIR_COOLED_MODULE_COUNT,
+    }
+  }
+
+  return groups
+}
+
+/** 热泵总览看板轮询设备编号列表 */
+export function resolveBoardStatusDeviceIds(options = {}) {
+  return Object.values(getHomeUnitStatusGroups(options)).flatMap((group) =>
+    Array.from({ length: group.count }, (_, index) => group.startNo + index),
   )
 }

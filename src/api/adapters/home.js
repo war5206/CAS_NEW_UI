@@ -3,9 +3,16 @@ import {
   HEAT_PUMP_GRID_COLS,
   HEAT_PUMP_GRID_ROWS,
   HEAT_PUMP_STATUS,
+  HEAT_PUMP_DETAIL_LABEL,
   getHeatPumpStatusSummary,
 } from '@/config/homeHeatPumps'
-import { getUnitDisplayName, parseUnitDeviceCodeLoose, resolveUnitDisplayLabelFromCode } from '@/config/projectUnitDevices'
+import {
+  AIR_COOLED_MODULE_START_NO,
+  getUnitDisplayName,
+  parseUnitDeviceCodeLoose,
+  resolveUnitDisplayLabelFromCode,
+} from '@/config/projectUnitDevices'
+import { USE_FIXED_UNIT_LAYOUT } from '@/config/projectProfile'
 import { createUnitDeviceDetailsFromParam } from '@/config/unitDeviceParamPoints'
 import { isOnValue } from '@/utils/realvalMap'
 import { resolveHeatPumpStatusFromRuntime } from '@/utils/heatPumpRuntimeStatus'
@@ -52,19 +59,62 @@ function normalizeRunModeValue(value) {
   }
 }
 
-function buildModePresentationFromRunMode(runModeValue, fallbackModeName) {
-  if (runModeValue === '1') {
-    return { name: '智能模式运行中', avatarType: 'A' }
+function pickDefinedField(bags, keys) {
+  for (const key of keys) {
+    for (const bag of bags) {
+      if (!bag || typeof bag !== 'object') continue
+      if (Object.prototype.hasOwnProperty.call(bag, key)) {
+        const value = bag[key]
+        if (value !== null && value !== undefined && value !== '') {
+          return value
+        }
+      }
+    }
   }
-  if (runModeValue === '0') {
+
+  for (const key of keys) {
+    for (const bag of bags) {
+      if (!bag || typeof bag !== 'object') continue
+      if (Object.prototype.hasOwnProperty.call(bag, key) && (bag[key] === 0 || bag[key] === '0')) {
+        return bag[key]
+      }
+    }
+  }
+
+  return null
+}
+
+function resolveSystemOperatingMode(optional, source) {
+  return pickDefinedField(
+    [optional, source?.optional, source],
+    ['systemOperatingMode', 'SystemOperatingMode', 'system_operating_mode'],
+  )
+}
+
+function buildModePresentationFromOperatingMode(rawOperatingModeValue, fallbackModeName) {
+  if (rawOperatingModeValue === null || rawOperatingModeValue === undefined || rawOperatingModeValue === '') {
+    return { name: fallbackModeName, avatarType: 'A' }
+  }
+
+  // 0=智能模式，1=手动模式（与 ModeSelectPage / SystemOperatingMode 一致）
+  if (isOnValue(rawOperatingModeValue)) {
     return { name: '手动模式运行中', avatarType: 'H' }
   }
+
+  const normalized = normalizeRunModeValue(rawOperatingModeValue)
+  if (normalized === '1') {
+    return { name: '手动模式运行中', avatarType: 'H' }
+  }
+  if (normalized === '0') {
+    return { name: '智能模式运行中', avatarType: 'A' }
+  }
+
   return { name: fallbackModeName, avatarType: 'A' }
 }
 
-function buildModeIconsPresentation(runModeValue, qhbcValue) {
-  const iconAVisible = runModeValue === '0' || runModeValue === '1'
-  const iconASrc = runModeValue === '0' ? 'cooling' : 'heating'
+function buildModeIconsPresentation(hpTotalRunModeValue, qhbcValue) {
+  const iconAVisible = hpTotalRunModeValue === '0' || hpTotalRunModeValue === '1'
+  const iconASrc = hpTotalRunModeValue === '0' ? 'cooling' : 'heating'
   const iconBVisible = qhbcValue === '0' || qhbcValue === '1'
   const iconBBlue = qhbcValue === '1'
   return { iconAVisible, iconASrc, iconBVisible, iconBBlue }
@@ -115,8 +165,31 @@ function toHeatPumpLabelFromName(name, fallbackIndex) {
   return String(fallbackIndex).padStart(2, '0')
 }
 
-function createHeatPumpDetailsFromParam(heatPumpData = {}) {
-  return createUnitDeviceDetailsFromParam(heatPumpData)
+function createStandardHeatPumpDetailsFromParam(heatPumpData = {}, stateFallback = '') {
+  return [
+    { label: HEAT_PUMP_DETAIL_LABEL.INLET_TEMP, value: toText(heatPumpData['进水温度'], '--') },
+    { label: HEAT_PUMP_DETAIL_LABEL.OUTLET_TEMP, value: toText(heatPumpData['出水温度'], '--') },
+    { label: HEAT_PUMP_DETAIL_LABEL.AMBIENT_TEMP, value: toText(heatPumpData['环境温度'], '--') },
+    { label: HEAT_PUMP_DETAIL_LABEL.CUMULATIVE_RUNTIME, value: toText(heatPumpData['累积运行时长(H)'], '--') },
+    { label: HEAT_PUMP_DETAIL_LABEL.CONTINUOUS_RUNTIME, value: toText(heatPumpData['持续运行时长(H)'], '--') },
+    { label: HEAT_PUMP_DETAIL_LABEL.COMPRESSOR_1_CURRENT, value: toText(heatPumpData['压缩机1电流(A)'], '--') },
+    { label: HEAT_PUMP_DETAIL_LABEL.COMPRESSOR_2_CURRENT, value: toText(heatPumpData['压缩机2电流(A)'], '--') },
+    { label: HEAT_PUMP_DETAIL_LABEL.ANTI_FREEZE_STATUS, value: toText(heatPumpData['防冻状态'], '--') },
+    {
+      label: HEAT_PUMP_DETAIL_LABEL.MODE_STATUS,
+      value: toText(heatPumpData['模式状态'], toText(stateFallback, '--')),
+    },
+    { label: HEAT_PUMP_DETAIL_LABEL.DEFROST_STATUS, value: toText(heatPumpData['化霜状态'], '--') },
+    { label: HEAT_PUMP_DETAIL_LABEL.MAINBOARD_POWER_SIGNAL_STATUS, value: toText(heatPumpData['主板开机信号状态'], '--') },
+    { label: HEAT_PUMP_DETAIL_LABEL.FAULT_STATUS, value: toText(heatPumpData['故障状态'], '--') },
+  ]
+}
+
+function createHeatPumpDetailsFromParam(heatPumpData = {}, stateFallback = '') {
+  if (USE_FIXED_UNIT_LAYOUT) {
+    return createUnitDeviceDetailsFromParam(heatPumpData)
+  }
+  return createStandardHeatPumpDetailsFromParam(heatPumpData, stateFallback)
 }
 
 function buildFallbackLoopPumpItems() {
@@ -217,7 +290,7 @@ export function adaptSystemConfig(rawData) {
 export function createDefaultHomeOverview() {
   const heatPumpItems = HEAT_PUMP_GRID_ITEMS
   const heatPumpSummary = getHeatPumpStatusSummary(heatPumpItems)
-  // const loopPumpItems = buildFallbackLoopPumpItems()
+  const loopPumpItems = buildFallbackLoopPumpItems()
 
   return {
     fetchedAt: null,
@@ -240,23 +313,23 @@ export function createDefaultHomeOverview() {
     system: {
       heatPumpSummary,
       outdoorTemp: '-2.1',
-      // condensatePipeTemp: '-2.1',
-      // heatTracingEnabled: false,
+      condensatePipeTemp: '-2.1',
+      heatTracingEnabled: false,
       couplingEnergyEnabled: true,
       waterPumpEnabled: true,
       supplyTemp: '-2.1',
       supplyPressure: '-2.1',
       returnPressure: '-2.1',
       returnTemp: '-2.1',
-      // circulationPumps: loopPumpItems,
+      circulationPumps: loopPumpItems,
       drainValveOpen: true,
-      // pressureTankOpen: true,
-      // pressureValveOpen: true,
-      // makeupPumps: [
-      //   { name: '水泵一', status: '运行中', tone: 'running' },
-      //   { name: '水泵二', status: '待机', tone: 'off' },
-      // ],
-      // waterTankLevel: '50',
+      pressureTankOpen: true,
+      pressureValveOpen: true,
+      makeupPumps: [
+        { name: '水泵一', status: '运行中', tone: 'running' },
+        { name: '水泵二', status: '待机', tone: 'off' },
+      ],
+      waterTankLevel: '50',
       primarySupplyMainTemp: '',
       indoorTemperatures: [
         { name: '室内温度1', value: '0.0' },
@@ -276,8 +349,7 @@ export function createDefaultHomeOverview() {
     },
     deviceStatus: {
       heatPumpData: buildHeatPumpChartData(heatPumpSummary),
-      // loopPumpItems,
-      loopPumpItems: [],
+      loopPumpItems,
     },
     heatPumpItems,
   }
@@ -329,7 +401,12 @@ export function adaptHeatPumpArrange(rawData) {
     const status = resolveHeatPumpStatusFromRuntime(item ?? {})
     const codeText = toText(item?.code, '')
     const unitId = parseUnitDeviceCodeLoose(codeText) ?? toNumberOrFallback(item?.id, index + 1)
-    const displayName = getUnitDisplayName(unitId)
+
+    if (!USE_FIXED_UNIT_LAYOUT && unitId >= AIR_COOLED_MODULE_START_NO) {
+      return
+    }
+
+    const displayName = USE_FIXED_UNIT_LAYOUT ? getUnitDisplayName(unitId) : `热泵${unitId}`
 
     arrangedMap.set(`${safeRow}-${safeCol}`, {
       key: `hp-${codeText || unitId}-${safeRow}-${safeCol}`,
@@ -380,7 +457,7 @@ export function adaptHeatPumpParam(rawData, fallbackPump = {}) {
     defrost,
     state,
     status: resolveHeatPumpStatusFromRuntime({ alarm, run, state, defrost }),
-    details: createHeatPumpDetailsFromParam(heatPumpData),
+    details: createHeatPumpDetailsFromParam(heatPumpData, state),
   }
 }
 
@@ -400,9 +477,11 @@ export function adaptHeatPumpOverviewPage(rawData) {
   const source = responseData?.data ?? responseData ?? {}
   const list = Array.isArray(source?.list)
     ? source.list.map((item) => {
+        if (!USE_FIXED_UNIT_LAYOUT) {
+          return item
+        }
         const codeCandidate = item?.heatPumpCode ?? item?.heatPumpNo ?? item?.热泵序号 ?? item?.code
         const displayName = resolveUnitDisplayLabelFromCode(codeCandidate)
-
         return {
           ...item,
           heatPumpNo: displayName,
@@ -438,40 +517,54 @@ export function adaptHomeTemperatureTrend(rawData) {
   }
 }
 
-function isHomeOverviewPayload(candidate) {
-  if (!candidate || typeof candidate !== 'object' || Array.isArray(candidate)) return false
-  return (
-    candidate.onlineHeatPump !== undefined ||
-    candidate.offlineHeatPump !== undefined ||
-    candidate.userSupplyWaterTemperature !== undefined ||
-    candidate.userBackWaterTemperature !== undefined ||
-    candidate.supplyWaterPressure !== undefined ||
-    candidate.backWaterPressure !== undefined ||
-    candidate.system !== undefined ||
-    candidate.mode !== undefined
-  )
+function scoreHomeOverviewPayload(candidate) {
+  if (!candidate || typeof candidate !== 'object' || Array.isArray(candidate)) return -1
+
+  let score = 0
+  if (candidate.onlineHeatPump !== undefined) score += 10
+  if (candidate.offlineHeatPump !== undefined) score += 5
+  if (candidate.optional !== undefined) score += 4
+  if (candidate.optional?.systemOperatingMode !== undefined) score += 8
+  if (candidate.optional?.SystemOperatingMode !== undefined) score += 8
+  if (candidate.userSupplyWaterTemperature !== undefined) score += 2
+  if (candidate.userBackWaterTemperature !== undefined) score += 2
+  if (candidate.supplyWaterPressure !== undefined) score += 2
+  if (candidate.backWaterPressure !== undefined) score += 2
+  if (candidate.system !== undefined) score += 1
+  if (candidate.mode !== undefined) score += 1
+
+  return score
 }
 
-/** 兼容算法编排多种返回结构：data / data.result / data.data 等 */
+/** 兼容算法编排多种返回结构：优先取含 onlineHeatPump / optional 的完整 payload，避免误选仅含静态 mode 的 result */
 function extractHomeOverviewSource(rawData) {
   const envelope = rawData?.data ?? rawData
   if (!envelope || typeof envelope !== 'object') return {}
 
   const candidates = [
-    envelope?.data?.result,
-    envelope?.data?.data,
     envelope?.data,
-    envelope?.result,
+    envelope?.data?.data,
     envelope,
+    envelope?.result,
+    envelope?.data?.result,
   ]
 
+  let bestCandidate = null
+  let bestScore = -1
+
   for (const candidate of candidates) {
-    if (isHomeOverviewPayload(candidate)) {
-      return candidate
+    const score = scoreHomeOverviewPayload(candidate)
+    if (score > bestScore) {
+      bestScore = score
+      bestCandidate = candidate
     }
   }
 
-  return envelope?.data?.result ?? envelope?.data ?? envelope?.result ?? envelope ?? {}
+  if (bestCandidate && bestScore > 0) {
+    return bestCandidate
+  }
+
+  return envelope?.data ?? envelope?.data?.result ?? envelope?.result ?? envelope ?? {}
 }
 
 function isNewHomeOverviewApi(source) {
@@ -499,7 +592,7 @@ export function adaptHomeOverview(rawData) {
   const temperatureSource = source.temperature ?? {}
   const heatPumpItems = adaptHeatPumpItems(source.heatPumpItems, fallback.heatPumpItems)
   const summarySource = source.heatPumpSummary ?? systemSource.heatPumpSummary ?? getHeatPumpStatusSummary(heatPumpItems)
-  // const loopPumpItems = adaptLoopPumpItems(source.loopPumpItems ?? systemSource.circulationPumps, fallback.deviceStatus.loopPumpItems)
+  const loopPumpItems = adaptLoopPumpItems(source.loopPumpItems ?? systemSource.circulationPumps, fallback.deviceStatus.loopPumpItems)
 
   const heatPumpSummary = {
     running: toNumberOrFallback(summarySource.running, fallback.system.heatPumpSummary.running),
@@ -508,13 +601,20 @@ export function adaptHomeOverview(rawData) {
     malfunction: toNumberOrFallback(summarySource.malfunction, fallback.system.heatPumpSummary.malfunction),
   }
 
+  const optional = source.optional ?? {}
+  const systemOperatingMode = resolveSystemOperatingMode(optional, source)
+  const operatingModePresentation =
+    systemOperatingMode === null || systemOperatingMode === undefined || systemOperatingMode === ''
+      ? null
+      : buildModePresentationFromOperatingMode(systemOperatingMode, fallback.mode.name)
+
   return {
     fetchedAt: source.fetchedAt ?? rawData?.fetchedAt ?? null,
     mode: {
-      name: toText(modeSource.name, fallback.mode.name),
+      name: operatingModePresentation?.name ?? toText(modeSource.name, fallback.mode.name),
       savedCost: toText(modeSource.savedCost, fallback.mode.savedCost),
       ambientTempText: toText(modeSource.ambientTempText, fallback.mode.ambientTempText),
-      avatarType: toText(modeSource.avatarType, fallback.mode.avatarType),
+      avatarType: operatingModePresentation?.avatarType ?? toText(modeSource.avatarType, fallback.mode.avatarType),
       iconAVisible: modeSource.iconAVisible ?? fallback.mode.iconAVisible,
       iconASrc: toText(modeSource.iconASrc, fallback.mode.iconASrc),
       iconBVisible: modeSource.iconBVisible ?? fallback.mode.iconBVisible,
@@ -529,21 +629,21 @@ export function adaptHomeOverview(rawData) {
     system: {
       heatPumpSummary,
       outdoorTemp: toText(systemSource.outdoorTemp, fallback.system.outdoorTemp),
-      // condensatePipeTemp: toText(systemSource.condensatePipeTemp, fallback.system.condensatePipeTemp),
-      // heatTracingEnabled: toBoolean(systemSource.heatTracingEnabled, fallback.system.heatTracingEnabled),
+      condensatePipeTemp: toText(systemSource.condensatePipeTemp, fallback.system.condensatePipeTemp),
+      heatTracingEnabled: toBoolean(systemSource.heatTracingEnabled, fallback.system.heatTracingEnabled),
       couplingEnergyEnabled: toBoolean(systemSource.couplingEnergyEnabled, fallback.system.couplingEnergyEnabled),
       waterPumpEnabled: toBoolean(systemSource.waterPumpEnabled, fallback.system.waterPumpEnabled),
       supplyTemp: toText(systemSource.supplyTemp, fallback.system.supplyTemp),
       supplyPressure: toText(systemSource.supplyPressure, fallback.system.supplyPressure),
       returnPressure: toText(systemSource.returnPressure, fallback.system.returnPressure),
       returnTemp: toText(systemSource.returnTemp, fallback.system.returnTemp),
-      // circulationPumps: loopPumpItems,
+      circulationPumps: loopPumpItems,
       terminalCirculationPumps: adaptLoopPumpItems(systemSource.terminalCirculationPumps, []),
       drainValveOpen: toBoolean(systemSource.drainValveOpen, fallback.system.drainValveOpen),
-      // pressureTankOpen: toBoolean(systemSource.pressureTankOpen, fallback.system.pressureTankOpen),
-      // pressureValveOpen: toBoolean(systemSource.pressureValveOpen, fallback.system.pressureValveOpen),
-      // makeupPumps: adaptLoopPumpItems(systemSource.makeupPumps, fallback.system.makeupPumps),
-      // waterTankLevel: toText(systemSource.waterTankLevel, fallback.system.waterTankLevel),
+      pressureTankOpen: toBoolean(systemSource.pressureTankOpen, fallback.system.pressureTankOpen),
+      pressureValveOpen: toBoolean(systemSource.pressureValveOpen, fallback.system.pressureValveOpen),
+      makeupPumps: adaptLoopPumpItems(systemSource.makeupPumps, fallback.system.makeupPumps),
+      waterTankLevel: toText(systemSource.waterTankLevel, fallback.system.waterTankLevel),
       primarySupplyMainTemp: toText(systemSource.primarySupplyMainTemp, ''),
       indoorTemperatures: Array.isArray(systemSource.indoorTemperatures) ? systemSource.indoorTemperatures : fallback.system.indoorTemperatures,
       targetBackwaterTemperature: toText(systemSource.targetBackwaterTemperature, fallback.system.targetBackwaterTemperature),
@@ -556,8 +656,7 @@ export function adaptHomeOverview(rawData) {
     },
     deviceStatus: {
       heatPumpData: buildHeatPumpChartData(heatPumpSummary),
-      // loopPumpItems,
-      loopPumpItems: [],
+      loopPumpItems,
     },
     heatPumpItems,
   }
@@ -571,18 +670,18 @@ function adaptNewApiResponse(source, fallback) {
     malfunction: toNumberOrFallback(source.alarmHeatPump, 0),
   }
 
-  // const circulationPumps = Array.isArray(source.heatCirculationPump)
-  //   ? source.heatCirculationPump.map((p) => pumpStateToPumpItem(p.name, p.state))
-  //   : fallback.system.circulationPumps
+  const circulationPumps = Array.isArray(source.heatCirculationPump)
+    ? source.heatCirculationPump.map((p) => pumpStateToPumpItem(p.name, p.state))
+    : fallback.system.circulationPumps
 
   const terminalCirculationPumps = Array.isArray(source.terminalCirculationPump)
     ? source.terminalCirculationPump.map((p) => pumpStateToPumpItem(p.name, p.state))
     : []
 
-  // const makeupPumps = [
-  //   pumpStateToPumpItem('水泵一', source.replenishWaterPump1),
-  //   pumpStateToPumpItem('水泵二', source.replenishWaterPump2),
-  // ]
+  const makeupPumps = [
+    pumpStateToPumpItem('水泵一', source.replenishWaterPump1),
+    pumpStateToPumpItem('水泵二', source.replenishWaterPump2),
+  ]
 
   const indoorTemperatures = Array.isArray(source.terminalTemperature)
     ? source.terminalTemperature.map((t) => ({
@@ -594,12 +693,13 @@ function adaptNewApiResponse(source, fallback) {
   const optional = source.optional ?? {}
   const ambientTemp = toText(source.ambientTemperature, fallback.system.outdoorTemp)
   const ambientTempText = `环境温度：${ambientTemp}℃`
-  const runModeValue = normalizeRunModeValue(optional.hpTotalRunMode)
+  const systemOperatingMode = resolveSystemOperatingMode(optional, source)
+  const hpTotalRunMode = normalizeRunModeValue(optional.hpTotalRunMode)
   const qhbcValue = normalizeRunModeValue(optional.qhbcValue)
-  const modePresentation = buildModePresentationFromRunMode(runModeValue, fallback.mode.name)
-  const modeIconsPresentation = buildModeIconsPresentation(runModeValue, qhbcValue)
+  const modePresentation = buildModePresentationFromOperatingMode(systemOperatingMode, fallback.mode.name)
+  const modeIconsPresentation = buildModeIconsPresentation(hpTotalRunMode, qhbcValue)
 
-  // const loopPumpItems = circulationPumps.length > 0 ? circulationPumps : fallback.deviceStatus.loopPumpItems
+  const loopPumpItems = circulationPumps.length > 0 ? circulationPumps : fallback.deviceStatus.loopPumpItems
 
   return {
     fetchedAt: Date.now(),
@@ -617,8 +717,8 @@ function adaptNewApiResponse(source, fallback) {
     system: {
       heatPumpSummary,
       outdoorTemp: ambientTemp,
-      // condensatePipeTemp: toText(source.condensateWaterTemperature, '0'),
-      // heatTracingEnabled: toBoolean(source.tropicalCompanion, false),
+      condensatePipeTemp: toText(source.condensateWaterTemperature, '0'),
+      heatTracingEnabled: toBoolean(source.tropicalCompanion, false),
       couplingEnergyEnabled: toBoolean(source.coupleEnergy, false),
       couplingEnergyName: toText(source.coupleEnergyName, ''),
       waterPumpEnabled: fallback.system.waterPumpEnabled,
@@ -626,13 +726,13 @@ function adaptNewApiResponse(source, fallback) {
       supplyPressure: toText(source.supplyWaterPressure, '0'),
       returnPressure: toText(source.backWaterPressure, '0'),
       returnTemp: toText(source.userBackWaterTemperature, '0'),
-      // circulationPumps,
+      circulationPumps,
       terminalCirculationPumps,
       drainValveOpen: toBoolean(source.dirtSeparator, false),
-      // pressureTankOpen: fallback.system.pressureTankOpen,
-      // pressureValveOpen: toBoolean(source.pressureReliefValve, false),
-      // makeupPumps,
-      // waterTankLevel: toText(source.softenWaterTank, '0'),
+      pressureTankOpen: fallback.system.pressureTankOpen,
+      pressureValveOpen: toBoolean(source.pressureReliefValve, false),
+      makeupPumps,
+      waterTankLevel: toText(source.softenWaterTank, '0'),
       primarySupplyMainTemp: toText(source.onceSupplyWaterTemperature, ''),
       indoorTemperatures,
       targetBackwaterTemperature: toText(optional.targetBackwaterTemperature, '0.0℃'),
@@ -640,8 +740,7 @@ function adaptNewApiResponse(source, fallback) {
     temperature: fallback.temperature,
     deviceStatus: {
       heatPumpData: buildHeatPumpChartData(heatPumpSummary),
-      // loopPumpItems,
-      loopPumpItems: [],
+      loopPumpItems,
     },
     heatPumpItems: fallback.heatPumpItems,
   }

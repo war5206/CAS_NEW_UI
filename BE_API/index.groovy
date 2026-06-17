@@ -594,6 +594,24 @@ if(dt.getRows().size() == 1){
 optionalMap.put("stateOnOff", stateOnOff);
 optionalMap.put("longNameOnOff", "Sys\\FinforWorx\\SystemStatus");
 
+// 系统运行模式（0=智能，1=手动）
+pointSql = "SELECT a.taglongname,a.times,a.realval,a.quality FROM psrealdata AS a WHERE a.taglongname IN ('Sys\\FinforWorx\\SystemOperatingMode')";
+dt = dataService.queryListDataBySql(pointSql);
+int systemOperatingMode = 0;
+if(dt.getRows().size() == 1){
+    for(int c = 0; c < dt.getColumns().size(); c++){
+        if(dt.getColumns().get(c).getColumnName() == "realval"){
+            try {
+                systemOperatingMode = Integer.parseInt(dt.getValue(0,c).toString());
+            } catch (Exception e) {
+                systemOperatingMode = 0;
+            }
+        }
+    }
+}
+optionalMap.put("systemOperatingMode", systemOperatingMode);
+optionalMap.put("longNameSystemOperatingMode", "Sys\\FinforWorx\\SystemOperatingMode");
+
 // 热泵总运行模式
 pointSql = "SELECT a.taglongname,a.times,a.realval,a.quality FROM psrealdata AS a WHERE a.taglongname IN ('Sys\\FinforWorx\\HPTotalRunMode')";
 dt = dataService.queryListDataBySql(pointSql);

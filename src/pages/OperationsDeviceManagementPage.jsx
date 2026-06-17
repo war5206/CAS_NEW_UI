@@ -3,7 +3,9 @@ import { filterOpsDeviceRowsByPointNos } from '@/api/adapters/operations'
 import {
   getFixedAirCooledModuleDeviceIds,
   getFixedHeatPumpDeviceIds,
+  USE_FIXED_UNIT_LAYOUT,
 } from '@/config/projectUnitDevices'
+import { SHOW_AIR_COOLED_AS_STANDALONE_UNITS } from '@/config/projectProfile'
 import useActionConfirm from '../hooks/useActionConfirm'
 import { writeRealvalByLongNames } from '@/api/modules/settings'
 import { useOpsOperatingTimeQuery, useOpsSystemTypeQuery } from '@/features/operations/hooks/useOperationsQueries'
@@ -22,8 +24,10 @@ const DEVICE_TYPE_MAP = {
 }
 
 const TAB_POINT_NO_FILTER = {
-  'ops-heat-pump': getFixedHeatPumpDeviceIds(),
-  'ops-air-cooled-module': getFixedAirCooledModuleDeviceIds(),
+  ...(USE_FIXED_UNIT_LAYOUT || SHOW_AIR_COOLED_AS_STANDALONE_UNITS
+    ? { 'ops-heat-pump': getFixedHeatPumpDeviceIds() }
+    : {}),
+  ...(SHOW_AIR_COOLED_AS_STANDALONE_UNITS ? { 'ops-air-cooled-module': getFixedAirCooledModuleDeviceIds() } : {}),
 }
 
 function OperationsDeviceManagementPage({ tabId }) {

@@ -881,7 +881,23 @@
   border-radius: 8px;
 }
 
-.home-system-hitbox--heat-pump-icon {
+.home-system-overlay--standard .home-system-hitbox--heat-pump-icon {
+  left: -0.1%;
+  top: 12%;
+  width: 15.5%;
+  height: 19.5%;
+  border-radius: 5%;
+}
+
+.home-system-overlay--standard .home-system-hitbox--terminal-building-icon {
+  left: 86.8%;
+  top: 46.2%;
+  width: 12.5%;
+  height: 22.5%;
+  border-radius: 5%;
+}
+
+.home-system-overlay--dajuyuan .home-system-hitbox--heat-pump-icon {
   left: -0.1%;
   top: 20%;
   width: 15.5%;
@@ -889,7 +905,7 @@
   border-radius: 5%;
 }
 
-.home-system-hitbox--terminal-building-icon {
+.home-system-overlay--dajuyuan .home-system-hitbox--terminal-building-icon {
   left: 87%;
   top: 54.3%;
   width: 12.5%;
@@ -918,7 +934,15 @@
   font-weight: 700;
 }
 
-.home-system-node--heat-pump-click-tip {
+.home-system-overlay--standard .home-system-node--heat-pump-click-tip {
+  top: 25%;
+  left: 4.7%;
+  margin-top: var(--home-system-tip-margin-top);
+  font-size: 14px;
+  color: #0e0e14;
+}
+
+.home-system-overlay--dajuyuan .home-system-node--heat-pump-click-tip {
   top: 33%;
   left: 4.7%;
   margin-top: var(--home-system-tip-margin-top);
@@ -983,29 +1007,152 @@
   box-shadow: 0 0 10px rgba(255, 66, 41, 0.36);
 }
 
-.home-system-node--heat-pump {
-  left: 18%;
-  top: 20%;
-}
-
-.home-system-node--air-cooled-module {
-  left: 28%;
-  top: 20%;
-}
-
-.home-unit-status-block .home-system-value {
+.home-unit-status-block .home-system-value,
+.home-system-overlay--standard .home-system-node--heat-pump .home-system-value {
   min-width: 2ch;
   text-align: right;
   font-variant-numeric: tabular-nums;
 }
 
-.home-system-node--outdoor-temperature {
+/* Standard overlay (system.png) */
+.home-system-overlay--standard .home-system-node--heat-pump {
+  left: 18%;
+  top: 8%;
+}
+
+.home-system-overlay--standard .home-system-node--outdoor-temperature {
+  left: 52.5%;
+  top: 14%;
+  transform: translateX(-50%);
+}
+
+.home-system-overlay--standard .home-system-node--condensate {
+  left: 45.5%;
+  top: 26%;
+  transform: translateX(-50%);
+}
+
+.home-system-overlay--standard .home-system-node--heat-tracing {
+  left: 18%;
+  top: 29%;
+}
+
+.home-system-overlay--standard .home-system-node--coupling-energy {
+  left: 74.5%;
+  top: 33%;
+}
+
+.home-system-overlay--standard .home-system-node--indoor-temperature-list {
+  left: 87.5%;
+  top: 27.5%;
+}
+
+.home-system-overlay--standard .home-system-node--supply-temperature {
+  left: 68%;
+  top: 45%;
+}
+
+.home-system-overlay--standard .home-system-node--supply-pressure {
+  left: 68%;
+  top: 55%;
+}
+
+.home-system-overlay--standard .home-system-node--return-pressure {
+  left: 16%;
+  top: 59.5%;
+}
+
+.home-system-overlay--standard .home-system-node--return-temperature {
+  left: 79%;
+  top: 62%;
+  transform: translateX(-50%);
+}
+
+.home-system-overlay--standard .home-system-node--circulation-pump {
+  left: 7%;
+  top: 70%;
+}
+
+.home-system-overlay--standard .home-system-node--terminal-loop-pump {
+  left: 44%;
+  top: 38%;
+}
+
+.home-system-overlay--standard .home-system-node--primary-supply-main-temp {
+  left: 19%;
+  top: 48%;
+}
+
+.home-system-overlay--standard .home-system-node--bypass-valve {
+  left: 38.5%;
+  top: 54%;
+  writing-mode: vertical-rl;
+  text-orientation: mixed;
+  letter-spacing: var(--home-system-letter-spacing);
+}
+
+.home-system-overlay--standard .home-system-node--drain-valve {
+  left: 62.5%;
+  top: 72%;
+}
+
+.home-system-overlay--standard .home-system-node--pressure-tank {
+  left: 39.5%;
+  top: 71%;
+}
+
+.home-system-overlay--standard .home-system-node--pressure-valve {
+  left: 28%;
+  top: 89%;
+}
+
+.home-system-overlay--standard .home-system-node--makeup-pump {
+  left: 51%;
+  top: 90%;
+}
+
+.home-system-overlay--standard .home-system-node--water-tank {
+  left: 66%;
+  top: 79%;
+}
+
+.home-system-overlay--standard .home-system-node--soft-water {
+  left: 93%;
+  top: 85%;
+  font-size: 18px;
+}
+
+.home-system-overlay--standard .home-system-node--terminal-building {
+  left: 89.5%;
+  top: 70%;
+  font-size: 18px;
+}
+
+.home-system-overlay--standard .home-system-node--terminal-building-tip {
+  left: 89.7%;
+  top: 59.8%;
+  font-size: 14px;
+  color: #0e0e14;
+}
+
+/* Dajuyuan overlay (dajuyuan-system.png) */
+.home-system-overlay--dajuyuan .home-system-node--heat-pump {
+  left: 18%;
+  top: 20%;
+}
+
+.home-system-overlay--dajuyuan .home-system-node--air-cooled-module {
+  left: 28%;
+  top: 20%;
+}
+
+.home-system-overlay--dajuyuan .home-system-node--outdoor-temperature {
   left: 83.5%;
   top: 22.5%;
   transform: translateX(-50%);
 }
 
-.home-system-node--condensate {
+.home-system-overlay--dajuyuan .home-system-node--condensate {
   left: 45.5%;
   top: 26%;
   transform: translateX(-50%);
@@ -1013,58 +1160,58 @@
   font-weight: 700;
 }
 
-.home-system-node--heat-tracing {
+.home-system-overlay--dajuyuan .home-system-node--heat-tracing {
   left: 18%;
   top: 29%;
 }
 
-.home-system-node--coupling-energy {
+.home-system-overlay--dajuyuan .home-system-node--coupling-energy {
   left: 74.5%;
   top: 33%;
 }
 
-.home-system-node--indoor-temperature-list {
+.home-system-overlay--dajuyuan .home-system-node--indoor-temperature-list {
   left: 88.5%;
   top: 69%;
 }
 
-.home-system-node--supply-temperature {
+.home-system-overlay--dajuyuan .home-system-node--supply-temperature {
   left: 70%;
   top: 53.5%;
 }
 
-.home-system-node--supply-pressure {
+.home-system-overlay--dajuyuan .home-system-node--supply-pressure {
   left: 70%;
   top: 63%;
 }
 
-.home-system-node--return-pressure {
+.home-system-overlay--dajuyuan .home-system-node--return-pressure {
   left: 6%;
   top: 67.5%;
 }
 
-.home-system-node--return-temperature {
+.home-system-overlay--dajuyuan .home-system-node--return-temperature {
   left: 79%;
   top: 75%;
   transform: translateX(-50%);
 }
 
-.home-system-node--circulation-pump {
+.home-system-overlay--dajuyuan .home-system-node--circulation-pump {
   left: 17.7%;
   top: 77.5%;
 }
 
-.home-system-node--terminal-loop-pump {
+.home-system-overlay--dajuyuan .home-system-node--terminal-loop-pump {
   left: 38%;
   top: 38%;
 }
 
-.home-system-node--primary-supply-main-temp {
+.home-system-overlay--dajuyuan .home-system-node--primary-supply-main-temp {
   left: 16%;
   top: 48%;
 }
 
-.home-system-node--bypass-valve {
+.home-system-overlay--dajuyuan .home-system-node--bypass-valve {
   left: 38.5%;
   top: 54.7%;
   writing-mode: vertical-rl;
@@ -1072,46 +1219,46 @@
   letter-spacing: var(--home-system-letter-spacing);
 }
 
-.home-system-node--drain-valve {
+.home-system-overlay--dajuyuan .home-system-node--drain-valve {
   left: 63.9%;
   top: 80%;
 }
 
-.home-system-node--pressure-tank {
+.home-system-overlay--dajuyuan .home-system-node--pressure-tank {
   left: 40%;
   top: 71%;
 }
 
-.home-system-node--pressure-valve {
+.home-system-overlay--dajuyuan .home-system-node--pressure-valve {
   left: 28.5%;
   top: 89%;
 }
 
-.home-system-node--makeup-pump {
+.home-system-overlay--dajuyuan .home-system-node--makeup-pump {
   left: 51.5%;
   top: 90%;
 }
 
-.home-system-node--water-tank {
+.home-system-overlay--dajuyuan .home-system-node--water-tank {
   left: 66.5%;
   top: 79%;
 }
 
-.home-system-node--soft-water {
+.home-system-overlay--dajuyuan .home-system-node--soft-water {
   left: 93%;
   top: 85%;
   font-size: 18px;
   font-weight: 700;
 }
 
-.home-system-node--terminal-building {
+.home-system-overlay--dajuyuan .home-system-node--terminal-building {
   left: 90.5%;
   top: 51.2%;
   font-size: 18px;
   font-weight: 700;
 }
 
-.home-system-node--terminal-building-tip {
+.home-system-overlay--dajuyuan .home-system-node--terminal-building-tip {
   left: 90.2%;
   top: 68.2%;
   font-size: 14px;

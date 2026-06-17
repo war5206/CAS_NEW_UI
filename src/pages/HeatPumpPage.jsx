@@ -24,6 +24,7 @@ import {
   remapAirCooledModuleDeviceCode,
   toUnitDeviceCode,
 } from '../config/projectUnitDevices'
+import { USE_FIXED_UNIT_LAYOUT } from '@/config/projectProfile'
 import { extractRealvalMap } from '../utils/realvalMap'
 import { isWriteSuccess, useWriteWithDelayedVerify } from '../hooks/useWriteWithDelayedVerify'
 import { useUnitDeviceStatusPoll } from '../hooks/useUnitDeviceStatusPoll'
@@ -35,11 +36,21 @@ import standbyIcon from '../assets/heat-pump/hp-modal-shutdown.svg'
 import checkMarkIcon from '../assets/icons/check-mark.svg'
 import './HeatPumpPage.css'
 
+const FALLBACK_HEAT_PUMP_DEVICE_CODES = ['No1']
+
+function getDefaultHeatPumpDeviceIds() {
+  return USE_FIXED_UNIT_LAYOUT ? getFixedHeatPumpDeviceIds() : []
+}
+
+function getDefaultHeatPumpDeviceCodes() {
+  return USE_FIXED_UNIT_LAYOUT ? getFixedHeatPumpDeviceCodes() : [...FALLBACK_HEAT_PUMP_DEVICE_CODES]
+}
+
 const DEVICE_MODULE_CONFIGS = {
   'heat-pump': {
     deviceLabel: '热泵',
-    getDefaultDeviceIds: getFixedHeatPumpDeviceIds,
-    getDefaultDeviceCodes: getFixedHeatPumpDeviceCodes,
+    getDefaultDeviceIds: getDefaultHeatPumpDeviceIds,
+    getDefaultDeviceCodes: getDefaultHeatPumpDeviceCodes,
     isDeviceCode: isHeatPumpModuleDeviceCode,
     defaultSelectedCode: 'No1',
     groupControlIconAlt: '热泵群控',
@@ -64,10 +75,20 @@ function getDeviceModuleConfig(deviceModuleType) {
 }
 
 function getDefaultSelectOptions(config) {
-  return config.getDefaultDeviceIds().map((id) => ({
-    value: toUnitDeviceCode(id),
-    label: getUnitDisplayName(id),
-  }))
+  const ids = config.getDefaultDeviceIds()
+  if (ids.length > 0) {
+    return ids.map((id) => ({
+      value: toUnitDeviceCode(id),
+      label: getUnitDisplayName(id),
+    }))
+  }
+  return FALLBACK_HEAT_PUMP_DEVICE_CODES.map((code) => {
+    const id = parseUnitDeviceCodeLoose(code)
+    return {
+      value: code,
+      label: id != null ? getUnitDisplayName(id) : config.deviceLabel,
+    }
+  })
 }
 
 /** 单台 / 批量共用：按 HeatPump\SJMG\NoX\{suffix} 拼点位 */

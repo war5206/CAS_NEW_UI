@@ -14,10 +14,13 @@ import micoeInfiniteLogo from '../assets/brand/micoe-infinite.png'
 import backIcon from '../assets/layout/back.svg'
 import {
   HEAT_PUMP_GRID_COLS,
+  HEAT_PUMP_GRID_ITEMS,
   HEAT_PUMP_GRID_ROWS,
   HEAT_PUMP_STATUS,
   HEAT_PUMP_STATUS_LABEL,
+  HEAT_PUMP_DETAIL_LABEL,
 } from '../config/homeHeatPumps'
+import { USE_FIXED_UNIT_LAYOUT } from '@/config/projectProfile'
 import { createUnitGridItem, resolveUnitDisplayLabelFromCode, toUnitDeviceCode } from '../config/projectUnitDevices'
 import { UNIT_DEVICE_OVERVIEW_METRIC_KEYS } from '../config/unitDeviceParamPoints'
 import { useHeatPumpBoardStatusPoll } from '../hooks/useHeatPumpBoardStatusPoll'
@@ -45,7 +48,10 @@ const stopPointerEvent = (event) => {
 }
 
 const HEAT_PUMP_OVERVIEW_PAGE_SIZE = 10
-const OVERVIEW_TABLE_METRIC_LABELS = UNIT_DEVICE_OVERVIEW_METRIC_KEYS
+const STANDARD_OVERVIEW_TABLE_METRIC_LABELS = Object.values(HEAT_PUMP_DETAIL_LABEL)
+const OVERVIEW_TABLE_METRIC_LABELS = USE_FIXED_UNIT_LAYOUT
+  ? UNIT_DEVICE_OVERVIEW_METRIC_KEYS
+  : STANDARD_OVERVIEW_TABLE_METRIC_LABELS
 const EMPTY_GRID_ITEMS = Array.from({ length: HEAT_PUMP_GRID_ROWS * HEAT_PUMP_GRID_COLS }, (_, index) => {
   const row = Math.floor(index / HEAT_PUMP_GRID_COLS) + 1
   const col = (index % HEAT_PUMP_GRID_COLS) + 1
@@ -107,7 +113,7 @@ function HomeHeatPumpOverview({ onBack, committedUnitLayoutSlots, heatPumpItems:
   const [isOverviewModalOpen, setIsOverviewModalOpen] = useState(false)
   const [overviewPage, setOverviewPage] = useState(1)
   const { data: arrangedHeatPumpItems } = useHeatPumpArrangeQuery()
-  const liveStatusByCode = useHeatPumpBoardStatusPoll()
+  const liveStatusByCode = useHeatPumpBoardStatusPoll({ enabled: USE_FIXED_UNIT_LAYOUT })
   const { data: pendingPumpWithParam, isError: isPumpParamError } = useHeatPumpParamQuery({
     pump: pendingPump,
     enabled: Boolean(pendingPump),
@@ -173,12 +179,18 @@ function HomeHeatPumpOverview({ onBack, committedUnitLayoutSlots, heatPumpItems:
   )
 
   const boardHeatPumpItems = useMemo(() => {
-    let items = EMPTY_GRID_ITEMS
-
     if (Array.isArray(arrangedHeatPumpItems) && arrangedHeatPumpItems.length > 0) {
-      items = arrangedHeatPumpItems
-    } else if (Array.isArray(committedUnitLayoutSlots) && committedUnitLayoutSlots.length > 0) {
-      items = Array.from({ length: HEAT_PUMP_GRID_ROWS * HEAT_PUMP_GRID_COLS }, (_, index) => {
+      return USE_FIXED_UNIT_LAYOUT
+        ? arrangedHeatPumpItems.map((item) => applyLiveStatusToBoardItem(item, liveStatusByCode))
+        : arrangedHeatPumpItems
+    }
+
+    if (!Array.isArray(committedUnitLayoutSlots) || committedUnitLayoutSlots.length === 0) {
+      return EMPTY_GRID_ITEMS
+    }
+
+    if (USE_FIXED_UNIT_LAYOUT) {
+      return Array.from({ length: HEAT_PUMP_GRID_ROWS * HEAT_PUMP_GRID_COLS }, (_, index) => {
         const row = Math.floor(index / HEAT_PUMP_GRID_COLS) + 1
         const col = (index % HEAT_PUMP_GRID_COLS) + 1
         const pumpId = committedUnitLayoutSlots[index]
@@ -205,10 +217,39 @@ function HomeHeatPumpOverview({ onBack, committedUnitLayoutSlots, heatPumpItems:
           name: null,
           details: [],
         }
-      })
+      }).map((item) => applyLiveStatusToBoardItem(item, liveStatusByCode))
     }
 
-    return items.map((item) => applyLiveStatusToBoardItem(item, liveStatusByCode))
+    const baseById = new Map(
+      HEAT_PUMP_GRID_ITEMS.filter((item) => item.id !== null).map((item) => [item.id, item]),
+    )
+
+    return Array.from({ length: HEAT_PUMP_GRID_ROWS * HEAT_PUMP_GRID_COLS }, (_, index) => {
+      const row = Math.floor(index / HEAT_PUMP_GRID_COLS) + 1
+      const col = (index % HEAT_PUMP_GRID_COLS) + 1
+      const pumpId = committedUnitLayoutSlots[index]
+      const mapped = baseById.get(pumpId)
+
+      if (mapped) {
+        return {
+          ...mapped,
+          row,
+          col,
+          key: `hp-layout-${mapped.id}-${row}-${col}`,
+        }
+      }
+
+      return {
+        key: `hp-layout-empty-${row}-${col}`,
+        id: null,
+        row,
+        col,
+        status: HEAT_PUMP_STATUS.EMPTY,
+        label: null,
+        name: null,
+        details: [],
+      }
+    })
   }, [arrangedHeatPumpItems, committedUnitLayoutSlots, liveStatusByCode])
 
   const totalOverviewPages = Math.max(1, overviewPageData.totalPages || 1)
@@ -407,9 +448,13 @@ function HomeHeatPumpOverview({ onBack, committedUnitLayoutSlots, heatPumpItems:
                     </thead>
                     <tbody>
                       {pagedHeatPumps.map((pump) => {
-                        const heatPumpName = resolveUnitDisplayLabelFromCode(
-                          pump?.heatPumpNo ?? pump?.热泵序号 ?? pump?.heatPumpCode ?? pump?.code,
-                        )
+                        const heatPumpName = USE_FIXED_UNIT_LAYOUT
+                          ? resolveUnitDisplayLabelFromCode(
+                              pump?.heatPumpNo ?? pump?.热泵序号 ?? pump?.heatPumpCode ?? pump?.code,
+                            )
+                          : String(
+                              pump?.heatPumpNo ?? pump?.热泵序号 ?? pump?.heatPumpCode ?? pump?.code ?? '--',
+                            )
 
                         return (
                           <tr key={`summary-row-${pump?.heatPumpCode ?? heatPumpName}`}>

@@ -1,4 +1,4 @@
-﻿import iconHome from '../assets/navigation/index.svg'
+import iconHome from '../assets/navigation/index.svg'
 import iconSetting from '../assets/navigation/setting.svg'
 import iconAlert from '../assets/navigation/alert.svg'
 import iconAnalysis from '../assets/navigation/analysis.svg'
@@ -21,8 +21,65 @@ import iconSystemManagement from '../assets/navigation/systemManagement.svg'
 import iconDeviceManagement from '../assets/navigation/deviceManagement.svg'
 import iconDocManagement from '../assets/navigation/docManagement.svg'
 import iconSystemInstruction from '../assets/navigation/systemInstruction.svg'
+import {
+  SHOW_AIR_COOLED_AS_STANDALONE_UNITS,
+  USE_SPLIT_OPS_UNIT_DATA_TABS,
+} from '@/config/projectProfile'
 
-export const modules = [
+function filterTabs(tabs, hiddenTabIds) {
+  return tabs.filter((tab) => !hiddenTabIds.has(tab.id))
+}
+
+function applyProjectProfileToModules(baseModules) {
+  const hiddenDeviceParamTabs = SHOW_AIR_COOLED_AS_STANDALONE_UNITS ? new Set() : new Set(['air-cooled-module'])
+  const hiddenOpsDeviceTabs = SHOW_AIR_COOLED_AS_STANDALONE_UNITS ? new Set() : new Set(['ops-air-cooled-module'])
+
+  return baseModules.map((module) => {
+    if (!module.sections?.length) {
+      return module
+    }
+
+    return {
+      ...module,
+      sections: module.sections.map((section) => {
+        if (section.id === 'device-params' && section.tabs?.length) {
+          return {
+            ...section,
+            tabs: filterTabs(section.tabs, hiddenDeviceParamTabs),
+          }
+        }
+
+        if (section.id === 'device-management' && section.tabs?.length) {
+          return {
+            ...section,
+            tabs: filterTabs(section.tabs, hiddenOpsDeviceTabs),
+          }
+        }
+
+        if (section.id === 'system-management' && section.tabs?.length) {
+          if (USE_SPLIT_OPS_UNIT_DATA_TABS) {
+            return section
+          }
+
+          const mergedUnitDataTab = { id: 'unit-data', label: '机组数据', path: 'unit-data' }
+          const tabs = section.tabs.filter((tab) => tab.id !== 'unit-data-heat-pump' && tab.id !== 'unit-data-air-cooled')
+          const settingDataIndex = tabs.findIndex((tab) => tab.id === 'setting-data')
+          const insertIndex = settingDataIndex >= 0 ? settingDataIndex + 1 : tabs.length
+          tabs.splice(insertIndex, 0, mergedUnitDataTab)
+
+          return {
+            ...section,
+            tabs,
+          }
+        }
+
+        return section
+      }),
+    }
+  })
+}
+
+const BASE_MODULES = [
   {
     id: 'home',
     label: '首页',
@@ -146,6 +203,8 @@ export const modules = [
     sections: [],
   },
 ]
+
+export const modules = applyProjectProfileToModules(BASE_MODULES)
 
 const sectionIconMap = {
   'mode-select': iconModeSelect,

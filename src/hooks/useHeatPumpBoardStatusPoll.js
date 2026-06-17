@@ -1,25 +1,18 @@
 import { useEffect, useRef, useState } from 'react'
 import { queryRealvalByLongNames } from '@/api/modules/settings'
+import { buildHomeUnitStatusPollLongNames } from '@/config/heatPumpUnitStatusPoints'
+import { resolveBoardStatusDeviceIds, resolveHeatPumpCountFromValueMap, toUnitDeviceCode } from '@/config/projectUnitDevices'
+import { STANDARD_DEFAULT_HEAT_PUMP_COUNT, USE_FIXED_UNIT_LAYOUT } from '@/config/projectProfile'
 import { getUnitDeviceStatusLongNames } from '@/config/unitDeviceParamPoints'
-import { FIXED_UNIT_DEVICE_IDS, toUnitDeviceCode } from '@/config/projectUnitDevices'
 import { extractRealvalMap } from '@/utils/realvalMap'
 import { resolveRuntimeStatusFromPoints } from '@/utils/heatPumpRuntimeStatus'
 
 const POLL_INTERVAL_MS = 10_000
 
-function buildStatusLongNames() {
-  const longNames = []
-  FIXED_UNIT_DEVICE_IDS.forEach((pointNo) => {
-    const statusLongNames = getUnitDeviceStatusLongNames(pointNo)
-    longNames.push(statusLongNames.operation, statusLongNames.defrosting, statusLongNames.fault, statusLongNames.commStatus)
-  })
-  return longNames
-}
-
-function buildStatusMapFromValueMap(valueMap) {
+function buildStatusMapFromValueMap(valueMap, deviceIds) {
   const statusByCode = new Map()
 
-  FIXED_UNIT_DEVICE_IDS.forEach((pointNo) => {
+  deviceIds.forEach((pointNo) => {
     const code = toUnitDeviceCode(pointNo)
     const longNames = getUnitDeviceStatusLongNames(pointNo)
     statusByCode.set(
@@ -36,12 +29,40 @@ function buildStatusMapFromValueMap(valueMap) {
   return statusByCode
 }
 
+async function queryBoardStatusMap(heatPumpCount) {
+  const longNames = buildHomeUnitStatusPollLongNames(heatPumpCount)
+  const response = await queryRealvalByLongNames(longNames)
+  let valueMap = extractRealvalMap(response)
+  if (!valueMap) {
+    return null
+  }
+
+  const resolvedCount = resolveHeatPumpCountFromValueMap(valueMap, heatPumpCount)
+  if (resolvedCount > heatPumpCount) {
+    const expandedLongNames = buildHomeUnitStatusPollLongNames(resolvedCount)
+    if (expandedLongNames.length > longNames.length) {
+      const retryResponse = await queryRealvalByLongNames(expandedLongNames)
+      const retryMap = extractRealvalMap(retryResponse)
+      if (retryMap) {
+        valueMap = retryMap
+      }
+    }
+  }
+
+  const deviceIds = resolveBoardStatusDeviceIds({ heatPumpCount: resolvedCount })
+  return {
+    statusByCode: buildStatusMapFromValueMap(valueMap, deviceIds),
+    resolvedCount,
+  }
+}
+
 /**
  * 热泵总览网格：轮询 Machine_Operation / Systematic_Defrosting / Fault_Alarm 实时状态。
+ * 标准款轮询范围由 Sys\FinforWorx\HPTotalNumber 决定。
  */
-export function useHeatPumpBoardStatusPoll({ enabled = true } = {}) {
-  const lastSuccessRef = useRef(new Map())
-  const [statusByCode, setStatusByCode] = useState(() => lastSuccessRef.current)
+export function useHeatPumpBoardStatusPoll({ enabled = USE_FIXED_UNIT_LAYOUT } = {}) {
+  const heatPumpCountRef = useRef(STANDARD_DEFAULT_HEAT_PUMP_COUNT)
+  const [liveStatusByCode, setLiveStatusByCode] = useState(() => new Map())
 
   useEffect(() => {
     if (!enabled) {
@@ -49,32 +70,28 @@ export function useHeatPumpBoardStatusPoll({ enabled = true } = {}) {
     }
 
     let cancelled = false
-    const longNames = buildStatusLongNames()
 
-    const run = async () => {
+    const pollOnce = async () => {
       try {
-        const response = await queryRealvalByLongNames(longNames)
-        const valueMap = extractRealvalMap(response)
-        if (!valueMap || cancelled) {
+        const result = await queryBoardStatusMap(heatPumpCountRef.current)
+        if (!result || cancelled) {
           return
         }
 
-        const nextStatusByCode = buildStatusMapFromValueMap(valueMap)
-        lastSuccessRef.current = nextStatusByCode
-        setStatusByCode(nextStatusByCode)
+        heatPumpCountRef.current = result.resolvedCount
+        setLiveStatusByCode(result.statusByCode)
       } catch {
-        // 保留上次成功值
+        // ignore
       }
     }
 
-    run()
-    const timerId = window.setInterval(run, POLL_INTERVAL_MS)
-
+    pollOnce()
+    const timerId = window.setInterval(pollOnce, POLL_INTERVAL_MS)
     return () => {
       cancelled = true
       window.clearInterval(timerId)
     }
   }, [enabled])
 
-  return statusByCode
+  return liveStatusByCode
 }

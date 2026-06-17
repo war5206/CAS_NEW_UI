@@ -62,9 +62,10 @@ export function createDefaultAnalysisOverviewSummary() {
 
 export function adaptAnalysisOverviewSummary(rawData) {
   const source = unwrapData(rawData)
+  const mode = source.mode || 'heating'
+  const isCooling = mode === 'cooling'
   const cop = splitMetricValue(source.cop)
   const heat = splitMetricValue(source.grl)
-  const feeRate = splitMetricValue(source.jfb)
   const electricity = splitMetricValue(source.hdl)
   const unitElectricity = splitMetricValue(source.dpmydl)
   const unitFee = splitMetricValue(source.dpmfy)
@@ -72,10 +73,9 @@ export function adaptAnalysisOverviewSummary(rawData) {
   return {
     seasonLabel: `本采暖季（${toText(source.startHeatingSeason, '--')} - ${toText(source.endHeatingSeason, '--')}）`,
     metrics: [
-      { title: 'COP', color: '#FF5A36', value: cop.value, trend: cop.trend },
-      { title: '总供热量（kWh）', color: '#6B3DFF', value: heat.value, trend: heat.trend },
-      { title: '节费比（%）', color: '#F4AE21', value: feeRate.value, trend: feeRate.trend },
-      { title: '耗电量（kWh）', color: '#22A8FF', value: electricity.value, trend: electricity.trend },
+      { title: isCooling ? '系统累计制冷COP' : '系统累计COP', color: '#FF5A36', value: cop.value, trend: cop.trend },
+      { title: isCooling ? '系统累计制冷量（kWh）' : '累计制热量（kWh）', color: '#6B3DFF', value: heat.value, trend: heat.trend },
+      { title: isCooling ? '系统累计制冷用电量（kWh）' : '累计用电量（kWh）', color: '#22A8FF', value: electricity.value, trend: electricity.trend },
       { title: '单平米用电量', color: '#D749C7', value: unitElectricity.value, trend: unitElectricity.trend },
       { title: '单平米费用', color: '#62F96D', value: unitFee.value, trend: unitFee.trend },
     ],

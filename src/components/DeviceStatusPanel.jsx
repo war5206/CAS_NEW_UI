@@ -1,13 +1,12 @@
-﻿import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import * as echarts from 'echarts'
 import { buildUnitStatusChartData, EMPTY_UNIT_STATUS_SUMMARY } from '@/utils/heatPumpUnitStatusSummary'
+import { SHOW_AIR_COOLED_AS_STANDALONE_UNITS, SHOW_DEVICE_STATUS_LOOP_PUMP_TAB } from '@/config/projectProfile'
 import { useDeferredVisible } from '../hooks/useDeferredVisible'
 
-const DEVICE_TABS_BASE = [
-  { id: 'heat-pump', label: '热泵机组' },
-  { id: 'air-cooled-module', label: '风冷模块机组' },
-]
-
+const DEVICE_TAB_HEAT_PUMP = { id: 'heat-pump', label: '热泵机组' }
+const DEVICE_TAB_AIR_COOLED = { id: 'air-cooled-module', label: '风冷模块机组' }
+const DEVICE_TAB_LOOP_PUMP = { id: 'loop-pump', label: '热泵循环泵' }
 const DEVICE_TAB_TERMINAL = { id: 'terminal-loop-pump', label: '末端循环水泵' }
 
 const DEFAULT_HEAT_PUMP_DATA = buildUnitStatusChartData(EMPTY_UNIT_STATUS_SUMMARY)
@@ -132,11 +131,17 @@ function DeviceStatusPanel({
   heatPumpData = DEFAULT_HEAT_PUMP_DATA,
   airCooledModuleData = DEFAULT_HEAT_PUMP_DATA,
   loopPumpData = DEFAULT_LOOP_PUMP_DATA,
+  showLoopPumpTab = SHOW_DEVICE_STATUS_LOOP_PUMP_TAB,
   showTerminalLoopPump = false,
   terminalLoopPumpData = [],
 }) {
   const [activeTab, setActiveTab] = useState('heat-pump')
-  const tabs = showTerminalLoopPump ? [...DEVICE_TABS_BASE, DEVICE_TAB_TERMINAL] : DEVICE_TABS_BASE
+  const tabs = [
+    DEVICE_TAB_HEAT_PUMP,
+    ...(SHOW_AIR_COOLED_AS_STANDALONE_UNITS ? [DEVICE_TAB_AIR_COOLED] : []),
+    ...(showLoopPumpTab ? [DEVICE_TAB_LOOP_PUMP] : []),
+    ...(showTerminalLoopPump ? [DEVICE_TAB_TERMINAL] : []),
+  ]
   const gridCols = tabs.length
 
   return (

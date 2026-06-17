@@ -3,11 +3,15 @@ import { usePollingQuery } from '@/shared/hooks/usePollingQuery'
 import {
   adaptOpsCurveData,
   adaptOpsDeviceRows,
+  adaptOpsHeatPumpOptions,
+  adaptOpsHeatPumpSingleMetrics,
   adaptOpsSystemConfigMetrics,
   adaptOpsSystemStateMetrics,
   adaptOpsSystemType,
   adaptOpsUnitDeviceMetrics,
   createDefaultOpsDeviceRows,
+  createDefaultOpsHeatPumpOptions,
+  createDefaultOpsHeatPumpSingleMetrics,
   createDefaultOpsUnitDeviceMetrics,
   createDefaultOpsSystemConfigMetrics,
   createDefaultOpsSystemStateMetrics,
@@ -17,10 +21,13 @@ import { queryHeatPumpParam } from '@/api/modules/home'
 import {
   heatPumpOperatingTime,
   queryCurveByLongName,
+  queryHeatPumpList,
+  queryHeatPumpSingle,
   querySystemConfigSingle,
   querySystemStateData,
   querySystemType,
 } from '@/api/modules/operations'
+import { USE_SPLIT_OPS_UNIT_DATA_TABS } from '@/config/projectProfile'
 
 export function useOpsSystemStateQuery({ enabled = true } = {}) {
   return usePollingQuery({
@@ -32,11 +39,31 @@ export function useOpsSystemStateQuery({ enabled = true } = {}) {
   })
 }
 
+export function useOpsHeatPumpListQuery({ enabled = true } = {}) {
+  return usePollingQuery({
+    queryKey: ['ops', 'heat-pump-list'],
+    queryFn: queryHeatPumpList,
+    enabled,
+    select: (response) => adaptOpsHeatPumpOptions(response?.data ?? response),
+    placeholderData: createDefaultOpsHeatPumpOptions(),
+  })
+}
+
+export function useOpsHeatPumpSingleQuery(code, { enabled = true } = {}) {
+  return usePollingQuery({
+    queryKey: ['ops', 'heat-pump-single', code],
+    queryFn: () => queryHeatPumpSingle(code),
+    enabled: enabled && Boolean(code),
+    select: (response) => adaptOpsHeatPumpSingleMetrics(response?.data ?? response),
+    placeholderData: createDefaultOpsHeatPumpSingleMetrics(),
+  })
+}
+
 export function useOpsUnitDeviceParamQuery(code, { enabled = true } = {}) {
   return usePollingQuery({
     queryKey: ['ops', 'unit-device-param', code],
     queryFn: () => queryHeatPumpParam({ code }),
-    enabled: enabled && Boolean(code),
+    enabled: enabled && Boolean(code) && USE_SPLIT_OPS_UNIT_DATA_TABS,
     select: (response) => adaptOpsUnitDeviceMetrics(response?.data ?? response, code),
     placeholderData: createDefaultOpsUnitDeviceMetrics(),
   })

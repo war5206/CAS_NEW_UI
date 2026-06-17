@@ -1,4 +1,6 @@
 /** 告警展示：arrange 14–25 对应风冷模块 1–12（仅文案，不改请求参数/点位） */
+import { USE_ALARM_UNIT_RENAME } from '@/config/projectProfile'
+
 export const ALARM_AIR_COOLED_ARRANGE_START = 14
 export const ALARM_AIR_COOLED_ARRANGE_END = 25
 
@@ -9,6 +11,9 @@ export function getAlarmArrangeUnitDisplayName(arrangeNo) {
   const n = Number(arrangeNo)
   if (!Number.isFinite(n) || n < 1) {
     return null
+  }
+  if (!USE_ALARM_UNIT_RENAME) {
+    return `热泵${n}`
   }
   if (n <= 13) {
     return `热泵${n}`
@@ -23,7 +28,7 @@ export function getAlarmArrangeUnitDisplayName(arrangeNo) {
  * 将文案中的「热泵14」…「热泵25」替换为「风冷模块1」…「风冷模块12」；热泵 1–13 归一为「热泵N」。
  */
 export function formatAlarmUnitLabelText(text) {
-  if (text == null || text === '') {
+  if (!USE_ALARM_UNIT_RENAME || text == null || text === '') {
     return text
   }
 
@@ -37,4 +42,8 @@ export function formatAlarmUnitLabelText(text) {
     }
     return match
   })
+}
+
+export function resolveAlarmUnitLabelText(text) {
+  return formatAlarmUnitLabelText(text)
 }
