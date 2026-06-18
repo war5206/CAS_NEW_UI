@@ -20,7 +20,7 @@ export async function queryAnalysisOverviewSummary() {
 }
 
 export async function queryAnalysisOverviewCopBar(payload) {
-  return callAlgorithmProcess(ALGORITHM_PROCESS_IDS.ANALYSIS_OVERVIEW_COP_BAR, payload)
+  return callAlgorithmProcess(ALGORITHM_PROCESS_IDS.ANALYSIS_OVERVIEW_COP, payload)
 }
 
 export async function queryAnalysisElectricityConsumption(payload) {

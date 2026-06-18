@@ -120,20 +120,27 @@ function DataOverviewFilterBar({
               role="tab"
               aria-selected={period === option}
               className={`data-overview-filter-bar__segment-btn${period === option ? ' is-active' : ''}`}
-              onClick={() => onPeriodChange(option)}
+              onClick={() => {
+                if (option !== '日' && compareMode === 'mom') {
+                  onCompareModeChange('none')
+                }
+                onPeriodChange(option)
+              }}
             >
               {option}
             </button>
           ))}
         </div>
 
-        <button
-          type="button"
-          className={`data-overview-filter-bar__toggle${compareMode === 'mom' ? ' is-active' : ''}`}
-          onClick={() => onCompareModeChange(compareMode === 'mom' ? 'none' : 'mom')}
-        >
-          环比
-        </button>
+        {period === '日' ? (
+          <button
+            type="button"
+            className={`data-overview-filter-bar__toggle${compareMode === 'mom' ? ' is-active' : ''}`}
+            onClick={() => onCompareModeChange(compareMode === 'mom' ? 'none' : 'mom')}
+          >
+            环比
+          </button>
+        ) : null}
 
         <button
           type="button"

@@ -380,6 +380,22 @@ function ModeSelectPage() {
     queryClient.invalidateQueries({ queryKey: HOME_OVERVIEW_QUERY_KEY })
   }, [queryClient])
 
+  const patchHomeOverviewTemperatureIcon = useCallback(
+    (nextTemperatureId) => {
+      queryClient.setQueryData(HOME_OVERVIEW_QUERY_KEY, (old) => {
+        if (!old) return old
+        return {
+          ...old,
+          mode: {
+            ...old.mode,
+            iconASrc: nextTemperatureId,
+          },
+        }
+      })
+    },
+    [queryClient],
+  )
+
   const { performWrite, isMountedRef } = useWriteWithDelayedVerify({
     write: writeRealvalByLongNames,
     onNotify: onWriteNotify,
@@ -616,14 +632,14 @@ function ModeSelectPage() {
         optimisticApply: () => {
           setTemperatureMode(nextTemperatureId)
           setStoredTemperatureMode(nextTemperatureId)
-          invalidateHomeOverview()
+          patchHomeOverviewTemperatureIcon(nextTemperatureId)
         },
         delayedVerify: () => fetchRealvals([LONG_NAME_HP_TOTAL_RUN_MODE]),
       })
       setIsRunModeSwitching(false)
       setAttentionMessage(success ? '切换模式成功' : '切换模式失败')
     },
-    [fetchRealvals, invalidateHomeOverview, isRunModeSwitching, performRunModeSwitch, temperatureMode],
+    [fetchRealvals, patchHomeOverviewTemperatureIcon, isRunModeSwitching, performRunModeSwitch, temperatureMode],
   )
 
   // 点击模式调节里的开关

@@ -130,7 +130,7 @@ export const ALGORITHM_PROCESS_IDS = {
   /** 分析模块 — 数据综述卡片 */
   ANALYSIS_OVERVIEW_SUMMARY: 'selRealValueRatioSJZS',
   /** 分析模块 — 数据综述 COP 柱图 */
-  ANALYSIS_OVERVIEW_COP_BAR: 'queryCOPBar',
+  ANALYSIS_OVERVIEW_COP: 'queryCopConsumption',
   /** 分析模块 — 用电统计 */
   ANALYSIS_ELECTRICITY_CONSUMPTION: 'queryElectricityConsumption',
   /** 分析模块 — 用水统计 */

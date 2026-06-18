@@ -105,7 +105,8 @@ export function adaptAnalysisOverviewChart(rawData, xAxisName = '日') {
   const source = unwrapData(rawData)
   const labels = Array.isArray(source.xList) ? source.xList : []
   const values = normalizeList(source?.yMap?.y1CurrentList)
-  const axis = resolveYMaxAndInterval(values)
+  const previousValues = normalizeList(source?.yMap?.y1PreviousList)
+  const axis = resolveYMaxAndInterval([...values, ...previousValues])
 
   return {
     ...createDefaultAnalysisOverviewChart(),
@@ -115,6 +116,7 @@ export function adaptAnalysisOverviewChart(rawData, xAxisName = '日') {
     yAxisMax: axis.yAxisMax,
     yAxisInterval: axis.yAxisInterval,
     compareBasisData: values,
+    previousData: previousValues.length > 0 ? previousValues : null,
     series: [
       {
         name: 'COP',

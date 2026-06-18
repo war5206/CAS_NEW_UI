@@ -3,6 +3,7 @@ import DataOverviewFilterBar from '../components/DataOverviewFilterBar'
 import DataOverviewChart from '../components/DataOverviewChart'
 import { syncMonthRange, addCalendarMonths, getDefaultCalendarMonthValue } from '../utils/analysisFilterUtils'
 import { useAnalysisTrendQuery } from '../features/analysis/hooks/useAnalysisTrendQuery'
+import { useAnalysisProjectContextQuery } from '../features/analysis/hooks/useAnalysisProjectContextQuery'
 import './DataOverviewPage.css'
 import './PowerStatisticsPage.css'
 
@@ -40,6 +41,9 @@ function PowerStatisticsPage() {
   const [compareMode, setCompareMode] = useState('none')
   const [equipmentType, setEquipmentType] = useState('total-power')
   const [filters, setFilters] = useState(DEFAULT_FILTERS)
+  const projectContext = useAnalysisProjectContextQuery()
+
+  const heatPumpLabel = projectContext.data.isHPHeating ? '热泵（制热）' : '热泵（制冷）'
 
   const activeRange = period === '日' ? filters.day : period === '月' ? filters.month : filters.year
   const viewModelQuery = useAnalysisTrendQuery({
@@ -84,7 +88,7 @@ function PowerStatisticsPage() {
         className="power-statistics-filter-bar"
         titleOptions={[
           { label: '总用电', value: 'total-power' },
-          { label: '热泵', value: 'heat-pump' },
+          { label: heatPumpLabel, value: 'heat-pump' },
           { label: '水泵', value: 'water-pump' },
           { label: '耦合能源', value: 'coupling-energy' },
         ]}

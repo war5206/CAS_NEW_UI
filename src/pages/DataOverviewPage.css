@@ -148,6 +148,41 @@
   font-size: 20px;
 }
 
+.data-overview-page .data-overview-filter-bar__title-dropdown {
+  width: 310px;
+  flex: 0 0 auto;
+}
+
+.data-overview-page .data-overview-filter-bar__title-trigger {
+  height: 64px;
+  border: none;
+  border-radius: 16px;
+  background: #22262D;
+  color: #ffffff;
+  font-size: 20px;
+  padding: 0 24px;
+}
+
+.data-overview-page .data-overview-filter-bar__title-trigger::after {
+  right: 26px;
+}
+
+.data-overview-page .data-overview-filter-bar__title-menu {
+  background: #22262D;
+  border-radius: 18px;
+  padding: 10px;
+}
+
+.data-overview-page .data-overview-filter-bar__title-option {
+  min-height: 52px;
+  padding: 0 18px;
+  font-size: 18px;
+}
+
+.data-overview-page .data-overview-filter-bar__title-option.is-selected {
+  background: rgba(49, 55, 67, 0.92);
+}
+
 .data-overview-filter-bar__controls {
   display: flex;
   align-items: center;

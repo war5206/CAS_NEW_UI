@@ -8,6 +8,8 @@ import {
   useAnalysisOverviewCopChartQuery,
   useAnalysisOverviewSummaryQuery,
 } from '../features/analysis/hooks/useAnalysisOverviewQueries'
+import { useAnalysisProjectContextQuery } from '../features/analysis/hooks/useAnalysisProjectContextQuery'
+import { getCopTypeOptions, COP_TYPE } from '../config/analysisProjectContext'
 import './DataOverviewPage.css'
 
 const defaultAnalysisMonth = getDefaultCalendarMonthValue()
@@ -67,7 +69,11 @@ function DataOverviewPage() {
   const [period, setPeriod] = useState('日')
   const [compareMode, setCompareMode] = useState('none')
   const [filters, setFilters] = useState(DEFAULT_FILTERS)
+  const [copType, setCopType] = useState(COP_TYPE.SYSTEM)
   const summaryQuery = useAnalysisOverviewSummaryQuery()
+  const projectContext = useAnalysisProjectContextQuery()
+
+  const copTypeOptions = getCopTypeOptions(projectContext.data.projectTypeId)
 
   const handleFilterChange = (nextRange) => {
     const filterKey = period === '日' ? 'day' : period === '月' ? 'month' : 'year'
@@ -90,11 +96,17 @@ function DataOverviewPage() {
     period,
     compareMode,
     range: activeRange,
+    copType,
   })
+
+  const isHeatingCooling = projectContext.data.isHeatingCooling
 
   return (
     <main className="data-overview-page">
-      <h2 className="data-overview-page__title">{summaryQuery.data.seasonLabel}</h2>
+      {!isHeatingCooling && (
+        <h2 className="data-overview-page__title">{summaryQuery.data.seasonLabel}</h2>
+      )}
+
       <p className="data-overview-page__tip">热表精度影响 COP，COP 仅作参考；节碳量以供热数据为准</p>
 
       <section className="data-overview-page__cards">
@@ -122,6 +134,10 @@ function DataOverviewPage() {
       </section>
 
       <DataOverviewFilterBar
+        titleOptions={copTypeOptions}
+        titleValue={copType}
+        onTitleChange={setCopType}
+        titleAriaLabel="选择COP类型"
         period={period}
         onPeriodChange={setPeriod}
         compareMode={compareMode}

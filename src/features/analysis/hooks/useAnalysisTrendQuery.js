@@ -97,9 +97,10 @@ function resolveTypeParam(pageType, titleValue) {
   return undefined
 }
 
-export function useAnalysisTrendQuery({ pageType, period, compareMode, range, titleValue, enabled = true } = {}) {
+export function useAnalysisTrendQuery({ pageType, period, compareMode, range, titleValue, configOverrides, enabled = true } = {}) {
   const lastSuccessRef = useRef(null)
-  const config = PAGE_CONFIGS[pageType]
+  const baseConfig = PAGE_CONFIGS[pageType]
+  const config = configOverrides ? { ...baseConfig, ...configOverrides } : baseConfig
   const payload = useMemo(() => {
     const dateRange = resolveDateRange(period, range)
     const withType = resolveTypeParam(pageType, titleValue)

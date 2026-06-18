@@ -44,20 +44,20 @@ export function useAnalysisOverviewSummaryQuery({ enabled = true } = {}) {
   }
 }
 
-export function useAnalysisOverviewCopChartQuery({ period, compareMode, range, enabled = true } = {}) {
+export function useAnalysisOverviewCopChartQuery({ period, compareMode, range, copType = 'COP', enabled = true } = {}) {
   const lastSuccessRef = useRef(null)
   const payload = useMemo(
     () => ({
       cycle: period,
       comparison: toComparison(compareMode),
       ...resolveDateRange(period, range),
-      type: 'COP',
+      copType,
     }),
-    [compareMode, period, range],
+    [compareMode, copType, period, range],
   )
 
   const query = usePollingQuery({
-    queryKey: ['analysis', 'overview', 'cop-chart', payload.cycle, payload.comparison, payload.startDate, payload.endDate],
+    queryKey: ['analysis', 'overview', 'cop-chart', payload.cycle, payload.comparison, payload.startDate, payload.endDate, copType],
     queryFn: () => queryAnalysisOverviewCopBar(payload),
     enabled,
     refetchInterval: false,

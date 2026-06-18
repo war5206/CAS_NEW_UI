@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef } from 'react'
 import * as echarts from 'echarts'
 import {
+  addCalendarMonths,
   enumerateMonthRange,
   formatMonthAxisLabel,
   getCurrentDateInfo,
@@ -9,6 +10,21 @@ import {
   getMonthDayCount,
   parseMonthValue,
 } from '../utils/analysisFilterUtils'
+
+function getMomCompareDayLabel(monthValue, axisLabel) {
+  if (!axisLabel) {
+    return '上月同日'
+  }
+
+  const dayPart = axisLabel.split('-')[1]
+  if (!monthValue || !dayPart) {
+    return `上月${dayPart ?? ''}日`
+  }
+
+  const prevMonth = addCalendarMonths(monthValue, -1)
+  const prevMonthPart = prevMonth.split('-')[1]
+  return `${prevMonthPart}-${dayPart}`
+}
 
 function createOverviewDayDataset(range) {
   const monthValue = range.month || getDefaultCalendarMonthValue()
@@ -183,7 +199,7 @@ function buildComparisonSeriesData(sourceData = []) {
   }
 }
 
-function buildPowerStatisticsOption(chartModel, compareMode) {
+function buildPowerStatisticsOption(chartModel, compareMode, period, range) {
   const stackTotals = chartModel.labels.map((_, index) =>
     chartModel.series.reduce((sum, seriesItem) => sum + (Number(seriesItem.data[index]) || 0), 0),
   )
@@ -215,7 +231,13 @@ function buildPowerStatisticsOption(chartModel, compareMode) {
     chartModel.series[0]?.data.map((value) => (value == null ? null : Number(value))) ??
     []
 
-  const { prevData, yoyData } = buildComparisonSeriesData(compareBasisData)
+  const hasRealPreviousData = chartModel.previousData?.length > 0
+  const { prevData, yoyData } = hasRealPreviousData
+    ? {
+        prevData: chartModel.previousData.map((value) => (value == null ? null : Number(value))),
+        yoyData: chartModel.previousData.map((value) => (value == null ? null : Number(value))),
+      }
+    : buildComparisonSeriesData(compareBasisData)
   const yoyPercentages = compareBasisData.map((value, index) =>
     value == null || yoyData[index] == null ? null : Number((((value - yoyData[index]) / (yoyData[index] || 1)) * 100).toFixed(1))
   )
@@ -305,6 +327,12 @@ function buildPowerStatisticsOption(chartModel, compareMode) {
 
         const labelIndex = activeItem.dataIndex
         const axisLabel = chartModel.tooltipLabels?.[labelIndex] ?? activeItem.axisValueLabel
+        const momCompareDayLabel = getMomCompareDayLabel(range?.month, axisLabel)
+        const axisTitle =
+          compareMode === 'mom' && period === '日' && axisLabel
+            ? `<div style="font-size:18px;color:#FFFFFF;">${axisLabel}（本月）</div>
+               <div style="font-size:15px;color:rgba(255,255,255,0.56);margin-top:6px;">环比：${momCompareDayLabel} 上月同日</div>`
+            : `<div style="font-size:18px;color:#FFFFFF;">${axisLabel}</div>`
         const comparePercentage =
           compareMode === 'mom'
             ? compareBasisData[labelIndex] == null || prevData[labelIndex] == null
@@ -374,10 +402,14 @@ function buildPowerStatisticsOption(chartModel, compareMode) {
                 ${compareRows
                   .map((item) => {
                     const markerColor = resolveMarkerColor(item, chartModel, seriesColorMap)
+                    const compareLabel =
+                      compareMode === 'mom' && period === '日'
+                        ? `上月同日（${momCompareDayLabel}）`
+                        : item.seriesName
                     return `
                       <div style="display:flex;align-items:center;gap:12px;min-width:260px;margin-top:12px;">
                         <span style="width:12px;height:12px;border-radius:999px;background:${markerColor};display:inline-block;flex:none;"></span>
-                        <span style="color:rgba(255,255,255,0.78);">${item.seriesName}</span>
+                        <span style="color:rgba(255,255,255,0.78);">${compareLabel}</span>
                         <span style="margin-left:auto;">${formatChartValue(item.value, chartModel.valueSuffix ?? '')}</span>
                       </div>
                     `
@@ -417,7 +449,7 @@ function buildPowerStatisticsOption(chartModel, compareMode) {
 
         return `
           <div style="min-width:260px;">
-            <div style="font-size:18px;color:#FFFFFF;">${axisLabel}</div>
+            ${axisTitle}
             ${currentTotalRow}
             ${extraCurrentRows}
             ${breakdownSection}
@@ -616,7 +648,7 @@ function DataOverviewChart({ period, compareMode, range, chartModel = null }) {
 
   const chartOption = useMemo(() => {
     if (chartModel?.variant === 'power-statistics') {
-      return buildPowerStatisticsOption(chartModel, compareMode)
+      return buildPowerStatisticsOption(chartModel, compareMode, period, range)
     }
 
     return buildOverviewOption(period, compareMode, range)

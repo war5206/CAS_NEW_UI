@@ -35,12 +35,12 @@ function formatFilterDateLabel(value, type, placeholder) {
   return value
 }
 
-function ResourceStatisticsPage({ pageType }) {
+function ResourceStatisticsPage({ pageType, titleOverride }) {
   const pageConfig =
     pageType === 'water'
       ? { title: '用水量', titleOptions: [] }
       : pageType === 'heat'
-        ? { title: '耗热量', titleOptions: [] }
+        ? { title: titleOverride || '耗热量', titleOptions: [] }
         : pageType === 'cold'
           ? { title: '制冷量', titleOptions: [] }
           : {
@@ -59,12 +59,23 @@ function ResourceStatisticsPage({ pageType }) {
 
   const activeRange = period === '日' ? filters.day : period === '月' ? filters.month : filters.year
   const queryPageType = pageType === 'cold' ? 'heat' : pageType
+
+  const configOverrides = titleOverride
+    ? {
+        legendName: titleOverride,
+        cardLabels: [`当前月总${titleOverride}（kWh）`, `日均${titleOverride}（kWh）`],
+        currentTotalLabel: `当前总${titleOverride}`,
+        compareNames: { mom: `上一周期${titleOverride}`, yoy: `去年同期${titleOverride}` },
+      }
+    : undefined
+
   const viewModelQuery = useAnalysisTrendQuery({
     pageType: queryPageType,
     period,
     compareMode,
     range: activeRange,
     titleValue,
+    configOverrides,
   })
 
   const handleFilterChange = (nextRange) => {
