@@ -36,8 +36,9 @@ def dataService = ApplicationContextProvider.getBean(DataService.class);
 // 调用逻辑编排
 FeignSolAlgorithmProcess sol = ApplicationContextProvider.getBean(FeignSolAlgorithmProcess.class);
 
-String selectAreaSql = "select project_acreage,start_heating_season,end_heating_season from sjmg_project_data";
+String selectAreaSql = "select project_type_uuid,project_acreage,start_heating_season,end_heating_season from sjmg_project_data";
 List<Map<String,Object>> selectAreaList = dynamicDataSource.excuteTenantSqlQuery(selectAreaSql, "t01");
+String projectTypeUuid = selectAreaList.get(0).get("project_type_uuid").toString();
 String start_heating_season = selectAreaList.get(0).get("start_heating_season").toString(); // 采暖季开始时间
 String end_heating_season = selectAreaList.get(0).get("end_heating_season").toString(); // 采暖季结束时间
 SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss"); // 时间格式化
@@ -64,7 +65,7 @@ try {
 
 //是否在采暖季
 boolean isno_season = calendar.getTime().compareTo(startDate) >= 0 && calendar.getTime().compareTo(endDate) <= 0;
-if (!isno_season){
+if ("1".equals(projectTypeUuid) && !isno_season){
     data.put("result", "当前不在采暖季，不执行下置操作");
     data.put("currentTime", sdf.format(calendar.getTime()));
     data.put("startDate", sdf.format(startDate));
@@ -77,7 +78,6 @@ AlgorithmProcessExecuteParam param_write_hour = new AlgorithmProcessExecuteParam
 Map<String, Object> paramMap_write_hour = new HashMap();
 param_write_hour.setAlgorithmProcessId("writeRealvalByLongNames");
 Map<String, Object> paramData_write_hour = new HashMap();
-Map<String,String> writeData_hour = new HashMap<>();
 
 // 下置小时数据到zizhi点位
 // 计算上一个整点的时间范围：例如现在是1点，则查询0点55分-0点59分59秒
@@ -214,82 +214,6 @@ def getValueFromHistory(String tagName, String startTime, String endTime, DataSe
 //     return sw.toString();
 // }
 
-// 1. 获取COP_hour的数据，下置到COP_hour_zizhi
-String copHourTag = "Sys\\FinforWorx\\EC\\COP_hour";
-String copHourZizhiTag = "Sys\\FinforWorx\\EC\\COP_hour_zizhi";
-try {
-    BigDecimal value = getValueFromHistory(copHourTag, prevHour55Start, prevHour59End, dataService);
-    if (value != null) {
-        writeData_hour.put(copHourZizhiTag, value.toString());
-    }
-} catch (Exception e) {
-    // 异常时跳过，记录异常信息到返回数据中
-    // if (data.get("debugInfo") == null) {
-    //     data.put("debugInfo", new ArrayList<Map<String, Object>>());
-    // }
-    // Map<String, Object> errorInfo = new HashMap<>();
-    // errorInfo.put("tag", copHourTag);
-    // errorInfo.put("error", e.getMessage());
-    // ((List<Map<String, Object>>)data.get("debugInfo")).add(errorInfo);
-}
-
-// 2. 获取HP_COP_hour的数据，下置到HP_COP_hour_zizhi
-String hpCopHourTag = "Sys\\FinforWorx\\EC\\HP_COP_hour";
-String hpCopHourZizhiTag = "Sys\\FinforWorx\\EC\\HP_COP_hour_zizhi";
-try {
-    BigDecimal value = getValueFromHistory(hpCopHourTag, prevHour55Start, prevHour59End, dataService);
-    if (value != null) {
-        writeData_hour.put(hpCopHourZizhiTag, value.toString());
-    }
-} catch (Exception e) {
-    // 异常时跳过，记录异常信息到返回数据中
-    // if (data.get("debugInfo") == null) {
-    //     data.put("debugInfo", new ArrayList<Map<String, Object>>());
-    // }
-    // Map<String, Object> errorInfo = new HashMap<>();
-    // errorInfo.put("tag", hpCopHourTag);
-    // errorInfo.put("error", e.getMessage());
-    // ((List<Map<String, Object>>)data.get("debugInfo")).add(errorInfo);
-}
-
-// 3. 获取WSHP_COP_hour的数据，下置到WSHP_COP_hour_zizhi
-String wshpCopHourTag = "Sys\\FinforWorx\\EC\\WSHP_COP_hour";
-String wshpCopHourZizhiTag = "Sys\\FinforWorx\\EC\\WSHP_COP_hour_zizhi";
-try {
-    BigDecimal value = getValueFromHistory(wshpCopHourTag, prevHour55Start, prevHour59End, dataService);
-    if (value != null) {
-        writeData_hour.put(wshpCopHourZizhiTag, value.toString());
-    }
-} catch (Exception e) {
-    // 异常时跳过，记录异常信息到返回数据中
-    // if (data.get("debugInfo") == null) {
-    //     data.put("debugInfo", new ArrayList<Map<String, Object>>());
-    // }
-    // Map<String, Object> errorInfo = new HashMap<>();
-    // errorInfo.put("tag", wshpCopHourTag);
-    // errorInfo.put("error", e.getMessage());
-    // ((List<Map<String, Object>>)data.get("debugInfo")).add(errorInfo);
-}
-
-// 执行小时数据下置
-if (!writeData_hour.isEmpty()) {
-    paramMap_write_hour.put("writeData", JSON.toJSONString(writeData_hour));
-    paramData_write_hour.put("data", paramMap_write_hour);
-    param_write_hour.setParam(paramData_write_hour);
-    sol.execute(param_write_hour);
-    if (data.get("result") == null) {
-        data.put("result", "小时数据下置成功，共下置 " + writeData_hour.size() + " 个点位");
-    } else {
-        data.put("result", data.get("result") + "；小时数据下置成功，共下置 " + writeData_hour.size() + " 个点位");
-    }
-    data.put("writeData_hour", writeData_hour);
-} else {
-    if (data.get("result") == null) {
-        data.put("result", "小时数据：没有数据需要下置，writeData_hour为空");
-    } else {
-        data.put("result", data.get("result") + "；小时数据：没有数据需要下置，writeData_hour为空");
-    }
-}
 
 // 每天0点计算月/年/采暖季COP
 if (hour == 0) {
@@ -298,25 +222,25 @@ if (hour == 0) {
 
     // 读取月/年/采暖季的点名
     // 月电量和热量点名
-    tagList.append("'Sys\\FinforWorx\\EC\\HP_Total_Meter_Elec_Consumption_month',");
-    tagList.append("'Sys\\FinforWorx\\EC\\WSHP_Total_Meter_Elec_Consumption_month',");
-    tagList.append("'Sys\\FinforWorx\\EC\\Total_Meter_Elec_Consumption_month',");
-    tagList.append("'Sys\\FinforWorx\\EC\\Heat_Meter1_Elec_Consumption_month',");
-    tagList.append("'Sys\\FinforWorx\\EC\\Heat_Meter2_Elec_Consumption_month',");
+    tagList.append("'Sys\\FinforWorx\\EnergyCost\\HP_Total_Meter_Elec_Consumption_month',");
+    tagList.append("'Sys\\FinforWorx\\EnergyCost\\WSHP_Total_Meter_Elec_Consumption_month',");
+    tagList.append("'Sys\\FinforWorx\\EnergyCost\\Total_Meter_Elec_Consumption_month',");
+    tagList.append("'Sys\\FinforWorx\\EnergyCost\\Heat_Meter1_Elec_Consumption_month',");
+    tagList.append("'Sys\\FinforWorx\\EnergyCost\\Heat_Meter2_Elec_Consumption_month',");
 
     // 年电量和热量点名
-    tagList.append("'Sys\\FinforWorx\\EC\\HP_Total_Meter_Elec_Consumption_year',");
-    tagList.append("'Sys\\FinforWorx\\EC\\WSHP_Total_Meter_Elec_Consumption_year',");
-    tagList.append("'Sys\\FinforWorx\\EC\\Total_Meter_Elec_Consumption_year',");
-    tagList.append("'Sys\\FinforWorx\\EC\\Heat_Meter1_Elec_Consumption_year',");
-    tagList.append("'Sys\\FinforWorx\\EC\\Heat_Meter2_Elec_Consumption_year',");
+    tagList.append("'Sys\\FinforWorx\\EnergyCost\\HP_Total_Meter_Elec_Consumption_year',");
+    tagList.append("'Sys\\FinforWorx\\EnergyCost\\WSHP_Total_Meter_Elec_Consumption_year',");
+    tagList.append("'Sys\\FinforWorx\\EnergyCost\\Total_Meter_Elec_Consumption_year',");
+    tagList.append("'Sys\\FinforWorx\\EnergyCost\\Heat_Meter1_Elec_Consumption_year',");
+    tagList.append("'Sys\\FinforWorx\\EnergyCost\\Heat_Meter2_Elec_Consumption_year',");
 
     // 采暖季电量和热量点名
-    tagList.append("'Sys\\FinforWorx\\EC\\HP_Total_Meter_Elec_Consumption_season',");
-    tagList.append("'Sys\\FinforWorx\\EC\\WSHP_Total_Meter_Elec_Consumption_season',");
-    tagList.append("'Sys\\FinforWorx\\EC\\Total_Meter_Elec_Consumption_season',");
-    tagList.append("'Sys\\FinforWorx\\EC\\Heat_Meter1_Elec_Consumption_season',");
-    tagList.append("'Sys\\FinforWorx\\EC\\Heat_Meter2_Elec_Consumption_season',");
+    tagList.append("'Sys\\FinforWorx\\EnergyCost\\HP_Total_Meter_Elec_Consumption_season',");
+    tagList.append("'Sys\\FinforWorx\\EnergyCost\\WSHP_Total_Meter_Elec_Consumption_season',");
+    tagList.append("'Sys\\FinforWorx\\EnergyCost\\Total_Meter_Elec_Consumption_season',");
+    tagList.append("'Sys\\FinforWorx\\EnergyCost\\Heat_Meter1_Elec_Consumption_season',");
+    tagList.append("'Sys\\FinforWorx\\EnergyCost\\Heat_Meter2_Elec_Consumption_season',");
 
     tagList.delete(tagList.length() - 1, tagList.length());
 
@@ -342,9 +266,9 @@ if (hour == 0) {
 
     // ========== 计算月COP ==========
     // 获取月电量总表数据（2号时已经是1号的日电量值）
-    String hp_total_elec_month_tag = "Sys\\FinforWorx\\EC\\HP_Total_Meter_Elec_Consumption_month";
-    String wshp_total_elec_month_tag = "Sys\\FinforWorx\\EC\\WSHP_Total_Meter_Elec_Consumption_month";
-    String total_elec_month_tag = "Sys\\FinforWorx\\EC\\Total_Meter_Elec_Consumption_month";
+    String hp_total_elec_month_tag = "Sys\\FinforWorx\\EnergyCost\\HP_Total_Meter_Elec_Consumption_month";
+    String wshp_total_elec_month_tag = "Sys\\FinforWorx\\EnergyCost\\WSHP_Total_Meter_Elec_Consumption_month";
+    String total_elec_month_tag = "Sys\\FinforWorx\\EnergyCost\\Total_Meter_Elec_Consumption_month";
 
     BigDecimal hp_total_elec_month = new BigDecimal("0.00");
     BigDecimal wshp_total_elec_month = new BigDecimal("0.00");
@@ -361,8 +285,8 @@ if (hour == 0) {
     }
 
     // 获取月热量（一次侧和二次侧）
-    String heat1_month_tag = "Sys\\FinforWorx\\EC\\Heat_Meter1_Elec_Consumption_month";
-    String heat2_month_tag = "Sys\\FinforWorx\\EC\\Heat_Meter2_Elec_Consumption_month";
+    String heat1_month_tag = "Sys\\FinforWorx\\EnergyCost\\Heat_Meter1_Elec_Consumption_month";
+    String heat2_month_tag = "Sys\\FinforWorx\\EnergyCost\\Heat_Meter2_Elec_Consumption_month";
     BigDecimal heat1_month = new BigDecimal("0.00");
     BigDecimal heat2_month = new BigDecimal("0.00");
 
@@ -378,34 +302,34 @@ if (hour == 0) {
     if (hp_total_elec_month.compareTo(BigDecimal.ZERO) != 0) {
         hp_cop_month = heat1_month.divide(hp_total_elec_month, 2, RoundingMode.HALF_UP);
     }
-    writeData.put("Sys\\FinforWorx\\EC\\HP_COP_month", hp_cop_month.toString());
+    writeData.put("Sys\\FinforWorx\\EnergyCost\\HP_COP_month", hp_cop_month.toString());
 
     // 计算水源热泵COP-月 = 二次侧热表2 / 水源热泵总电表
     BigDecimal wshp_cop_month = new BigDecimal("0.00");
     if (wshp_total_elec_month.compareTo(BigDecimal.ZERO) != 0) {
         wshp_cop_month = heat2_month.divide(wshp_total_elec_month, 2, RoundingMode.HALF_UP);
     }
-    writeData.put("Sys\\FinforWorx\\EC\\WSHP_COP_month", wshp_cop_month.toString());
+    writeData.put("Sys\\FinforWorx\\EnergyCost\\WSHP_COP_month", wshp_cop_month.toString());
 
     // 计算系统COP-月 = 二次侧热表2 / 总电表
     BigDecimal cop_month = new BigDecimal("0.00");
     if (total_elec_month.compareTo(BigDecimal.ZERO) != 0) {
         cop_month = heat2_month.divide(total_elec_month, 2, RoundingMode.HALF_UP);
     }
-    writeData.put("Sys\\FinforWorx\\EC\\COP_month", cop_month.toString());
+    writeData.put("Sys\\FinforWorx\\EnergyCost\\COP_month", cop_month.toString());
 
     // 如果是每月1号，将计算出的月COP值下置到zizhi点位
     if (day_of_month == 1) {
-        writeData.put("Sys\\FinforWorx\\EC\\COP_month_zizhi", cop_month.toString());
-        writeData.put("Sys\\FinforWorx\\EC\\HP_COP_month_zizhi", hp_cop_month.toString());
-        writeData.put("Sys\\FinforWorx\\EC\\WSHP_COP_month_zizhi", wshp_cop_month.toString());
+        writeData.put("Sys\\FinforWorx\\EnergyCost\\COP_month_zizhi", cop_month.toString());
+        writeData.put("Sys\\FinforWorx\\EnergyCost\\HP_COP_month_zizhi", hp_cop_month.toString());
+        writeData.put("Sys\\FinforWorx\\EnergyCost\\WSHP_COP_month_zizhi", wshp_cop_month.toString());
     }
 
     // ========== 计算年COP ==========
     // 获取年电量总表数据（1月2号时已经是1号的日电量值）
-    String hp_total_elec_year_tag = "Sys\\FinforWorx\\EC\\HP_Total_Meter_Elec_Consumption_year";
-    String wshp_total_elec_year_tag = "Sys\\FinforWorx\\EC\\WSHP_Total_Meter_Elec_Consumption_year";
-    String total_elec_year_tag = "Sys\\FinforWorx\\EC\\Total_Meter_Elec_Consumption_year";
+    String hp_total_elec_year_tag = "Sys\\FinforWorx\\EnergyCost\\HP_Total_Meter_Elec_Consumption_year";
+    String wshp_total_elec_year_tag = "Sys\\FinforWorx\\EnergyCost\\WSHP_Total_Meter_Elec_Consumption_year";
+    String total_elec_year_tag = "Sys\\FinforWorx\\EnergyCost\\Total_Meter_Elec_Consumption_year";
 
     BigDecimal hp_total_elec_year = new BigDecimal("0.00");
     BigDecimal wshp_total_elec_year = new BigDecimal("0.00");
@@ -422,8 +346,8 @@ if (hour == 0) {
     }
 
     // 获取年热量（一次侧和二次侧）
-    String heat1_year_tag = "Sys\\FinforWorx\\EC\\Heat_Meter1_Elec_Consumption_year";
-    String heat2_year_tag = "Sys\\FinforWorx\\EC\\Heat_Meter2_Elec_Consumption_year";
+    String heat1_year_tag = "Sys\\FinforWorx\\EnergyCost\\Heat_Meter1_Elec_Consumption_year";
+    String heat2_year_tag = "Sys\\FinforWorx\\EnergyCost\\Heat_Meter2_Elec_Consumption_year";
     BigDecimal heat1_year = new BigDecimal("0.00");
     BigDecimal heat2_year = new BigDecimal("0.00");
 
@@ -439,34 +363,34 @@ if (hour == 0) {
     if (hp_total_elec_year.compareTo(BigDecimal.ZERO) != 0) {
         hp_cop_year = heat1_year.divide(hp_total_elec_year, 2, RoundingMode.HALF_UP);
     }
-    writeData.put("Sys\\FinforWorx\\EC\\HP_COP_year", hp_cop_year.toString());
+    writeData.put("Sys\\FinforWorx\\EnergyCost\\HP_COP_year", hp_cop_year.toString());
 
     // 计算水源热泵COP-年 = 二次侧热表2 / 水源热泵总电表
     BigDecimal wshp_cop_year = new BigDecimal("0.00");
     if (wshp_total_elec_year.compareTo(BigDecimal.ZERO) != 0) {
         wshp_cop_year = heat2_year.divide(wshp_total_elec_year, 2, RoundingMode.HALF_UP);
     }
-    writeData.put("Sys\\FinforWorx\\EC\\WSHP_COP_year", wshp_cop_year.toString());
+    writeData.put("Sys\\FinforWorx\\EnergyCost\\WSHP_COP_year", wshp_cop_year.toString());
 
     // 计算系统COP-年 = 二次侧热表2 / 总电表
     BigDecimal cop_year = new BigDecimal("0.00");
     if (total_elec_year.compareTo(BigDecimal.ZERO) != 0) {
         cop_year = heat2_year.divide(total_elec_year, 2, RoundingMode.HALF_UP);
     }
-    writeData.put("Sys\\FinforWorx\\EC\\COP_year", cop_year.toString());
+    writeData.put("Sys\\FinforWorx\\EnergyCost\\COP_year", cop_year.toString());
 
     // 如果是1月1号，将计算出的年COP值下置到zizhi点位
     if (day_of_month == 1 && monthOfYear == 1) {
-        writeData.put("Sys\\FinforWorx\\EC\\COP_year_zizhi", cop_year.toString());
-        writeData.put("Sys\\FinforWorx\\EC\\HP_COP_year_zizhi", hp_cop_year.toString());
-        writeData.put("Sys\\FinforWorx\\EC\\WSHP_COP_year_zizhi", wshp_cop_year.toString());
+        writeData.put("Sys\\FinforWorx\\EnergyCost\\COP_year_zizhi", cop_year.toString());
+        writeData.put("Sys\\FinforWorx\\EnergyCost\\HP_COP_year_zizhi", hp_cop_year.toString());
+        writeData.put("Sys\\FinforWorx\\EnergyCost\\WSHP_COP_year_zizhi", wshp_cop_year.toString());
     }
 
     // ========== 计算采暖季COP ==========
     // 获取采暖季电量总表数据（采暖季第一天时已经是当天的日电量值）
-    String hp_total_elec_season_tag = "Sys\\FinforWorx\\EC\\HP_Total_Meter_Elec_Consumption_season";
-    String wshp_total_elec_season_tag = "Sys\\FinforWorx\\EC\\WSHP_Total_Meter_Elec_Consumption_season";
-    String total_elec_season_tag = "Sys\\FinforWorx\\EC\\Total_Meter_Elec_Consumption_season";
+    String hp_total_elec_season_tag = "Sys\\FinforWorx\\EnergyCost\\HP_Total_Meter_Elec_Consumption_season";
+    String wshp_total_elec_season_tag = "Sys\\FinforWorx\\EnergyCost\\WSHP_Total_Meter_Elec_Consumption_season";
+    String total_elec_season_tag = "Sys\\FinforWorx\\EnergyCost\\Total_Meter_Elec_Consumption_season";
 
     BigDecimal hp_total_elec_season = new BigDecimal("0.00");
     BigDecimal wshp_total_elec_season = new BigDecimal("0.00");
@@ -483,8 +407,8 @@ if (hour == 0) {
     }
 
     // 获取采暖季热量（一次侧和二次侧）
-    String heat1_season_tag = "Sys\\FinforWorx\\EC\\Heat_Meter1_Elec_Consumption_season";
-    String heat2_season_tag = "Sys\\FinforWorx\\EC\\Heat_Meter2_Elec_Consumption_season";
+    String heat1_season_tag = "Sys\\FinforWorx\\EnergyCost\\Heat_Meter1_Elec_Consumption_season";
+    String heat2_season_tag = "Sys\\FinforWorx\\EnergyCost\\Heat_Meter2_Elec_Consumption_season";
     BigDecimal heat1_season = new BigDecimal("0.00");
     BigDecimal heat2_season = new BigDecimal("0.00");
 
@@ -500,21 +424,21 @@ if (hour == 0) {
     if (hp_total_elec_season.compareTo(BigDecimal.ZERO) != 0) {
         hp_cop_season = heat1_season.divide(hp_total_elec_season, 2, RoundingMode.HALF_UP);
     }
-    writeData.put("Sys\\FinforWorx\\EC\\HP_COP_season", hp_cop_season.toString());
+    writeData.put("Sys\\FinforWorx\\EnergyCost\\HP_COP_season", hp_cop_season.toString());
 
     // 计算水源热泵COP-采暖季 = 二次侧热表2 / 水源热泵总电表
     // BigDecimal wshp_cop_season = new BigDecimal("0.00");
     // if (wshp_total_elec_season.compareTo(BigDecimal.ZERO) != 0) {
     //     wshp_cop_season = heat2_season.divide(wshp_total_elec_season, 2, RoundingMode.HALF_UP);
     // }
-    // writeData.put("Sys\\FinforWorx\\EC\\WSHP_COP_season", wshp_cop_season.toString());
+    // writeData.put("Sys\\FinforWorx\\EnergyCost\\WSHP_COP_season", wshp_cop_season.toString());
 
     // 计算系统COP-采暖季 = 二次侧热表2 / 总电表
     BigDecimal cop_season = new BigDecimal("0.00");
     if (total_elec_season.compareTo(BigDecimal.ZERO) != 0) {
         cop_season = heat2_season.divide(total_elec_season, 2, RoundingMode.HALF_UP);
     }
-    writeData.put("Sys\\FinforWorx\\EC\\COP_season", cop_season.toString());
+    writeData.put("Sys\\FinforWorx\\EnergyCost\\COP_season", cop_season.toString());
 
     // 执行下置业务编排（只有当writeData不为空时才执行）
     if (writeData != null && writeData.size() > 0) {
@@ -536,7 +460,7 @@ if (hour == 0) {
         }
     }
 
-    // 下置日数据到zizhi点位
+    // 下置日数据到chart点位
     // 逻辑编排参数（用于下置日数据）
     AlgorithmProcessExecuteParam param_write_day = new AlgorithmProcessExecuteParam();
     Map<String, Object> paramMap_write_day = new HashMap();
@@ -556,61 +480,40 @@ if (hour == 0) {
     prevDay23HourCalendar.set(Calendar.SECOND, 59);
     String prevDay23Hour59End = sdf.format(prevDay23HourCalendar.getTime());
 
-    // 1. 获取COP_day的数据，下置到COP_day_zizhi
-    String copDayTag = "Sys\\FinforWorx\\EC\\COP_day";
-    String copDayZizhiTag = "Sys\\FinforWorx\\EC\\COP_day_zizhi";
+    // 1. 制热日COP
+    String heatDailyCOP = "Sys\\FinforWorx\\EnergyCost\\Heat_Daily_COP";
+    String heatDailyCOPTagChart = "Sys\\FinforWorx\\EnergyCostChart\\Heat_Daily_COP_Chart";
     try {
-        BigDecimal value = getValueFromHistory(copDayTag, prevDay23Hour55Start, prevDay23Hour59End, dataService);
+        BigDecimal value = getValueFromHistory(heatDailyCOP, prevDay23Hour55Start, prevDay23Hour59End, dataService);
         if (value != null) {
-            writeData_day.put(copDayZizhiTag, value.toString());
+            writeData_day.put(heatDailyCOPTagChart, value.toString());
         }
     } catch (Exception e) {
-        // 异常时跳过，记录异常信息到返回数据中
-        // if (data.get("debugInfo") == null) {
-        //     data.put("debugInfo", new ArrayList<Map<String, Object>>());
-        // }
-        // Map<String, Object> errorInfo = new HashMap<>();
-        // errorInfo.put("tag", copDayTag);
-        // errorInfo.put("error", e.getMessage());
-        // ((List<Map<String, Object>>)data.get("debugInfo")).add(errorInfo);
+
     }
 
-    // 2. 获取HP_COP_day的数据，下置到HP_COP_day_zizhi
-    String hpCopDayTag = "Sys\\FinforWorx\\EC\\HP_COP_day";
-    String hpCopDayZizhiTag = "Sys\\FinforWorx\\EC\\HP_COP_day_zizhi";
+    // 2. 制冷日COP
+    String coldDailyCOP = "Sys\\FinforWorx\\EnergyCost\\Cold_Daily_COP";
+    String coldDailyCOPTagChart = "Sys\\FinforWorx\\EnergyCostChart\\Cold_Daily_COP_Chart";
     try {
-        BigDecimal value = getValueFromHistory(hpCopDayTag, prevDay23Hour55Start, prevDay23Hour59End, dataService);
+        BigDecimal value = getValueFromHistory(coldDailyCOP, prevDay23Hour55Start, prevDay23Hour59End, dataService);
         if (value != null) {
-            writeData_day.put(hpCopDayZizhiTag, value.toString());
+            writeData_day.put(coldDailyCOPTagChart, value.toString());
         }
     } catch (Exception e) {
-        // 异常时跳过，记录异常信息到返回数据中
-        // if (data.get("debugInfo") == null) {
-        //     data.put("debugInfo", new ArrayList<Map<String, Object>>());
-        // }
-        // Map<String, Object> errorInfo = new HashMap<>();
-        // errorInfo.put("tag", hpCopDayTag);
-        // errorInfo.put("error", e.getMessage());
-        // ((List<Map<String, Object>>)data.get("debugInfo")).add(errorInfo);
+
     }
 
-    // 3. 获取WSHP_COP_day的数据，下置到WSHP_COP_day_zizhi
-    String wshpCopDayTag = "Sys\\FinforWorx\\EC\\WSHP_COP_day";
-    String wshpCopDayZizhiTag = "Sys\\FinforWorx\\EC\\WSHP_COP_day_zizhi";
+    // 3. 系统日COP
+    String systemDailyCOP = "Sys\\FinforWorx\\EnergyCost\\System_Daily_COP";
+    String systemDailyCOPTagChart = "Sys\\FinforWorx\\EnergyCostChart\\System_Daily_COP_Chart";
     try {
-        BigDecimal value = getValueFromHistory(wshpCopDayTag, prevDay23Hour55Start, prevDay23Hour59End, dataService);
+        BigDecimal value = getValueFromHistory(systemDailyCOP, prevDay23Hour55Start, prevDay23Hour59End, dataService);
         if (value != null) {
-            writeData_day.put(wshpCopDayZizhiTag, value.toString());
+            writeData_day.put(systemDailyCOPTagChart, value.toString());
         }
     } catch (Exception e) {
-        // 异常时跳过，记录异常信息到返回数据中
-        // if (data.get("debugInfo") == null) {
-        //     data.put("debugInfo", new ArrayList<Map<String, Object>>());
-        // }
-        // Map<String, Object> errorInfo = new HashMap<>();
-        // errorInfo.put("tag", wshpCopDayTag);
-        // errorInfo.put("error", e.getMessage());
-        // ((List<Map<String, Object>>)data.get("debugInfo")).add(errorInfo);
+
     }
 
     // 执行日数据下置
