@@ -15,8 +15,6 @@ import {
   setStoredEnergyPriceStateForGuide,
 } from '../../utils/energyPriceState'
 
-/** 与后端尖峰平谷命名一致；按时段顺序循环映射 */
-const SEGMENT_ENERGY_NAMES = ['峰电', '谷电', '平电', '深谷电']
 
 function segmentUiTimeToApi(time) {
   if (!time || typeof time !== 'string') return '00:00:00'
@@ -570,8 +568,8 @@ const SystemParamsEnergyPrice = forwardRef(function SystemParamsEnergyPrice(
       return
     }
 
-    const segmentsPayload = normalizedSegments.map((segment, index) => ({
-      energyPriceName: SEGMENT_ENERGY_NAMES[index % SEGMENT_ENERGY_NAMES.length],
+    const segmentsPayload = normalizedSegments.map((segment) => ({
+      energyPriceName: '',
       unitPrice: String(segment.price).trim(),
       startTime: segmentUiTimeToApi(segment.start),
       endTime: segmentUiTimeToApi(segment.end),

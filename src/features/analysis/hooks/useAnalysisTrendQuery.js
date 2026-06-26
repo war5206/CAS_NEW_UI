@@ -59,7 +59,8 @@ const POWER_TYPE_MAP = {
 
 const COST_TYPE_MAP = {
   'total-cost': '总费用',
-  'heat-pump': '热泵',
+  'heat-pump-heating': '热泵（制热）',
+  'heat-pump-cooling': '热泵（制冷）',
   'water-pump': '水泵',
   'coupling-energy': '耦合能源',
 }

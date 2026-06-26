@@ -207,22 +207,26 @@ export function adaptAnalysisTrendViewModel(rawData, options) {
     })
   } else if (yMap?.y1CurrentList && typeof yMap.y1CurrentList === 'object' && !Array.isArray(yMap.y1CurrentList)) {
     const priceMap = yMap.y1CurrentList
+    const expenseColors = ['#2387f0', '#efc443', '#ff7a45', '#2dd283', '#9b6bcc', '#00b4d8']
     const priceKeys = Object.keys(priceMap)
     const rows = priceKeys.map((key) => ({
       key,
       data: normalizeList(priceMap[key]),
     }))
     compareBasisData = labels.map((_, index) => rows.reduce((sum, row) => sum + (row.data[index] ?? 0), 0))
-    series = rows.map((row) => ({
-      name: row.key,
-      type: 'bar',
-      stack: 'analysis-expense',
-      data: row.data,
-      color,
-      barWidth: labels.length > 12 ? 18 : 24,
-      itemStyleColor: color,
-      tooltipColor: color,
-    }))
+    series = rows.map((row, index) => {
+      const seriesColor = expenseColors[index % expenseColors.length]
+      return {
+        name: row.key,
+        type: 'bar',
+        stack: 'analysis-expense',
+        data: row.data,
+        color: seriesColor,
+        barWidth: labels.length > 12 ? 18 : 24,
+        itemStyleColor: seriesColor,
+        tooltipColor: seriesColor,
+      }
+    })
   } else {
     const values = normalizeList(yMap?.y1CurrentList)
     compareBasisData = values

@@ -101,6 +101,7 @@ String prevHour59End = sdf.format(prevHourCalendar.getTime());
 // 每天0点计算月用电量、年用电量和采暖季用电量
 if (hour == 0) {
     // 从PLC点位读取日用电量
+    BigDecimal systemTotalDay = BigDecimal.ZERO; // 系统日电量
     BigDecimal hpTotalDayHeating = BigDecimal.ZERO; // 热泵制热日电量
     BigDecimal hpTotalDayCooling = BigDecimal.ZERO; // 热泵制冷日电量
     BigDecimal primaryWpTotalDay = BigDecimal.ZERO; // 一次泵日电量
@@ -120,6 +121,28 @@ if (hour == 0) {
     calendar_now.set(Calendar.SECOND, 59);
     // 昨天23:59:59
     String lastday_end = sdf.format(calendar_now.getTime());
+
+    // 系统日用电量点位
+    String systemElecDayTag = "Sys\\FinforWorx\\EnergyCost\\System_Daily_Energy_Consumption";
+    try {
+        String tagEscaped = systemElecDayTag.replace("'", "''");
+        String sql = "select a.taglongname,a.times,a.hisval from pshisdata as a where a.taglongname in ('" + tagEscaped + "') and a.starttime ='" + lastday_start + "' and a.endtime = '" + lastday_end + "' limitpage 1,9999";
+        DataTable dt = dataService.queryListDataBySql(sql);
+        BigDecimal maxValue = BigDecimal.ZERO;
+        for (int j = 0; j < dt.getRows().size(); j++) {
+            DataRow dataRow = dt.getDataRow(j);
+            Object hisvalObj = dataRow.getValue(2);
+            if (hisvalObj != null) {
+                BigDecimal value = new BigDecimal(hisvalObj.toString());
+                if (value.compareTo(maxValue) > 0) {
+                    maxValue = value;
+                }
+            }
+        }
+        systemTotalDay = maxValue.setScale(2, RoundingMode.HALF_UP);
+    } catch (Exception e) {
+        systemTotalDay = BigDecimal.ZERO;
+    }
 
     // 热泵制热日用电量点位
     String heatHPElecDayTag = "Sys\\FinforWorx\\EnergyCost\\HP_Heat_Daily_Energy_Consumption";
@@ -235,12 +258,14 @@ if (hour == 0) {
     
 
     // 计算月用电量
+    String systemTotalMonthTag = "Sys\\FinforWorx\\EnergyCost\\System_Monthly_Energy_Consumption";
     String hpTotalMonthHeatingTag = "Sys\\FinforWorx\\EnergyCost\\HP_Heat_Monthly_Energy_Consumption";
     String hpTotalMonthCoolingTag = "Sys\\FinforWorx\\EnergyCost\\HP_Cold_Monthly_Energy_Consumption";
     String primaryWpTotalMonthTag = "Sys\\FinforWorx\\EnergyCost\\primary_WP_Monthly_Energy_Consumption";
     String secondaryWpTotalMonthTag = "Sys\\FinforWorx\\EnergyCost\\secondary_WP_Monthly_Energy_Consumption";
     String ohnyTotalMonthTag = "Sys\\FinforWorx\\EnergyCost\\OHNY_Monthly_Energy_Consumption";
     
+    String systemTotalMonthTagChart = "Sys\\FinforWorx\\EnergyCostChart\\System_Monthly_Energy_Consumption_Chart";
     String hpTotalMonthHeatingTagChart = "Sys\\FinforWorx\\EnergyCostChart\\HP_Heat_Monthly_Energy_Consumption_Chart";
     String hpTotalMonthCoolingTagChart = "Sys\\FinforWorx\\EnergyCostChart\\HP_Cold_Monthly_Energy_Consumption_Chart";
     String primaryWpTotalMonthTagChart = "Sys\\FinforWorx\\EnergyCostChart\\Primary_WP_Monthly_Energy_Consumption_Chart";
@@ -249,6 +274,7 @@ if (hour == 0) {
 
     if (day_of_month == 2) {
         // 每月2号重置月用电量，重置为1号的日用电量
+        writeData.put(systemTotalMonthTag, systemTotalDay.setScale(2, RoundingMode.HALF_UP).toString());
         writeData.put(hpTotalMonthHeatingTag, hpTotalDayHeating.setScale(2, RoundingMode.HALF_UP).toString());
         writeData.put(hpTotalMonthCoolingTag, hpTotalDayCooling.setScale(2, RoundingMode.HALF_UP).toString());
         writeData.put(primaryWpTotalMonthTag, primaryWpTotalDay.setScale(2, RoundingMode.HALF_UP).toString());
@@ -256,6 +282,29 @@ if (hour == 0) {
         writeData.put(ohnyTotalMonthTag, ohnyTotalDay.setScale(2, RoundingMode.HALF_UP).toString());
     } else {
         // 其他日期累加月用电量
+        // 系统月用电量
+        try {
+            String monthTagEscaped = systemTotalMonthTag.replace("'", "''");
+            String sql = "select a.taglongname,a.times,a.realval,a.quality from psrealdata as a where a.taglongname in ('" + monthTagEscaped + "')";
+            DataTable dt = dataService.queryListDataBySql(sql);
+            if (dt.getRows().size() > 0) {
+                DataRow dataRow = dt.getDataRow(0);
+                Object realvalObj = dataRow.getValue(2);
+                if (realvalObj != null) {
+                    BigDecimal value = new BigDecimal(realvalObj.toString()).setScale(2, RoundingMode.HALF_UP);
+                    BigDecimal newValue = value.add(systemTotalDay).setScale(2, RoundingMode.HALF_UP);
+                    writeData.put(systemTotalMonthTag, newValue.toString());
+                    if(day_of_month == 1){
+                        writeData.put(systemTotalMonthTagChart, newValue.toString());
+                    }
+                }
+                // 如果realvalObj为null，不更新，保持原值，避免丢失之前的累计值
+            }
+            // 如果查询不到数据行，不更新，保持原值，避免丢失之前的累计值
+        } catch (Exception e) {
+            // 异常时，不更新，保持原值，避免丢失之前的累计值
+        }
+
         // 热泵制热月用电量
         try {
             String monthTagEscaped = hpTotalMonthHeatingTag.replace("'", "''");
@@ -373,12 +422,14 @@ if (hour == 0) {
     }
     
     // 计算年用电量
+    String systemTotalYearTag = "Sys\\FinforWorx\\EnergyCost\\System_Yearly_Energy_Consumption";
     String hpTotalYearHeatingTag = "Sys\\FinforWorx\\EnergyCost\\HP_Heat_Yearly_Energy_Consumption";
     String hpTotalYearCoolingTag = "Sys\\FinforWorx\\EnergyCost\\HP_Cold_Yearly_Energy_Consumption";
     String primaryWpTotalYearTag = "Sys\\FinforWorx\\EnergyCost\\primary_WP_Yearly_Energy_Consumption";
     String secondaryWpTotalYearTag = "Sys\\FinforWorx\\EnergyCost\\secondary_WP_Yearly_Energy_Consumption";
     String ohnyTotalYearTag = "Sys\\FinforWorx\\EnergyCost\\OHNY_Yearly_Energy_Consumption";
     
+    String systemTotalYearTagChart = "Sys\\FinforWorx\\EnergyCostChart\\System_Yearly_Energy_Consumption_Chart";
     String hpTotalYearHeatingTagChart = "Sys\\FinforWorx\\EnergyCostChart\\HP_Heat_Yearly_Energy_Consumption_Chart";
     String hpTotalYearCoolingTagChart = "Sys\\FinforWorx\\EnergyCostChart\\HP_Cold_Yearly_Energy_Consumption_Chart";
     String primaryWpTotalYearTagChart = "Sys\\FinforWorx\\EnergyCostChart\\Primary_WP_Yearly_Energy_Consumption_Chart";
@@ -386,6 +437,7 @@ if (hour == 0) {
     String ohnyTotalYearTagChart = "Sys\\FinforWorx\\EnergyCostChart\\OHNY_Yearly_Energy_Consumption_Chart";
     if (day_of_month == 2 && monthOfYear == 1) {
         // 1月2号重置年用电量，重置为1号的日用电量
+        writeData.put(systemTotalYearTag, systemTotalDay.setScale(2, RoundingMode.HALF_UP).toString());
         writeData.put(hpTotalYearHeatingTag, hpTotalDayHeating.setScale(2, RoundingMode.HALF_UP).toString());
         writeData.put(hpTotalYearCoolingTag, hpTotalDayCooling.setScale(2, RoundingMode.HALF_UP).toString());
         writeData.put(primaryWpTotalYearTag, primaryWpTotalDay.setScale(2, RoundingMode.HALF_UP).toString());
@@ -393,6 +445,29 @@ if (hour == 0) {
         writeData.put(ohnyTotalYearTag, ohnyTotalDay.setScale(2, RoundingMode.HALF_UP).toString());
     } else {
         // 其他日期累加年用电量
+        // 系统用电量
+        try {
+            String yearTagEscaped = systemTotalYearTag.replace("'", "''");
+            String sql = "select a.taglongname,a.times,a.realval,a.quality from psrealdata as a where a.taglongname in ('" + yearTagEscaped + "')";
+            DataTable dt = dataService.queryListDataBySql(sql);
+            if (dt.getRows().size() > 0) {
+                DataRow dataRow = dt.getDataRow(0);
+                Object realvalObj = dataRow.getValue(2);
+                if (realvalObj != null) {
+                    BigDecimal value = new BigDecimal(realvalObj.toString()).setScale(2, RoundingMode.HALF_UP);
+                    BigDecimal newValue = value.add(systemTotalDay).setScale(2, RoundingMode.HALF_UP);
+                    writeData.put(systemTotalYearTag, newValue.toString());
+                    if (day_of_month == 1 && monthOfYear == 1) {
+                        writeData.put(systemTotalYearTagChart, newValue.toString());
+                    }
+                }
+                // 如果realvalObj为null，不更新，保持原值，避免丢失之前的累计值
+            }
+            // 如果查询不到数据行，不更新，保持原值，避免丢失之前的累计值
+        } catch (Exception e) {
+            // 异常时，不更新，保持原值，避免丢失之前的累计值
+        }
+
         // 热泵制热年用电量
         try {
             String yearTagEscaped = hpTotalYearHeatingTag.replace("'", "''");
@@ -403,7 +478,7 @@ if (hour == 0) {
                 Object realvalObj = dataRow.getValue(2);
                 if (realvalObj != null) {
                     BigDecimal value = new BigDecimal(realvalObj.toString()).setScale(2, RoundingMode.HALF_UP);
-                    BigDecimal newValue = value.add(hpTotalDay).setScale(2, RoundingMode.HALF_UP);
+                    BigDecimal newValue = value.add(hpTotalDayHeating).setScale(2, RoundingMode.HALF_UP);
                     writeData.put(hpTotalYearHeatingTag, newValue.toString());
                     if (day_of_month == 1 && monthOfYear == 1) {
                         writeData.put(hpTotalYearHeatingTagChart, newValue.toString());
@@ -426,7 +501,7 @@ if (hour == 0) {
                 Object realvalObj = dataRow.getValue(2);
                 if (realvalObj != null) {
                     BigDecimal value = new BigDecimal(realvalObj.toString()).setScale(2, RoundingMode.HALF_UP);
-                    BigDecimal newValue = value.add(wshpTotalDay).setScale(2, RoundingMode.HALF_UP);
+                    BigDecimal newValue = value.add(hpTotalDayCooling).setScale(2, RoundingMode.HALF_UP);
                     writeData.put(hpTotalYearCoolingTag, newValue.toString());
                     if (day_of_month == 1 && monthOfYear == 1) {
                         writeData.put(hpTotalYearCoolingTagChart, newValue.toString());
@@ -449,7 +524,7 @@ if (hour == 0) {
                 Object realvalObj = dataRow.getValue(2);
                 if (realvalObj != null) {
                     BigDecimal value = new BigDecimal(realvalObj.toString()).setScale(2, RoundingMode.HALF_UP);
-                    BigDecimal newValue = value.add(wpTotalDay).setScale(2, RoundingMode.HALF_UP);
+                    BigDecimal newValue = value.add(primaryWpTotalDay).setScale(2, RoundingMode.HALF_UP);
                     writeData.put(primaryWpTotalYearTag, newValue.toString());
                     if (day_of_month == 1 && monthOfYear == 1) {
                         writeData.put(primaryWpTotalYearTagChart, newValue.toString());
@@ -472,7 +547,7 @@ if (hour == 0) {
                 Object realvalObj = dataRow.getValue(2);
                 if (realvalObj != null) {
                     BigDecimal value = new BigDecimal(realvalObj.toString()).setScale(2, RoundingMode.HALF_UP);
-                    BigDecimal newValue = value.add(totalDay).setScale(2, RoundingMode.HALF_UP);
+                    BigDecimal newValue = value.add(secondaryWpTotalDay).setScale(2, RoundingMode.HALF_UP);
                     writeData.put(secondaryWpTotalYearTag, newValue.toString());
                     if (day_of_month == 1 && monthOfYear == 1) {
                         writeData.put(secondaryWpTotalYearTagChart, newValue.toString());
@@ -495,7 +570,7 @@ if (hour == 0) {
                 Object realvalObj = dataRow.getValue(2);
                 if (realvalObj != null) {
                     BigDecimal value = new BigDecimal(realvalObj.toString()).setScale(2, RoundingMode.HALF_UP);
-                    BigDecimal newValue = value.add(totalDay).setScale(2, RoundingMode.HALF_UP);
+                    BigDecimal newValue = value.add(ohnyTotalDay).setScale(2, RoundingMode.HALF_UP);
                     writeData.put(ohnyTotalYearTag, newValue.toString());
                     if (day_of_month == 1 && monthOfYear == 1) {
                         writeData.put(ohnyTotalYearTagChart, newValue.toString());
@@ -511,12 +586,16 @@ if (hour == 0) {
 
 
     // 下置日数据到chart点位（使用已获取的日数据变量）
+    String systemElecDayTagChart = "Sys\\FinforWorx\\EnergyCost\\System_Daily_Energy_Consumption_Chart";
     String heatHPElecDayTagChart = "Sys\\FinforWorx\\EnergyCost\\HP_Heat_Daily_Energy_Consumption_Chart";
     String coolHPElecDayTagChart = "Sys\\FinforWorx\\EnergyCost\\HP_Cold_Daily_Energy_Consumption_Chart";
     String primaryWPElecDayTagChart = "Sys\\FinforWorx\\EnergyCost\\Primary_WP_Daily_Energy_Consumption_Chart";
     String secondaryWPElecDayTagChart = "Sys\\FinforWorx\\EnergyCost\\Secondary_WP_Daily_Energy_Consumption_Chart";
     String ohnyElecDayTagChart = "Sys\\FinforWorx\\EnergyCost\\OHNY_Daily_Energy_Consumption_Chart";
 
+    if (systemTotalDay != null) {
+        writeData.put(systemElecDayTagChart, systemTotalDay.setScale(2, RoundingMode.HALF_UP).toString());
+    }
     if (hpTotalDayHeating != null) {
         writeData.put(heatHPElecDayTagChart, hpTotalDayHeating.setScale(2, RoundingMode.HALF_UP).toString());
     }

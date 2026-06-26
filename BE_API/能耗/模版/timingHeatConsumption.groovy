@@ -272,7 +272,7 @@ if (hour == 0) {
                 Object realvalObj = dataRow.getValue(2);
                 if (realvalObj != null) {
                     BigDecimal value = new BigDecimal(realvalObj.toString()).setScale(2, RoundingMode.HALF_UP);
-                    BigDecimal newValue = value.add(primaryHeatDay).setScale(2, RoundingMode.HALF_UP);
+                    BigDecimal newValue = value.add(primaryCoolDay).setScale(2, RoundingMode.HALF_UP);
                     writeData.put(primarySystemMonthlyCoolingEnergyTag, newValue.toString());
                     if(day_of_month == 1){
                         writeData.put(primarySystemMonthlyCoolingEnergyTagChart, newValue.toString());
@@ -293,7 +293,7 @@ if (hour == 0) {
                 Object realvalObj = dataRow.getValue(2);
                 if (realvalObj != null) {
                     BigDecimal value = new BigDecimal(realvalObj.toString()).setScale(2, RoundingMode.HALF_UP);
-                    BigDecimal newValue = value.add(primaryHeatDay).setScale(2, RoundingMode.HALF_UP);
+                    BigDecimal newValue = value.add(secondaryHeatDay).setScale(2, RoundingMode.HALF_UP);
                     writeData.put(secondarySystemMonthlyHeatingEnergyTag, newValue.toString());
                     if(day_of_month == 1){
                         writeData.put(secondarySystemMonthlyHeatingEnergyTagChart, newValue.toString());
@@ -314,7 +314,7 @@ if (hour == 0) {
                 Object realvalObj = dataRow.getValue(2);
                 if (realvalObj != null) {
                     BigDecimal value = new BigDecimal(realvalObj.toString()).setScale(2, RoundingMode.HALF_UP);
-                    BigDecimal newValue = value.add(primaryHeatDay).setScale(2, RoundingMode.HALF_UP);
+                    BigDecimal newValue = value.add(secondaryCoolDay).setScale(2, RoundingMode.HALF_UP);
                     writeData.put(secondarySystemMonthlyCoolingEnergyTag, newValue.toString());
                     if(day_of_month == 1){
                         writeData.put(secondarySystemMonthlyCoolingEnergyTagChart, newValue.toString());
@@ -368,7 +368,7 @@ if (hour == 0) {
                 Object realvalObj = dataRow.getValue(2);
                 if (realvalObj != null) {
                     BigDecimal value = new BigDecimal(realvalObj.toString()).setScale(2, RoundingMode.HALF_UP);
-                    writeData.put(primarySystemYearlyCoolingEnergyTag, value.add(secondaryHeatDay).setScale(2, RoundingMode.HALF_UP).toString());
+                    writeData.put(primarySystemYearlyCoolingEnergyTag, value.add(primaryCoolDay).setScale(2, RoundingMode.HALF_UP).toString());
                     if(day_of_month == 1 && monthOfYear == 1){
                         writeData.put(primarySystemYearlyCoolingEnergyTagChart, newValue.toString());
                     }
@@ -387,7 +387,7 @@ if (hour == 0) {
                 Object realvalObj = dataRow.getValue(2);
                 if (realvalObj != null) {
                     BigDecimal value = new BigDecimal(realvalObj.toString()).setScale(2, RoundingMode.HALF_UP);
-                    BigDecimal newValue = value.add(primaryHeatDay).setScale(2, RoundingMode.HALF_UP);
+                    BigDecimal newValue = value.add(secondaryHeatDay).setScale(2, RoundingMode.HALF_UP);
                     writeData.put(secondarySystemYearlyHeatingEnergyTag, newValue.toString());
                     if(day_of_month == 1 && monthOfYear == 1){
                         writeData.put(secondarySystemYearlyHeatingEnergyTagChart, newValue.toString());
@@ -407,7 +407,7 @@ if (hour == 0) {
                 Object realvalObj = dataRow.getValue(2);
                 if (realvalObj != null) {
                     BigDecimal value = new BigDecimal(realvalObj.toString()).setScale(2, RoundingMode.HALF_UP);
-                    BigDecimal newValue = value.add(primaryHeatDay).setScale(2, RoundingMode.HALF_UP);
+                    BigDecimal newValue = value.add(secondaryCoolDay).setScale(2, RoundingMode.HALF_UP);
                     writeData.put(secondarySystemYearlyCoolingEnergyTag, newValue.toString());
                     if(day_of_month == 1 && monthOfYear == 1){
                         writeData.put(secondarySystemYearlyCoolingEnergyTagChart, newValue.toString());
@@ -420,7 +420,7 @@ if (hour == 0) {
     }
 
 
-    // 下置日数据到zizhi点位（使用已获取的日数据变量）
+    // 下置日数据到chart点位（使用已获取的日数据变量）
     String primarySystemDailyHeatingEnergyTagChart = "Sys\\FinforWorx\\EnergyCostChart\\Primary_System_Daily_Heating_Energy_Chart";
     String primarySystemDailyCoolingEnergyTagChart = "Sys\\FinforWorx\\EnergyCostChart\\Primary_System_Daily_Cooling_Energy_Chart";
     String secondarySystemDailyHeatingEnergyTagChart = "Sys\\FinforWorx\\EnergyCostChart\\Secondary_System_Daily_Heating_Energy_Chart";
