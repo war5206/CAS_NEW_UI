@@ -11,21 +11,16 @@
 
 // 每小时计算用电量统计信息
 import cn.hutool.core.codec.Base64;
-import com.alibaba.fastjson.JSON;
-import com.sunwayland.algorithm.feign.FeignSolAlgorithmProcess;
-import com.sunwayland.algorithm.pojo.AlgorithmProcessExecuteParam
-import com.sunwayland.common.core.constant.PlatformConst;
 import com.sunwayland.common.core.pojo.PtUser;
 import com.sunwayland.common.core.utils.ThreadLocalUtil;
 import com.sunwayland.platform.biz.algorithm.utils.ApplicationContextProvider;
 import com.sunwayland.platform.biz.platform.modules.dynamicsql.service.DataService;
 import com.sunwayland.platform.dao.data.DataTable;
-import com.sunwayland.platform.dao.impl.PsSqlImpl;
+import com.sunwayland.platform.dao.data.DataRow;
 import com.sunwayland.platform.dynamic.DynamicDataSource;
 import com.sunwayland.platform.utils.SnowFlake;
 import java.text.SimpleDateFormat;
 import com.sunwayland.platform.utils.HttpRequest;
-import com.sunwayland.platform.dao.data.DataRow;
 import java.text.ParseException;
 import java.text.DecimalFormat;
 import java.math.BigDecimal;
@@ -33,11 +28,21 @@ import java.math.RoundingMode;
 
 def dynamicDataSource = ApplicationContextProvider.getBean(DynamicDataSource.class);
 def dataService = ApplicationContextProvider.getBean(DataService.class);
-// 调用逻辑编排
-FeignSolAlgorithmProcess sol = ApplicationContextProvider.getBean(FeignSolAlgorithmProcess.class);
+SnowFlake idWorker = new SnowFlake();
+
+PtUser ptUser = ThreadLocalUtil.getCurrentUser();
+String dbCode = ptUser != null && ptUser.dbCode != null ? ptUser.dbCode.toString() : "t01";
+if ("base".equals(dbCode)) {
+    dbCode = "t01";
+}
+
+def escapeSql = { String s ->
+    if (s == null) return "";
+    return s.replace("'", "''");
+}
 
 String selectAreaSql = "select project_type_uuid,project_acreage,start_heating_season,end_heating_season from sjmg_project_data";
-List<Map<String,Object>> selectAreaList = dynamicDataSource.excuteTenantSqlQuery(selectAreaSql, "t01");
+List<Map<String,Object>> selectAreaList = dynamicDataSource.excuteTenantSqlQuery(selectAreaSql, dbCode);
 String projectTypeUuid = selectAreaList.get(0).get("project_type_uuid").toString();
 String start_heating_season = selectAreaList.get(0).get("start_heating_season").toString();
 String end_heating_season = selectAreaList.get(0).get("end_heating_season").toString();
@@ -65,569 +70,140 @@ try {
 boolean isno_season = calendar.getTime().compareTo(startDate) >= 0 && calendar.getTime().compareTo(endDate) <= 0;
 // 如果项目类型是采暖，则判断是否在采暖季
 if ("1".equals(projectTypeUuid) && !isno_season){
-    data.put("result", "当前不在采暖季，不执行下置操作");
+    data.put("result", "当前不在采暖季，不执行归档操作");
     data.put("currentTime", sdf.format(calendar.getTime()));
     data.put("startDate", sdf.format(startDate));
     data.put("endDate", sdf.format(endDate));
-    return;
+    return data;
 }
 
-// 逻辑编排参数
-AlgorithmProcessExecuteParam param_write = new AlgorithmProcessExecuteParam();
-Map<String, Object> paramMap_write = new HashMap();
-param_write.setAlgorithmProcessId("writeRealvalByLongNames");
-Map<String, Object> paramData_write = new HashMap();
-
-Map<String,String> writeData = new HashMap<>();
-
-// 下置小时数据到zizhi点位（获取上一个整点55-59:59的最大值）
-// 计算上一个整点的时间范围：例如现在是1点，则查询0点55分-0点59分59秒
-Calendar prevHourCalendar = Calendar.getInstance();
-prevHourCalendar.set(Calendar.MINUTE, 0);
-prevHourCalendar.set(Calendar.SECOND, 0);
-prevHourCalendar.set(Calendar.MILLISECOND, 0);
-prevHourCalendar.add(Calendar.HOUR_OF_DAY, -1);
-// 上一个整点（例如：0点）
-String prevHourStart = sdf.format(prevHourCalendar.getTime());
-// 上一个整点的55分
-prevHourCalendar.set(Calendar.MINUTE, 55);
-prevHourCalendar.set(Calendar.SECOND, 0);
-String prevHour55Start = sdf.format(prevHourCalendar.getTime());
-// 上一个整点的59分59秒
-prevHourCalendar.set(Calendar.MINUTE, 59);
-prevHourCalendar.set(Calendar.SECOND, 59);
-String prevHour59End = sdf.format(prevHourCalendar.getTime());
-
-// 每天0点计算月用电量、年用电量和采暖季用电量
+// 每天0点计算日用电量并写入数据库
 if (hour == 0) {
-    // 从PLC点位读取日用电量
-    BigDecimal systemTotalDay = BigDecimal.ZERO; // 系统日电量
-    BigDecimal hpTotalDayHeating = BigDecimal.ZERO; // 热泵制热日电量
-    BigDecimal hpTotalDayCooling = BigDecimal.ZERO; // 热泵制冷日电量
-    BigDecimal primaryWpTotalDay = BigDecimal.ZERO; // 一次泵日电量
-    BigDecimal secondaryWpTotalDay = BigDecimal.ZERO; // 二次泵日电量
-    BigDecimal ohnyTotalDay = BigDecimal.ZERO; // 耦合能源日电量
-    
-    // 计算时间范围：昨天23:55到23:59:59
-    Calendar calendar_now = Calendar.getInstance();
-    calendar_now.add(Calendar.DAY_OF_MONTH, -1);
-    calendar_now.set(Calendar.HOUR_OF_DAY, 23);
-    calendar_now.set(Calendar.MINUTE, 55);
-    calendar_now.set(Calendar.SECOND, 0);
-    calendar_now.set(Calendar.MILLISECOND, 0);
-    // 昨天23:55:00
-    String lastday_start = sdf.format(calendar_now.getTime());
-    calendar_now.set(Calendar.MINUTE, 59);
-    calendar_now.set(Calendar.SECOND, 59);
-    // 昨天23:59:59
-    String lastday_end = sdf.format(calendar_now.getTime());
+    SimpleDateFormat dateSdf = new SimpleDateFormat("yyyy-MM-dd");
+    // 只处理昨天
+    Calendar baseCal = Calendar.getInstance();
+    baseCal.add(Calendar.DAY_OF_MONTH, -1);
+    String yesterdayStr = dateSdf.format(baseCal.getTime());
 
-    // 系统日用电量点位
-    String systemElecDayTag = "Sys\\FinforWorx\\EnergyCost\\System_Daily_Energy_Consumption";
-    try {
-        String tagEscaped = systemElecDayTag.replace("'", "''");
-        String sql = "select a.taglongname,a.times,a.hisval from pshisdata as a where a.taglongname in ('" + tagEscaped + "') and a.starttime ='" + lastday_start + "' and a.endtime = '" + lastday_end + "' limitpage 1,9999";
-        DataTable dt = dataService.queryListDataBySql(sql);
-        BigDecimal maxValue = BigDecimal.ZERO;
-        for (int j = 0; j < dt.getRows().size(); j++) {
-            DataRow dataRow = dt.getDataRow(j);
-            Object hisvalObj = dataRow.getValue(2);
-            if (hisvalObj != null) {
-                BigDecimal value = new BigDecimal(hisvalObj.toString());
-                if (value.compareTo(maxValue) > 0) {
-                    maxValue = value;
-                }
+    String[] deviceCodes = ['SYSTEM', 'HP_HEAT', 'HP_COLD', 'PRIMARY_WP', 'SECONDARY_WP', 'OHNY'];
+    String[] deviceTags = [
+        "Sys\\FinforWorx\\EnergyCost\\System_Daily_Energy_Consumption",
+        "Sys\\FinforWorx\\EnergyCost\\HP_Heat_Daily_Energy_Consumption",
+        "Sys\\FinforWorx\\EnergyCost\\HP_Cold_Daily_Energy_Consumption",
+        "Sys\\FinforWorx\\EnergyCost\\primary_WP_Daily_Energy_Consumption",
+        "Sys\\FinforWorx\\EnergyCost\\secondary_WP_Daily_Energy_Consumption",
+        "Sys\\FinforWorx\\EnergyCost\\OHNY_Daily_Energy_Consumption"
+    ];
+
+    int totalInserted = 0;
+    int totalInsertedWithData = 0;
+    int totalInsertedZero = 0;
+    int totalSkippedExisting = 0;
+    List<String> processedDates = new ArrayList<>();
+    List<String> skippedExistingDates = new ArrayList<>();
+
+    // 单次处理昨天
+    String targetDate = yesterdayStr;
+
+    // 1. 查询该日期已存在哪些 device_code
+    String existSql = "SELECT device_code FROM sjmg_electricity_daily_detail " +
+            "WHERE stat_date = '" + escapeSql(targetDate) + "' " +
+            "AND device_code IN ('SYSTEM','HP_HEAT','HP_COLD','PRIMARY_WP','SECONDARY_WP','OHNY')";
+    List<Map<String, Object>> existResult = dynamicDataSource.excuteTenantSqlQuery(existSql, dbCode);
+    Set<String> existingCodes = new HashSet<>();
+    if (existResult != null) {
+        for (Map<String, Object> row : existResult) {
+            if (row.get("device_code") != null) {
+                existingCodes.add(row.get("device_code").toString());
             }
         }
-        systemTotalDay = maxValue.setScale(2, RoundingMode.HALF_UP);
-    } catch (Exception e) {
-        systemTotalDay = BigDecimal.ZERO;
     }
-
-    // 热泵制热日用电量点位
-    String heatHPElecDayTag = "Sys\\FinforWorx\\EnergyCost\\HP_Heat_Daily_Energy_Consumption";
-    try {
-        String tagEscaped = heatHPElecDayTag.replace("'", "''");
-        String sql = "select a.taglongname,a.times,a.hisval from pshisdata as a where a.taglongname in ('" + tagEscaped + "') and a.starttime ='" + lastday_start + "' and a.endtime = '" + lastday_end + "' limitpage 1,9999";
-        DataTable dt = dataService.queryListDataBySql(sql);
-        BigDecimal maxValue = BigDecimal.ZERO;
-        for (int j = 0; j < dt.getRows().size(); j++) {
-            DataRow dataRow = dt.getDataRow(j);
-            Object hisvalObj = dataRow.getValue(2);
-            if (hisvalObj != null) {
-                BigDecimal value = new BigDecimal(hisvalObj.toString());
-                if (value.compareTo(maxValue) > 0) {
-                    maxValue = value;
-                }
-            }
-        }
-        hpTotalDayHeating = maxValue.setScale(2, RoundingMode.HALF_UP);
-    } catch (Exception e) {
-        hpTotalDayHeating = BigDecimal.ZERO;
-    }
-    
-    // 热泵制冷日用电量点位
-    String coolHPElecDayTag = "Sys\\FinforWorx\\EnergyCost\\HP_Cold_Daily_Energy_Consumption";
-    try {
-        String tagEscaped = coolHPElecDayTag.replace("'", "''");
-        String sql = "select a.taglongname,a.times,a.hisval from pshisdata as a where a.taglongname in ('" + tagEscaped + "') and a.starttime ='" + lastday_start + "' and a.endtime = '" + lastday_end + "' limitpage 1,9999";
-        DataTable dt = dataService.queryListDataBySql(sql);
-        
-        BigDecimal maxValue = BigDecimal.ZERO;
-        for (int j = 0; j < dt.getRows().size(); j++) {
-            DataRow dataRow = dt.getDataRow(j);
-            Object hisvalObj = dataRow.getValue(2);
-            if (hisvalObj != null) {
-                BigDecimal value = new BigDecimal(hisvalObj.toString());
-                if (value.compareTo(maxValue) > 0) {
-                    maxValue = value;
-                }
-            }
-        }
-        
-        hpTotalDayCooling = maxValue.setScale(2, RoundingMode.HALF_UP);
-    } catch (Exception e) {
-        hpTotalDayCooling = BigDecimal.ZERO;
-    }
-    
-    // 一次泵日用电量点位
-    String primaryWPElecDayTag = "Sys\\FinforWorx\\EnergyCost\\primary_WP_Daily_Energy_Consumption";
-    try {
-        String tagEscaped = primaryWPElecDayTag.replace("'", "''");
-        String sql = "select a.taglongname,a.times,a.hisval from pshisdata as a where a.taglongname in ('" + tagEscaped + "') and a.starttime ='" + lastday_start + "' and a.endtime = '" + lastday_end + "' limitpage 1,9999";
-        DataTable dt = dataService.queryListDataBySql(sql);
-        BigDecimal maxValue = BigDecimal.ZERO;
-        for (int j = 0; j < dt.getRows().size(); j++) {
-            DataRow dataRow = dt.getDataRow(j);
-            Object hisvalObj = dataRow.getValue(2);
-            if (hisvalObj != null) {
-                BigDecimal value = new BigDecimal(hisvalObj.toString());
-                if (value.compareTo(maxValue) > 0) {
-                    maxValue = value;
-                }
-            }
-        }
-        primaryWpTotalDay = maxValue.setScale(2, RoundingMode.HALF_UP);
-    } catch (Exception e) {
-        primaryWpTotalDay = BigDecimal.ZERO;
-    }
-
-    // 二次泵日用电量点位
-    String secondaryWPElecDayTag = "Sys\\FinforWorx\\EnergyCost\\secondary_WP_Daily_Energy_Consumption";
-    try {
-        String tagEscaped = secondaryWPElecDayTag.replace("'", "''");
-        String sql = "select a.taglongname,a.times,a.hisval from pshisdata as a where a.taglongname in ('" + tagEscaped + "') and a.starttime ='" + lastday_start + "' and a.endtime = '" + lastday_end + "' limitpage 1,9999";
-        DataTable dt = dataService.queryListDataBySql(sql);
-        BigDecimal maxValue = BigDecimal.ZERO;
-        for (int j = 0; j < dt.getRows().size(); j++) {
-            DataRow dataRow = dt.getDataRow(j);
-            Object hisvalObj = dataRow.getValue(2);
-            if (hisvalObj != null) {
-                BigDecimal value = new BigDecimal(hisvalObj.toString());
-                if (value.compareTo(maxValue) > 0) {
-                    maxValue = value;
-                }
-            }
-        }
-        secondaryWpTotalDay = maxValue.setScale(2, RoundingMode.HALF_UP);
-    } catch (Exception e) {
-        secondaryWpTotalDay = BigDecimal.ZERO;
-    }
-
-    // 耦合能源日用电量点位
-    String ohnyElecDayTag = "Sys\\FinforWorx\\EnergyCost\\OHNY_Daily_Energy_Consumption";
-    try {
-        String tagEscaped = ohnyElecDayTag.replace("'", "''");
-        String sql = "select a.taglongname,a.times,a.hisval from pshisdata as a where a.taglongname in ('" + tagEscaped + "') and a.starttime ='" + lastday_start + "' and a.endtime = '" + lastday_end + "' limitpage 1,9999";
-        DataTable dt = dataService.queryListDataBySql(sql);
-        BigDecimal maxValue = BigDecimal.ZERO;
-        for (int j = 0; j < dt.getRows().size(); j++) {
-            DataRow dataRow = dt.getDataRow(j);
-            Object hisvalObj = dataRow.getValue(2);
-            if (hisvalObj != null) {
-                BigDecimal value = new BigDecimal(hisvalObj.toString());
-                if (value.compareTo(maxValue) > 0) {
-                    maxValue = value;
-                }
-            }
-        }
-        ohnyTotalDay = maxValue.setScale(2, RoundingMode.HALF_UP);
-    } catch (Exception e) {
-        ohnyTotalDay = BigDecimal.ZERO;
-    }
-    
-
-    // 计算月用电量
-    String systemTotalMonthTag = "Sys\\FinforWorx\\EnergyCost\\System_Monthly_Energy_Consumption";
-    String hpTotalMonthHeatingTag = "Sys\\FinforWorx\\EnergyCost\\HP_Heat_Monthly_Energy_Consumption";
-    String hpTotalMonthCoolingTag = "Sys\\FinforWorx\\EnergyCost\\HP_Cold_Monthly_Energy_Consumption";
-    String primaryWpTotalMonthTag = "Sys\\FinforWorx\\EnergyCost\\primary_WP_Monthly_Energy_Consumption";
-    String secondaryWpTotalMonthTag = "Sys\\FinforWorx\\EnergyCost\\secondary_WP_Monthly_Energy_Consumption";
-    String ohnyTotalMonthTag = "Sys\\FinforWorx\\EnergyCost\\OHNY_Monthly_Energy_Consumption";
-    
-    String systemTotalMonthTagChart = "Sys\\FinforWorx\\EnergyCostChart\\System_Monthly_Energy_Consumption_Chart";
-    String hpTotalMonthHeatingTagChart = "Sys\\FinforWorx\\EnergyCostChart\\HP_Heat_Monthly_Energy_Consumption_Chart";
-    String hpTotalMonthCoolingTagChart = "Sys\\FinforWorx\\EnergyCostChart\\HP_Cold_Monthly_Energy_Consumption_Chart";
-    String primaryWpTotalMonthTagChart = "Sys\\FinforWorx\\EnergyCostChart\\Primary_WP_Monthly_Energy_Consumption_Chart";
-    String secondaryWpTotalMonthTagChart = "Sys\\FinforWorx\\EnergyCostChart\\Secondary_WP_Monthly_Energy_Consumption_Chart";
-    String ohnyTotalMonthTagChart = "Sys\\FinforWorx\\EnergyCostChart\\OHNY_Monthly_Energy_Consumption_Chart";
-
-    if (day_of_month == 2) {
-        // 每月2号重置月用电量，重置为1号的日用电量
-        writeData.put(systemTotalMonthTag, systemTotalDay.setScale(2, RoundingMode.HALF_UP).toString());
-        writeData.put(hpTotalMonthHeatingTag, hpTotalDayHeating.setScale(2, RoundingMode.HALF_UP).toString());
-        writeData.put(hpTotalMonthCoolingTag, hpTotalDayCooling.setScale(2, RoundingMode.HALF_UP).toString());
-        writeData.put(primaryWpTotalMonthTag, primaryWpTotalDay.setScale(2, RoundingMode.HALF_UP).toString());
-        writeData.put(secondaryWpTotalMonthTag, secondaryWpTotalDay.setScale(2, RoundingMode.HALF_UP).toString());
-        writeData.put(ohnyTotalMonthTag, ohnyTotalDay.setScale(2, RoundingMode.HALF_UP).toString());
+    if (existingCodes.size() >= 6) {
+        totalSkippedExisting += 6;
+        skippedExistingDates.add(targetDate);
     } else {
-        // 其他日期累加月用电量
-        // 系统月用电量
+        // 2. 计算该日期的 23:55:00 - 23:59:59
+        Calendar rangeCal = Calendar.getInstance();
         try {
-            String monthTagEscaped = systemTotalMonthTag.replace("'", "''");
-            String sql = "select a.taglongname,a.times,a.realval,a.quality from psrealdata as a where a.taglongname in ('" + monthTagEscaped + "')";
-            DataTable dt = dataService.queryListDataBySql(sql);
-            if (dt.getRows().size() > 0) {
-                DataRow dataRow = dt.getDataRow(0);
-                Object realvalObj = dataRow.getValue(2);
-                if (realvalObj != null) {
-                    BigDecimal value = new BigDecimal(realvalObj.toString()).setScale(2, RoundingMode.HALF_UP);
-                    BigDecimal newValue = value.add(systemTotalDay).setScale(2, RoundingMode.HALF_UP);
-                    writeData.put(systemTotalMonthTag, newValue.toString());
-                    if(day_of_month == 1){
-                        writeData.put(systemTotalMonthTagChart, newValue.toString());
-                    }
-                }
-                // 如果realvalObj为null，不更新，保持原值，避免丢失之前的累计值
-            }
-            // 如果查询不到数据行，不更新，保持原值，避免丢失之前的累计值
+            rangeCal.setTime(dateSdf.parse(targetDate));
         } catch (Exception e) {
-            // 异常时，不更新，保持原值，避免丢失之前的累计值
+            // ignore, keep current date
         }
+        rangeCal.set(Calendar.HOUR_OF_DAY, 23);
+        rangeCal.set(Calendar.MINUTE, 55);
+        rangeCal.set(Calendar.SECOND, 0);
+        rangeCal.set(Calendar.MILLISECOND, 0);
+        String dayStart = sdf.format(rangeCal.getTime());
+        rangeCal.set(Calendar.MINUTE, 59);
+        rangeCal.set(Calendar.SECOND, 59);
+        String dayEnd = sdf.format(rangeCal.getTime());
 
-        // 热泵制热月用电量
-        try {
-            String monthTagEscaped = hpTotalMonthHeatingTag.replace("'", "''");
-            String sql = "select a.taglongname,a.times,a.realval,a.quality from psrealdata as a where a.taglongname in ('" + monthTagEscaped + "')";
-            DataTable dt = dataService.queryListDataBySql(sql);
-            if (dt.getRows().size() > 0) {
-                DataRow dataRow = dt.getDataRow(0);
-                Object realvalObj = dataRow.getValue(2);
-                if (realvalObj != null) {
-                    BigDecimal value = new BigDecimal(realvalObj.toString()).setScale(2, RoundingMode.HALF_UP);
-                    BigDecimal newValue = value.add(hpTotalDayHeating).setScale(2, RoundingMode.HALF_UP);
-                    writeData.put(hpTotalMonthHeatingTag, newValue.toString());
-                    if(day_of_month == 1){
-                        writeData.put(hpTotalMonthHeatingTagChart, newValue.toString());
+        // 3. 只读取缺失点位的历史数据，缺失则补入（有效值或0），已有记录不动
+        int dateInserted = 0;
+        int dateInsertedWithData = 0;
+        int dateInsertedZero = 0;
+        int dateSkippedExisting = 0;
+        for (int i = 0; i < deviceCodes.length; i++) {
+            String deviceCode = deviceCodes[i];
+            // 已存在则跳过，不刷新
+            if (existingCodes.contains(deviceCode)) {
+                totalSkippedExisting++;
+                dateSkippedExisting++;
+                continue;
+            }
+            try {
+                String tagEscaped = deviceTags[i].replace("'", "''");
+                String sql = "select a.taglongname,a.times,a.hisval from pshisdata as a where a.taglongname in ('" + tagEscaped + "') and a.starttime ='" + dayStart + "' and a.endtime = '" + dayEnd + "' limitpage 1,9999";
+                DataTable dt = dataService.queryListDataBySql(sql);
+                BigDecimal maxValue = BigDecimal.ZERO;
+                boolean hasData = false;
+                for (int j = 0; j < dt.getRows().size(); j++) {
+                    DataRow dataRow = dt.getDataRow(j);
+                    Object hisvalObj = dataRow.getValue(2);
+                    if (hisvalObj != null) {
+                        hasData = true;
+                        BigDecimal value = new BigDecimal(hisvalObj.toString());
+                        if (value.compareTo(maxValue) > 0) {
+                            maxValue = value;
+                        }
                     }
                 }
-                // 如果realvalObj为null，不更新，保持原值，避免丢失之前的累计值
-            }
-            // 如果查询不到数据行，不更新，保持原值，避免丢失之前的累计值
-        } catch (Exception e) {
-            // 异常时，不更新，保持原值，避免丢失之前的累计值
-        }
-        
-        // 热泵制冷月用电量
-        try {
-            String monthTagEscaped = hpTotalMonthCoolingTag.replace("'", "''");
-            String sql = "select a.taglongname,a.times,a.realval,a.quality from psrealdata as a where a.taglongname in ('" + monthTagEscaped + "')";
-            DataTable dt = dataService.queryListDataBySql(sql);
-            if (dt.getRows().size() > 0) {
-                DataRow dataRow = dt.getDataRow(0);
-                Object realvalObj = dataRow.getValue(2);
-                if (realvalObj != null) {
-                    BigDecimal value = new BigDecimal(realvalObj.toString()).setScale(2, RoundingMode.HALF_UP);
-                    BigDecimal newValue = value.add(hpTotalDayCooling).setScale(2, RoundingMode.HALF_UP);
-                    writeData.put(hpTotalMonthCoolingTag, newValue.toString());
-                    if(day_of_month == 1){
-                        writeData.put(hpTotalMonthCoolingTagChart, newValue.toString());
-                    }
-                }
-                // 如果realvalObj为null，不更新，保持原值，避免丢失之前的累计值
-            }
-            // 如果查询不到数据行，不更新，保持原值，避免丢失之前的累计值
-        } catch (Exception e) {
-            // 异常时，不更新，保持原值，避免丢失之前的累计值
-        }
-        
-        // 一次泵月用电量
-        try {
-            String monthTagEscaped = primaryWpTotalMonthTag.replace("'", "''");
-            String sql = "select a.taglongname,a.times,a.realval,a.quality from psrealdata as a where a.taglongname in ('" + monthTagEscaped + "')";
-            DataTable dt = dataService.queryListDataBySql(sql);
-            if (dt.getRows().size() > 0) {
-                DataRow dataRow = dt.getDataRow(0);
-                Object realvalObj = dataRow.getValue(2);
-                if (realvalObj != null) {
-                    BigDecimal value = new BigDecimal(realvalObj.toString()).setScale(2, RoundingMode.HALF_UP);
-                    BigDecimal newValue = value.add(primaryWpTotalDay).setScale(2, RoundingMode.HALF_UP);
-                    writeData.put(primaryWpTotalMonthTag, newValue.toString());
-                    if(day_of_month == 1){
-                        writeData.put(primaryWpTotalMonthTagChart, newValue.toString());
-                    }
-                }
-                // 如果realvalObj为null，不更新，保持原值，避免丢失之前的累计值
-            }
-            // 如果查询不到数据行，不更新，保持原值，避免丢失之前的累计值
-        } catch (Exception e) {
-            // 异常时，不更新，保持原值，避免丢失之前的累计值
-        }
 
-        // 二次泵月用电量
-        try {
-            String monthTagEscaped = secondaryWpTotalMonthTag.replace("'", "''");
-            String sql = "select a.taglongname,a.times,a.realval,a.quality from psrealdata as a where a.taglongname in ('" + monthTagEscaped + "')";
-            DataTable dt = dataService.queryListDataBySql(sql);
-            if (dt.getRows().size() > 0) {
-                DataRow dataRow = dt.getDataRow(0);
-                Object realvalObj = dataRow.getValue(2);
-                if (realvalObj != null) {
-                    BigDecimal value = new BigDecimal(realvalObj.toString()).setScale(2, RoundingMode.HALF_UP);
-                    BigDecimal newValue = value.add(secondaryWpTotalDay).setScale(2, RoundingMode.HALF_UP);
-                    writeData.put(secondaryWpTotalMonthTag, newValue.toString());
-                    if(day_of_month == 1){
-                        writeData.put(secondaryWpTotalMonthTagChart, newValue.toString());
-                    }
+                String id = idWorker.nextId();
+                String insertSql = "INSERT INTO sjmg_electricity_daily_detail (id, stat_date, device_code, elec_value) VALUES ('" +
+                        escapeSql(id) + "','" + escapeSql(targetDate) + "','" + escapeSql(deviceCode) + "','" + escapeSql(maxValue.setScale(2, RoundingMode.HALF_UP).toPlainString()) + "')";
+                dynamicDataSource.excuteTenantSql(insertSql, dbCode);
+                totalInserted++;
+                dateInserted++;
+                if (hasData) {
+                    totalInsertedWithData++;
+                    dateInsertedWithData++;
+                } else {
+                    totalInsertedZero++;
+                    dateInsertedZero++;
                 }
-                // 如果realvalObj为null，不更新，保持原值，避免丢失之前的累计值
+            } catch (Exception e) {
+                // 异常时仍补0，保证缺失点位有记录
+                String id = idWorker.nextId();
+                String insertSql = "INSERT INTO sjmg_electricity_daily_detail (id, stat_date, device_code, elec_value) VALUES ('" +
+                        escapeSql(id) + "','" + escapeSql(targetDate) + "','" + escapeSql(deviceCode) + "','0.00')";
+                dynamicDataSource.excuteTenantSql(insertSql, dbCode);
+                totalInserted++;
+                totalInsertedZero++;
+                dateInserted++;
+                dateInsertedZero++;
             }
-            // 如果查询不到数据行，不更新，保持原值，避免丢失之前的累计值
-        } catch (Exception e) {
-            // 异常时，不更新，保持原值，避免丢失之前的累计值
         }
-
-        // 耦合能源月用电量
-        try {
-            String monthTagEscaped = ohnyTotalMonthTag.replace("'", "''");
-            String sql = "select a.taglongname,a.times,a.realval,a.quality from psrealdata as a where a.taglongname in ('" + monthTagEscaped + "')";
-            DataTable dt = dataService.queryListDataBySql(sql);
-            if (dt.getRows().size() > 0) {
-                DataRow dataRow = dt.getDataRow(0);
-                Object realvalObj = dataRow.getValue(2);
-                if (realvalObj != null) {
-                    BigDecimal value = new BigDecimal(realvalObj.toString()).setScale(2, RoundingMode.HALF_UP);
-                    BigDecimal newValue = value.add(ohnyTotalDay).setScale(2, RoundingMode.HALF_UP);
-                    writeData.put(ohnyTotalMonthTag, newValue.toString());
-                    if(day_of_month == 1){
-                        writeData.put(ohnyTotalMonthTagChart, newValue.toString());
-                    }
-                }
-                // 如果realvalObj为null，不更新，保持原值，避免丢失之前的累计值
-            }
-            // 如果查询不到数据行，不更新，保持原值，避免丢失之前的累计值
-        } catch (Exception e) {
-            // 异常时，不更新，保持原值，避免丢失之前的累计值
-        }
-    }
-    
-    // 计算年用电量
-    String systemTotalYearTag = "Sys\\FinforWorx\\EnergyCost\\System_Yearly_Energy_Consumption";
-    String hpTotalYearHeatingTag = "Sys\\FinforWorx\\EnergyCost\\HP_Heat_Yearly_Energy_Consumption";
-    String hpTotalYearCoolingTag = "Sys\\FinforWorx\\EnergyCost\\HP_Cold_Yearly_Energy_Consumption";
-    String primaryWpTotalYearTag = "Sys\\FinforWorx\\EnergyCost\\primary_WP_Yearly_Energy_Consumption";
-    String secondaryWpTotalYearTag = "Sys\\FinforWorx\\EnergyCost\\secondary_WP_Yearly_Energy_Consumption";
-    String ohnyTotalYearTag = "Sys\\FinforWorx\\EnergyCost\\OHNY_Yearly_Energy_Consumption";
-    
-    String systemTotalYearTagChart = "Sys\\FinforWorx\\EnergyCostChart\\System_Yearly_Energy_Consumption_Chart";
-    String hpTotalYearHeatingTagChart = "Sys\\FinforWorx\\EnergyCostChart\\HP_Heat_Yearly_Energy_Consumption_Chart";
-    String hpTotalYearCoolingTagChart = "Sys\\FinforWorx\\EnergyCostChart\\HP_Cold_Yearly_Energy_Consumption_Chart";
-    String primaryWpTotalYearTagChart = "Sys\\FinforWorx\\EnergyCostChart\\Primary_WP_Yearly_Energy_Consumption_Chart";
-    String secondaryWpTotalYearTagChart = "Sys\\FinforWorx\\EnergyCostChart\\Secondary_WP_Yearly_Energy_Consumption_Chart";
-    String ohnyTotalYearTagChart = "Sys\\FinforWorx\\EnergyCostChart\\OHNY_Yearly_Energy_Consumption_Chart";
-    if (day_of_month == 2 && monthOfYear == 1) {
-        // 1月2号重置年用电量，重置为1号的日用电量
-        writeData.put(systemTotalYearTag, systemTotalDay.setScale(2, RoundingMode.HALF_UP).toString());
-        writeData.put(hpTotalYearHeatingTag, hpTotalDayHeating.setScale(2, RoundingMode.HALF_UP).toString());
-        writeData.put(hpTotalYearCoolingTag, hpTotalDayCooling.setScale(2, RoundingMode.HALF_UP).toString());
-        writeData.put(primaryWpTotalYearTag, primaryWpTotalDay.setScale(2, RoundingMode.HALF_UP).toString());
-        writeData.put(secondaryWpTotalYearTag, secondaryWpTotalDay.setScale(2, RoundingMode.HALF_UP).toString());
-        writeData.put(ohnyTotalYearTag, ohnyTotalDay.setScale(2, RoundingMode.HALF_UP).toString());
-    } else {
-        // 其他日期累加年用电量
-        // 系统用电量
-        try {
-            String yearTagEscaped = systemTotalYearTag.replace("'", "''");
-            String sql = "select a.taglongname,a.times,a.realval,a.quality from psrealdata as a where a.taglongname in ('" + yearTagEscaped + "')";
-            DataTable dt = dataService.queryListDataBySql(sql);
-            if (dt.getRows().size() > 0) {
-                DataRow dataRow = dt.getDataRow(0);
-                Object realvalObj = dataRow.getValue(2);
-                if (realvalObj != null) {
-                    BigDecimal value = new BigDecimal(realvalObj.toString()).setScale(2, RoundingMode.HALF_UP);
-                    BigDecimal newValue = value.add(systemTotalDay).setScale(2, RoundingMode.HALF_UP);
-                    writeData.put(systemTotalYearTag, newValue.toString());
-                    if (day_of_month == 1 && monthOfYear == 1) {
-                        writeData.put(systemTotalYearTagChart, newValue.toString());
-                    }
-                }
-                // 如果realvalObj为null，不更新，保持原值，避免丢失之前的累计值
-            }
-            // 如果查询不到数据行，不更新，保持原值，避免丢失之前的累计值
-        } catch (Exception e) {
-            // 异常时，不更新，保持原值，避免丢失之前的累计值
-        }
-
-        // 热泵制热年用电量
-        try {
-            String yearTagEscaped = hpTotalYearHeatingTag.replace("'", "''");
-            String sql = "select a.taglongname,a.times,a.realval,a.quality from psrealdata as a where a.taglongname in ('" + yearTagEscaped + "')";
-            DataTable dt = dataService.queryListDataBySql(sql);
-            if (dt.getRows().size() > 0) {
-                DataRow dataRow = dt.getDataRow(0);
-                Object realvalObj = dataRow.getValue(2);
-                if (realvalObj != null) {
-                    BigDecimal value = new BigDecimal(realvalObj.toString()).setScale(2, RoundingMode.HALF_UP);
-                    BigDecimal newValue = value.add(hpTotalDayHeating).setScale(2, RoundingMode.HALF_UP);
-                    writeData.put(hpTotalYearHeatingTag, newValue.toString());
-                    if (day_of_month == 1 && monthOfYear == 1) {
-                        writeData.put(hpTotalYearHeatingTagChart, newValue.toString());
-                    }
-                }
-                // 如果realvalObj为null，不更新，保持原值，避免丢失之前的累计值
-            }
-            // 如果查询不到数据行，不更新，保持原值，避免丢失之前的累计值
-        } catch (Exception e) {
-            // 异常时，不更新，保持原值，避免丢失之前的累计值
-        }
-        
-        // 热泵制冷年用电量
-        try {
-            String yearTagEscaped = hpTotalYearCoolingTag.replace("'", "''");
-            String sql = "select a.taglongname,a.times,a.realval,a.quality from psrealdata as a where a.taglongname in ('" + yearTagEscaped + "')";
-            DataTable dt = dataService.queryListDataBySql(sql);
-            if (dt.getRows().size() > 0) {
-                DataRow dataRow = dt.getDataRow(0);
-                Object realvalObj = dataRow.getValue(2);
-                if (realvalObj != null) {
-                    BigDecimal value = new BigDecimal(realvalObj.toString()).setScale(2, RoundingMode.HALF_UP);
-                    BigDecimal newValue = value.add(hpTotalDayCooling).setScale(2, RoundingMode.HALF_UP);
-                    writeData.put(hpTotalYearCoolingTag, newValue.toString());
-                    if (day_of_month == 1 && monthOfYear == 1) {
-                        writeData.put(hpTotalYearCoolingTagChart, newValue.toString());
-                    }
-                }
-                // 如果realvalObj为null，不更新，保持原值，避免丢失之前的累计值
-            }
-            // 如果查询不到数据行，不更新，保持原值，避免丢失之前的累计值
-        } catch (Exception e) {
-            // 异常时，不更新，保持原值，避免丢失之前的累计值
-        }
-        
-        // 一次泵年用电量
-        try {
-            String yearTagEscaped = primaryWpTotalYearTag.replace("'", "''");
-            String sql = "select a.taglongname,a.times,a.realval,a.quality from psrealdata as a where a.taglongname in ('" + yearTagEscaped + "')";
-            DataTable dt = dataService.queryListDataBySql(sql);
-            if (dt.getRows().size() > 0) {
-                DataRow dataRow = dt.getDataRow(0);
-                Object realvalObj = dataRow.getValue(2);
-                if (realvalObj != null) {
-                    BigDecimal value = new BigDecimal(realvalObj.toString()).setScale(2, RoundingMode.HALF_UP);
-                    BigDecimal newValue = value.add(primaryWpTotalDay).setScale(2, RoundingMode.HALF_UP);
-                    writeData.put(primaryWpTotalYearTag, newValue.toString());
-                    if (day_of_month == 1 && monthOfYear == 1) {
-                        writeData.put(primaryWpTotalYearTagChart, newValue.toString());
-                    }
-                }
-                // 如果realvalObj为null，不更新，保持原值，避免丢失之前的累计值
-            }
-            // 如果查询不到数据行，不更新，保持原值，避免丢失之前的累计值
-        } catch (Exception e) {
-            // 异常时，不更新，保持原值，避免丢失之前的累计值
-        }
-
-        // 二次泵年用电量
-        try {
-            String yearTagEscaped = secondaryWpTotalYearTag.replace("'", "''");
-            String sql = "select a.taglongname,a.times,a.realval,a.quality from psrealdata as a where a.taglongname in ('" + yearTagEscaped + "')";
-            DataTable dt = dataService.queryListDataBySql(sql);
-            if (dt.getRows().size() > 0) {
-                DataRow dataRow = dt.getDataRow(0);
-                Object realvalObj = dataRow.getValue(2);
-                if (realvalObj != null) {
-                    BigDecimal value = new BigDecimal(realvalObj.toString()).setScale(2, RoundingMode.HALF_UP);
-                    BigDecimal newValue = value.add(secondaryWpTotalDay).setScale(2, RoundingMode.HALF_UP);
-                    writeData.put(secondaryWpTotalYearTag, newValue.toString());
-                    if (day_of_month == 1 && monthOfYear == 1) {
-                        writeData.put(secondaryWpTotalYearTagChart, newValue.toString());
-                    }
-                }
-                // 如果realvalObj为null，不更新，保持原值，避免丢失之前的累计值
-            }
-            // 如果查询不到数据行，不更新，保持原值，避免丢失之前的累计值
-        } catch (Exception e) {
-            // 异常时，不更新，保持原值，避免丢失之前的累计值
-        }
-
-        // 耦合能源年用电量
-        try {
-            String yearTagEscaped = ohnyTotalYearTag.replace("'", "''");
-            String sql = "select a.taglongname,a.times,a.realval,a.quality from psrealdata as a where a.taglongname in ('" + yearTagEscaped + "')";
-            DataTable dt = dataService.queryListDataBySql(sql);
-            if (dt.getRows().size() > 0) {
-                DataRow dataRow = dt.getDataRow(0);
-                Object realvalObj = dataRow.getValue(2);
-                if (realvalObj != null) {
-                    BigDecimal value = new BigDecimal(realvalObj.toString()).setScale(2, RoundingMode.HALF_UP);
-                    BigDecimal newValue = value.add(ohnyTotalDay).setScale(2, RoundingMode.HALF_UP);
-                    writeData.put(ohnyTotalYearTag, newValue.toString());
-                    if (day_of_month == 1 && monthOfYear == 1) {
-                        writeData.put(ohnyTotalYearTagChart, newValue.toString());
-                    }
-                }
-                // 如果realvalObj为null，不更新，保持原值，避免丢失之前的累计值
-            }
-            // 如果查询不到数据行，不更新，保持原值，避免丢失之前的累计值
-        } catch (Exception e) {
-            // 异常时，不更新，保持原值，避免丢失之前的累计值
+        if (dateInserted > 0 || dateSkippedExisting > 0) {
+            processedDates.add(targetDate + "（写入" + dateInserted + "条，其中有效值" + dateInsertedWithData + "条、0值" + dateInsertedZero + "条，已存在跳过" + dateSkippedExisting + "条）");
         }
     }
 
-
-    // 下置日数据到chart点位（使用已获取的日数据变量）
-    String systemElecDayTagChart = "Sys\\FinforWorx\\EnergyCost\\System_Daily_Energy_Consumption_Chart";
-    String heatHPElecDayTagChart = "Sys\\FinforWorx\\EnergyCost\\HP_Heat_Daily_Energy_Consumption_Chart";
-    String coolHPElecDayTagChart = "Sys\\FinforWorx\\EnergyCost\\HP_Cold_Daily_Energy_Consumption_Chart";
-    String primaryWPElecDayTagChart = "Sys\\FinforWorx\\EnergyCost\\Primary_WP_Daily_Energy_Consumption_Chart";
-    String secondaryWPElecDayTagChart = "Sys\\FinforWorx\\EnergyCost\\Secondary_WP_Daily_Energy_Consumption_Chart";
-    String ohnyElecDayTagChart = "Sys\\FinforWorx\\EnergyCost\\OHNY_Daily_Energy_Consumption_Chart";
-
-    if (systemTotalDay != null) {
-        writeData.put(systemElecDayTagChart, systemTotalDay.setScale(2, RoundingMode.HALF_UP).toString());
-    }
-    if (hpTotalDayHeating != null) {
-        writeData.put(heatHPElecDayTagChart, hpTotalDayHeating.setScale(2, RoundingMode.HALF_UP).toString());
-    }
-    if (hpTotalDayCooling != null) {
-        writeData.put(coolHPElecDayTagChart, hpTotalDayCooling.setScale(2, RoundingMode.HALF_UP).toString());
-    }
-    if (primaryWpTotalDay != null) {
-        writeData.put(primaryWPElecDayTagChart, primaryWpTotalDay.setScale(2, RoundingMode.HALF_UP).toString());
-    }
-    if (secondaryWpTotalDay != null) {
-        writeData.put(secondaryWPElecDayTagChart, secondaryWpTotalDay.setScale(2, RoundingMode.HALF_UP).toString());
-    }
-    if (ohnyTotalDay != null) {
-        writeData.put(ohnyElecDayTagChart, ohnyTotalDay.setScale(2, RoundingMode.HALF_UP).toString());
-    }
-}
-
-// 执行下置业务编排（只有当writeData不为空时才执行）
-if (writeData != null && writeData.size() > 0) {
-    paramMap_write.put("writeData", JSON.toJSONString(writeData));
-    paramData_write.put("data", paramMap_write);
-    param_write.setParam(paramData_write);
-    try {
-        sol.execute(param_write);
-        data.put("result", "下置成功，共下置 " + writeData.size() + " 个点位");
-        data.put("writeData", writeData);
-    } catch (Exception e) {
-        data.put("result", "下置执行异常: " + e.getMessage());
-        data.put("writeData", writeData);
-    }
+    data.put("result", "日电量归档成功，共写入 " + totalInserted + " 条（有效值 " + totalInsertedWithData + " 条，0值 " + totalInsertedZero + " 条），跳过已存在 " + totalSkippedExisting + " 条");
+    data.put("processedDates", processedDates);
+    data.put("skippedExistingDates", skippedExistingDates);
 } else {
-    data.put("result", "没有数据需要下置，writeData为空");
-    data.put("writeData", writeData);
+    data.put("result", "非0点，不执行日电量归档");
 }
+
 return data;

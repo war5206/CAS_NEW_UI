@@ -10,34 +10,31 @@
 */
 
 // 每小时计算热量统计信息
-import cn.hutool.core.codec.Base64;
-import com.alibaba.fastjson.JSON;
-import com.sunwayland.algorithm.feign.FeignSolAlgorithmProcess;
-import com.sunwayland.algorithm.pojo.AlgorithmProcessExecuteParam
-import com.sunwayland.common.core.constant.PlatformConst;
 import com.sunwayland.common.core.pojo.PtUser;
 import com.sunwayland.common.core.utils.ThreadLocalUtil;
 import com.sunwayland.platform.biz.algorithm.utils.ApplicationContextProvider;
 import com.sunwayland.platform.biz.platform.modules.dynamicsql.service.DataService;
 import com.sunwayland.platform.dao.data.DataTable;
-import com.sunwayland.platform.dao.impl.PsSqlImpl;
+import com.sunwayland.platform.dao.data.DataRow;
 import com.sunwayland.platform.dynamic.DynamicDataSource;
 import com.sunwayland.platform.utils.SnowFlake;
 import java.text.SimpleDateFormat;
-import com.sunwayland.platform.utils.HttpRequest;
-import com.sunwayland.platform.dao.data.DataRow;
 import java.text.ParseException;
-import java.text.DecimalFormat;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 
 def dynamicDataSource = ApplicationContextProvider.getBean(DynamicDataSource.class);
 def dataService = ApplicationContextProvider.getBean(DataService.class);
-// 调用逻辑编排
-FeignSolAlgorithmProcess sol = ApplicationContextProvider.getBean(FeignSolAlgorithmProcess.class);
+SnowFlake idWorker = new SnowFlake();
+
+PtUser ptUser = ThreadLocalUtil.getCurrentUser();
+String dbCode = ptUser != null && ptUser.dbCode != null ? ptUser.dbCode.toString() : "t01";
+if ("base".equals(dbCode)) {
+    dbCode = "t01";
+}
 
 String selectAreaSql = "select project_type_uuid,project_acreage,start_heating_season,end_heating_season from sjmg_project_data";
-List<Map<String,Object>> selectAreaList = dynamicDataSource.excuteTenantSqlQuery(selectAreaSql, "t01");
+List<Map<String,Object>> selectAreaList = dynamicDataSource.excuteTenantSqlQuery(selectAreaSql, dbCode);
 String projectTypeUuid = selectAreaList.get(0).get("project_type_uuid").toString();
 String start_heating_season = selectAreaList.get(0).get("start_heating_season").toString();
 String end_heating_season = selectAreaList.get(0).get("end_heating_season").toString();
@@ -65,390 +62,237 @@ try {
 //是否在采暖季
 boolean isno_season = calendar.getTime().compareTo(startDate) >= 0 && calendar.getTime().compareTo(endDate) <= 0;
 if ("1".equals(projectTypeUuid) && !isno_season){
-    data.put("result", "当前不在采暖季，不执行下置操作");
+    data.put("result", "当前不在采暖季，不执行归档操作");
     data.put("currentTime", sdf.format(calendar.getTime()));
     data.put("startDate", sdf.format(startDate));
     data.put("endDate", sdf.format(endDate));
     return;
 }
 
-// 逻辑编排参数
-AlgorithmProcessExecuteParam param_write = new AlgorithmProcessExecuteParam();
-Map<String, Object> paramMap_write = new HashMap();
-param_write.setAlgorithmProcessId("writeRealvalByLongNames");
-Map<String, Object> paramData_write = new HashMap();
+def escapeSql(String s) {
+    if (s == null) return "";
+    return s.replace("'", "''");
+}
 
-//每天热量点长名
-String primarySystemDailyHeatingEnergyTag = "Sys\\FinforWorx\\EnergyCost\\Primary_System_Daily_Heating_Energy";
-String primarySystemDailyCoolingEnergyTag = "Sys\\FinforWorx\\EnergyCost\\Primary_System_Daily_Cooling_Energy";
-String secondarySystemDailyHeatingEnergyTag = "Sys\\FinforWorx\\EnergyCost\\Secondary_System_Daily_Heating_Energy";
-String secondarySystemDailyCoolingEnergyTag = "Sys\\FinforWorx\\EnergyCost\\Secondary_System_Daily_Cooling_Energy";
-
-//每月热量点长名
-String primarySystemMonthlyHeatingEnergyTag = "Sys\\FinforWorx\\EnergyCost\\Primary_System_Monthly_Heating_Energy";
-String primarySystemMonthlyCoolingEnergyTag = "Sys\\FinforWorx\\EnergyCost\\Primary_System_Monthly_Cooling_Energy";
-String secondarySystemMonthlyHeatingEnergyTag = "Sys\\FinforWorx\\EnergyCost\\Secondary_System_Monthly_Heating_Energy";
-String secondarySystemMonthlyCoolingEnergyTag = "Sys\\FinforWorx\\EnergyCost\\Secondary_System_Monthly_Cooling_Energy";
-
-//每年热量点长名
-String primarySystemYearlyHeatingEnergyTag = "Sys\\FinforWorx\\EnergyCost\\Primary_System_Yearly_Heating_Energy";
-String primarySystemYearlyCoolingEnergyTag = "Sys\\FinforWorx\\EnergyCost\\Primary_System_Yearly_Cooling_Energy";
-String secondarySystemYearlyHeatingEnergyTag = "Sys\\FinforWorx\\EnergyCost\\Secondary_System_Yearly_Heating_Energy";
-String secondarySystemYearlyCoolingEnergyTag = "Sys\\FinforWorx\\EnergyCost\\Secondary_System_Yearly_Cooling_Energy";
-
-Map<String,String> writeData = new HashMap<>();
-
-// 下置小时数据到zizhi点位（获取上一个整点55-59:59的最大值）
-// 计算上一个整点的时间范围：例如现在是1点，则查询0点55分-0点59分59秒
-Calendar prevHourCalendar = Calendar.getInstance();
-prevHourCalendar.set(Calendar.MINUTE, 0);
-prevHourCalendar.set(Calendar.SECOND, 0);
-prevHourCalendar.set(Calendar.MILLISECOND, 0);
-prevHourCalendar.add(Calendar.HOUR_OF_DAY, -1);
-// 上一个整点的55分
-prevHourCalendar.set(Calendar.MINUTE, 55);
-prevHourCalendar.set(Calendar.SECOND, 0);
-String prevHour55Start = sdf.format(prevHourCalendar.getTime());
-// 上一个整点的59分59秒
-prevHourCalendar.set(Calendar.MINUTE, 59);
-prevHourCalendar.set(Calendar.SECOND, 59);
-String prevHour59End = sdf.format(prevHourCalendar.getTime());
-
-
-// 每天0点计算月热量、年热量和采暖季热量
+// 每天0点计算日热量并写入 sjmg_heat_daily_detail
 if (hour == 0) {
-    // 从系统点位读取日热量（查询历史数据表）
-    BigDecimal primaryHeatDay = BigDecimal.ZERO;
-    BigDecimal primaryCoolDay = BigDecimal.ZERO;
-    BigDecimal secondaryHeatDay = BigDecimal.ZERO;
-    BigDecimal secondaryCoolDay = BigDecimal.ZERO;
-    
-    // 计算时间范围：昨天23:55到昨天23:59:59
-    Calendar calendar_now = Calendar.getInstance();
-    calendar_now.set(Calendar.MINUTE, 0);
-    calendar_now.set(Calendar.SECOND, 0);
-    calendar_now.set(Calendar.MILLISECOND, 0);
-    calendar_now.add(Calendar.DAY_OF_MONTH, -1);
-    // 昨天23:55:00
-    calendar_now.set(Calendar.HOUR_OF_DAY, 23);
-    calendar_now.set(Calendar.MINUTE, 55);
-    calendar_now.set(Calendar.SECOND, 0);
-    String lastday_start = sdf.format(calendar_now.getTime());
-    // 昨天23:59:59
-    calendar_now.set(Calendar.MINUTE, 59);
-    calendar_now.set(Calendar.SECOND, 59);
-    String lastday_end = sdf.format(calendar_now.getTime());
-    
-    // 一次系统日制热量
-    try {
-        String tagEscaped = primarySystemDailyHeatingEnergyTag.replace("'", "''");
-        // 查询历史数据表，使用starttime和endtime字段
-        String sql = "select a.taglongname,a.times,a.hisval from pshisdata as a where a.taglongname in ('" + tagEscaped + "') and a.starttime ='" + lastday_start + "' and a.endtime = '" + lastday_end + "' limitpage 1,9999";
-        DataTable dt = dataService.queryListDataBySql(sql);
-        // 取最大值
-        BigDecimal maxValue = BigDecimal.ZERO;
-        for (int j = 0; j < dt.getRows().size(); j++) {
-            DataRow dataRow = dt.getDataRow(j);
-            Object hisvalObj = dataRow.getValue(2);
-            if (hisvalObj != null) {
-                BigDecimal value = new BigDecimal(hisvalObj.toString());
-                if (value.compareTo(maxValue) > 0) {
-                    maxValue = value;
-                }
-            }
-        }
-        primaryHeatDay = maxValue.setScale(2, RoundingMode.HALF_UP);
-    } catch (Exception e) {
-        // 异常时保持为0
-    }
-    
-    // 一次系统日制冷量
-    try {
-        String tagEscaped = primarySystemDailyCoolingEnergyTag.replace("'", "''");
-        String sql = "select a.taglongname,a.times,a.hisval from pshisdata as a where a.taglongname in ('" + tagEscaped + "') and a.starttime ='" + lastday_start + "' and a.endtime = '" + lastday_end + "' limitpage 1,9999";
-        DataTable dt = dataService.queryListDataBySql(sql);
-        BigDecimal maxValue = BigDecimal.ZERO;
-        for (int j = 0; j < dt.getRows().size(); j++) {
-            DataRow dataRow = dt.getDataRow(j);
-            Object hisvalObj = dataRow.getValue(2);
-            if (hisvalObj != null) {
-                BigDecimal value = new BigDecimal(hisvalObj.toString());
-                if (value.compareTo(maxValue) > 0) {
-                    maxValue = value;
-                }
-            }
-        }
-        primaryCoolDay = maxValue.setScale(2, RoundingMode.HALF_UP);
-    } catch (Exception e) {
-        // 异常时保持为0
-    }
+    SimpleDateFormat dateSdf = new SimpleDateFormat("yyyy-MM-dd");
+    // 只处理昨天
+    Calendar baseCal = Calendar.getInstance();
+    baseCal.add(Calendar.DAY_OF_MONTH, -1);
+    String yesterdayStr = dateSdf.format(baseCal.getTime());
+    String targetDate = yesterdayStr;
 
-    // 二次系统日制热量
-    try {
-        String tagEscaped = secondarySystemDailyHeatingEnergyTag.replace("'", "''");
-        // 查询历史数据表，使用starttime和endtime字段
-        String sql = "select a.taglongname,a.times,a.hisval from pshisdata as a where a.taglongname in ('" + tagEscaped + "') and a.starttime ='" + lastday_start + "' and a.endtime = '" + lastday_end + "' limitpage 1,9999";
-        DataTable dt = dataService.queryListDataBySql(sql);
-        // 取最大值
-        BigDecimal maxValue = BigDecimal.ZERO;
-        for (int j = 0; j < dt.getRows().size(); j++) {
-            DataRow dataRow = dt.getDataRow(j);
-            Object hisvalObj = dataRow.getValue(2);
-            if (hisvalObj != null) {
-                BigDecimal value = new BigDecimal(hisvalObj.toString());
-                if (value.compareTo(maxValue) > 0) {
-                    maxValue = value;
-                }
-            }
-        }
-        secondaryHeatDay = maxValue.setScale(2, RoundingMode.HALF_UP);
-    } catch (Exception e) {
-        // 异常时保持为0
-    }
-    
-    // 二次系统日制冷量
-    try {
-        String tagEscaped = secondarySystemDailyCoolingEnergyTag.replace("'", "''");
-        String sql = "select a.taglongname,a.times,a.hisval from pshisdata as a where a.taglongname in ('" + tagEscaped + "') and a.starttime ='" + lastday_start + "' and a.endtime = '" + lastday_end + "' limitpage 1,9999";
-        DataTable dt = dataService.queryListDataBySql(sql);
-        BigDecimal maxValue = BigDecimal.ZERO;
-        for (int j = 0; j < dt.getRows().size(); j++) {
-            DataRow dataRow = dt.getDataRow(j);
-            Object hisvalObj = dataRow.getValue(2);
-            if (hisvalObj != null) {
-                BigDecimal value = new BigDecimal(hisvalObj.toString());
-                if (value.compareTo(maxValue) > 0) {
-                    maxValue = value;
-                }
-            }
-        }
-        secondaryCoolDay = maxValue.setScale(2, RoundingMode.HALF_UP);
-    } catch (Exception e) {
-        // 异常时保持为0
-    }
+    // 每天热量点长名
+    String primarySystemDailyHeatingEnergyTag = "Sys\\FinforWorx\\EnergyCost\\Primary_System_Daily_Heating_Energy";
+    String primarySystemDailyCoolingEnergyTag = "Sys\\FinforWorx\\EnergyCost\\Primary_System_Daily_Cooling_Energy";
+    String secondarySystemDailyHeatingEnergyTag = "Sys\\FinforWorx\\EnergyCost\\Secondary_System_Daily_Heating_Energy";
+    String secondarySystemDailyCoolingEnergyTag = "Sys\\FinforWorx\\EnergyCost\\Secondary_System_Daily_Cooling_Energy";
 
-    // 计算月热量
-    if (day_of_month == 2) {
-        // 每月2号重置月热量，重置为1号的日热量
-        writeData.put(primarySystemMonthlyHeatingEnergyTag, primaryHeatDay.setScale(2, RoundingMode.HALF_UP).toString());
-        writeData.put(primarySystemMonthlyCoolingEnergyTag, primaryCoolDay.setScale(2, RoundingMode.HALF_UP).toString());
-        writeData.put(secondarySystemMonthlyHeatingEnergyTag, secondaryHeatDay.setScale(2, RoundingMode.HALF_UP).toString());
-        writeData.put(secondarySystemMonthlyCoolingEnergyTag, secondaryCoolDay.setScale(2, RoundingMode.HALF_UP).toString());
+    int totalArchived = 0;
+    int totalArchivedWithData = 0;
+    int totalArchivedZero = 0;
+    int totalSkippedExisting = 0;
+    List<String> processedDates = new ArrayList<>();
+    List<String> skippedExistingDates = new ArrayList<>();
+    List<String> archiveErrors = new ArrayList<>();
+
+    // 1. 查询该日期已存在哪些维度组合
+    String existSql = "SELECT system_type, energy_type FROM sjmg_heat_daily_detail " +
+            "WHERE stat_date = '" + escapeSql(targetDate) + "' " +
+            "AND system_type IN ('PRIMARY','SECONDARY') " +
+            "AND energy_type IN ('HEATING','COOLING')";
+    List<Map<String, Object>> existResult = dynamicDataSource.excuteTenantSqlQuery(existSql, dbCode);
+    Set<String> existingKeys = new HashSet<>();
+    if (existResult != null) {
+        for (Map<String, Object> row : existResult) {
+            String st = row.get("system_type") != null ? row.get("system_type").toString() : "";
+            String et = row.get("energy_type") != null ? row.get("energy_type").toString() : "";
+            if (!st.isEmpty() && !et.isEmpty()) {
+                existingKeys.add(st + "_" + et);
+            }
+        }
+    }
+    if (existingKeys.size() >= 4) {
+        totalSkippedExisting += 4;
+        skippedExistingDates.add(targetDate);
     } else {
-        String primarySystemMonthlyHeatingEnergyTagChart = "Sys\\FinforWorx\\EnergyCostChart\\Primary_System_Monthly_Heating_Energy_Chart";
-        String primarySystemMonthlyCoolingEnergyTagChart = "Sys\\FinforWorx\\EnergyCostChart\\Primary_System_Monthly_Cooling_Energy_Chart";
-        String secondarySystemMonthlyHeatingEnergyTagChart = "Sys\\FinforWorx\\EnergyCostChart\\Secondary_System_Monthly_Heating_Energy_Chart";
-        String secondarySystemMonthlyCoolingEnergyTagChart = "Sys\\FinforWorx\\EnergyCostChart\\Secondary_System_Monthly_Cooling_Energy_Chart";
-        // 其他日期累加月热量
-
-        // 一次系统月制热量
+        // 2. 计算昨天的 23:55:00 - 23:59:59
+        Calendar rangeCal = Calendar.getInstance();
         try {
-            String monthTagEscaped = primarySystemMonthlyHeatingEnergyTag.replace("'", "''");
-            String sql = "select a.taglongname,a.times,a.realval,a.quality from psrealdata as a where a.taglongname in ('" + monthTagEscaped + "')";
-            DataTable dt = dataService.queryListDataBySql(sql);
-            if (dt.getRows().size() > 0) {
-                DataRow dataRow = dt.getDataRow(0);
-                Object realvalObj = dataRow.getValue(2);
-                if (realvalObj != null) {
-                    BigDecimal value = new BigDecimal(realvalObj.toString()).setScale(2, RoundingMode.HALF_UP);
-                    BigDecimal newValue = value.add(primaryHeatDay).setScale(2, RoundingMode.HALF_UP);
-                    writeData.put(primarySystemMonthlyHeatingEnergyTag, newValue.toString());
-                    if(day_of_month == 1){
-                        writeData.put(primarySystemMonthlyHeatingEnergyTagChart, newValue.toString());
-                    }
-                }
-            }
+            rangeCal.setTime(dateSdf.parse(targetDate));
         } catch (Exception e) {
-            // 异常时，不更新，保持原值，避免丢失之前的累计值
+            // ignore, keep current date
         }
-        
-        // 一次系统月制冷量
-        try {
-            String monthTagEscaped = primarySystemMonthlyCoolingEnergyTag.replace("'", "''");
-            String sql = "select a.taglongname,a.times,a.realval,a.quality from psrealdata as a where a.taglongname in ('" + monthTagEscaped + "')";
-            DataTable dt = dataService.queryListDataBySql(sql);
-            if (dt.getRows().size() > 0) {
-                DataRow dataRow = dt.getDataRow(0);
-                Object realvalObj = dataRow.getValue(2);
-                if (realvalObj != null) {
-                    BigDecimal value = new BigDecimal(realvalObj.toString()).setScale(2, RoundingMode.HALF_UP);
-                    BigDecimal newValue = value.add(primaryCoolDay).setScale(2, RoundingMode.HALF_UP);
-                    writeData.put(primarySystemMonthlyCoolingEnergyTag, newValue.toString());
-                    if(day_of_month == 1){
-                        writeData.put(primarySystemMonthlyCoolingEnergyTagChart, newValue.toString());
-                    }
-                }
-            }
-        } catch (Exception e) {
-            // 异常时，不更新，保持原值，避免丢失之前的累计值
-        }
+        rangeCal.set(Calendar.HOUR_OF_DAY, 23);
+        rangeCal.set(Calendar.MINUTE, 55);
+        rangeCal.set(Calendar.SECOND, 0);
+        rangeCal.set(Calendar.MILLISECOND, 0);
+        String dayStart = sdf.format(rangeCal.getTime());
+        rangeCal.set(Calendar.MINUTE, 59);
+        rangeCal.set(Calendar.SECOND, 59);
+        String dayEnd = sdf.format(rangeCal.getTime());
 
-        // 二次系统月制热量
+        // 3. 从系统点位读取日热量（查询历史数据表）
+        BigDecimal primaryHeatDay = BigDecimal.ZERO;
+        boolean primaryHeatHasData = false;
+        BigDecimal primaryCoolDay = BigDecimal.ZERO;
+        boolean primaryCoolHasData = false;
+        BigDecimal secondaryHeatDay = BigDecimal.ZERO;
+        boolean secondaryHeatHasData = false;
+        BigDecimal secondaryCoolDay = BigDecimal.ZERO;
+        boolean secondaryCoolHasData = false;
+
+        // 一次系统日制热量
         try {
-            String monthTagEscaped = secondarySystemMonthlyHeatingEnergyTag.replace("'", "''");
-            String sql = "select a.taglongname,a.times,a.realval,a.quality from psrealdata as a where a.taglongname in ('" + monthTagEscaped + "')";
+            String tagEscaped = primarySystemDailyHeatingEnergyTag.replace("'", "''");
+            // 查询历史数据表，使用starttime和endtime字段
+            String sql = "select a.taglongname,a.times,a.hisval from pshisdata as a where a.taglongname in ('" + tagEscaped + "') and a.starttime ='" + dayStart + "' and a.endtime = '" + dayEnd + "' limitpage 1,9999";
             DataTable dt = dataService.queryListDataBySql(sql);
-            if (dt.getRows().size() > 0) {
-                DataRow dataRow = dt.getDataRow(0);
-                Object realvalObj = dataRow.getValue(2);
-                if (realvalObj != null) {
-                    BigDecimal value = new BigDecimal(realvalObj.toString()).setScale(2, RoundingMode.HALF_UP);
-                    BigDecimal newValue = value.add(secondaryHeatDay).setScale(2, RoundingMode.HALF_UP);
-                    writeData.put(secondarySystemMonthlyHeatingEnergyTag, newValue.toString());
-                    if(day_of_month == 1){
-                        writeData.put(secondarySystemMonthlyHeatingEnergyTagChart, newValue.toString());
+            // 取最大值
+            BigDecimal maxValue = BigDecimal.ZERO;
+            for (int j = 0; j < dt.getRows().size(); j++) {
+                DataRow dataRow = dt.getDataRow(j);
+                Object hisvalObj = dataRow.getValue(2);
+                if (hisvalObj != null) {
+                    primaryHeatHasData = true;
+                    BigDecimal value = new BigDecimal(hisvalObj.toString());
+                    if (value.compareTo(maxValue) > 0) {
+                        maxValue = value;
                     }
                 }
             }
+            primaryHeatDay = maxValue.setScale(2, RoundingMode.HALF_UP);
         } catch (Exception e) {
-            // 异常时，不更新，保持原值，避免丢失之前的累计值
+            // 异常时保持为0
         }
 
-        // 二次系统月制冷量
+        // 一次系统日制冷量
         try {
-            String monthTagEscaped = secondarySystemMonthlyCoolingEnergyTag.replace("'", "''");
-            String sql = "select a.taglongname,a.times,a.realval,a.quality from psrealdata as a where a.taglongname in ('" + monthTagEscaped + "')";
+            String tagEscaped = primarySystemDailyCoolingEnergyTag.replace("'", "''");
+            String sql = "select a.taglongname,a.times,a.hisval from pshisdata as a where a.taglongname in ('" + tagEscaped + "') and a.starttime ='" + dayStart + "' and a.endtime = '" + dayEnd + "' limitpage 1,9999";
             DataTable dt = dataService.queryListDataBySql(sql);
-            if (dt.getRows().size() > 0) {
-                DataRow dataRow = dt.getDataRow(0);
-                Object realvalObj = dataRow.getValue(2);
-                if (realvalObj != null) {
-                    BigDecimal value = new BigDecimal(realvalObj.toString()).setScale(2, RoundingMode.HALF_UP);
-                    BigDecimal newValue = value.add(secondaryCoolDay).setScale(2, RoundingMode.HALF_UP);
-                    writeData.put(secondarySystemMonthlyCoolingEnergyTag, newValue.toString());
-                    if(day_of_month == 1){
-                        writeData.put(secondarySystemMonthlyCoolingEnergyTagChart, newValue.toString());
+            BigDecimal maxValue = BigDecimal.ZERO;
+            for (int j = 0; j < dt.getRows().size(); j++) {
+                DataRow dataRow = dt.getDataRow(j);
+                Object hisvalObj = dataRow.getValue(2);
+                if (hisvalObj != null) {
+                    primaryCoolHasData = true;
+                    BigDecimal value = new BigDecimal(hisvalObj.toString());
+                    if (value.compareTo(maxValue) > 0) {
+                        maxValue = value;
                     }
                 }
             }
+            primaryCoolDay = maxValue.setScale(2, RoundingMode.HALF_UP);
         } catch (Exception e) {
-            // 异常时，不更新，保持原值，避免丢失之前的累计值
+            // 异常时保持为0
+        }
+
+        // 二次系统日制热量
+        try {
+            String tagEscaped = secondarySystemDailyHeatingEnergyTag.replace("'", "''");
+            // 查询历史数据表，使用starttime和endtime字段
+            String sql = "select a.taglongname,a.times,a.hisval from pshisdata as a where a.taglongname in ('" + tagEscaped + "') and a.starttime ='" + dayStart + "' and a.endtime = '" + dayEnd + "' limitpage 1,9999";
+            DataTable dt = dataService.queryListDataBySql(sql);
+            // 取最大值
+            BigDecimal maxValue = BigDecimal.ZERO;
+            for (int j = 0; j < dt.getRows().size(); j++) {
+                DataRow dataRow = dt.getDataRow(j);
+                Object hisvalObj = dataRow.getValue(2);
+                if (hisvalObj != null) {
+                    secondaryHeatHasData = true;
+                    BigDecimal value = new BigDecimal(hisvalObj.toString());
+                    if (value.compareTo(maxValue) > 0) {
+                        maxValue = value;
+                    }
+                }
+            }
+            secondaryHeatDay = maxValue.setScale(2, RoundingMode.HALF_UP);
+        } catch (Exception e) {
+            // 异常时保持为0
+        }
+
+        // 二次系统日制冷量
+        try {
+            String tagEscaped = secondarySystemDailyCoolingEnergyTag.replace("'", "''");
+            String sql = "select a.taglongname,a.times,a.hisval from pshisdata as a where a.taglongname in ('" + tagEscaped + "') and a.starttime ='" + dayStart + "' and a.endtime = '" + dayEnd + "' limitpage 1,9999";
+            DataTable dt = dataService.queryListDataBySql(sql);
+            BigDecimal maxValue = BigDecimal.ZERO;
+            for (int j = 0; j < dt.getRows().size(); j++) {
+                DataRow dataRow = dt.getDataRow(j);
+                Object hisvalObj = dataRow.getValue(2);
+                if (hisvalObj != null) {
+                    secondaryCoolHasData = true;
+                    BigDecimal value = new BigDecimal(hisvalObj.toString());
+                    if (value.compareTo(maxValue) > 0) {
+                        maxValue = value;
+                    }
+                }
+            }
+            secondaryCoolDay = maxValue.setScale(2, RoundingMode.HALF_UP);
+        } catch (Exception e) {
+            // 异常时保持为0
+        }
+
+        // 4. 写入 sjmg_heat_daily_detail：已有维度不动，缺失维度补入（有效值或0）
+        List<Map<String, Object>> heatRows = new ArrayList<>();
+        heatRows.add(["system_type": "PRIMARY", "energy_type": "HEATING", "heat_value": primaryHeatDay, "hasData": primaryHeatHasData]);
+        heatRows.add(["system_type": "PRIMARY", "energy_type": "COOLING", "heat_value": primaryCoolDay, "hasData": primaryCoolHasData]);
+        heatRows.add(["system_type": "SECONDARY", "energy_type": "HEATING", "heat_value": secondaryHeatDay, "hasData": secondaryHeatHasData]);
+        heatRows.add(["system_type": "SECONDARY", "energy_type": "COOLING", "heat_value": secondaryCoolDay, "hasData": secondaryCoolHasData]);
+
+        int dateArchived = 0;
+        int dateArchivedWithData = 0;
+        int dateArchivedZero = 0;
+        int dateSkippedExisting = 0;
+        for (Map<String, Object> row : heatRows) {
+            String systemType = row.get("system_type").toString();
+            String energyType = row.get("energy_type").toString();
+            String dimKey = systemType + "_" + energyType;
+            // 已存在则跳过，不刷新
+            if (existingKeys.contains(dimKey)) {
+                totalSkippedExisting++;
+                dateSkippedExisting++;
+                continue;
+            }
+            BigDecimal heatValue = (BigDecimal) row.get("heat_value");
+            boolean hasData = Boolean.valueOf(row.get("hasData").toString());
+            String id = idWorker.nextId();
+            String insertSql = "INSERT INTO sjmg_heat_daily_detail (id, stat_date, system_type, energy_type, heat_value) VALUES (" +
+                    "'" + escapeSql(id) + "','" + escapeSql(targetDate) + "','" + escapeSql(systemType) + "','" +
+                    escapeSql(energyType) + "','" + escapeSql(heatValue.setScale(2, RoundingMode.HALF_UP).toPlainString()) + "')";
+            try {
+                dynamicDataSource.excuteTenantSql(insertSql, dbCode);
+                totalArchived++;
+                dateArchived++;
+                if (hasData) {
+                    totalArchivedWithData++;
+                    dateArchivedWithData++;
+                } else {
+                    totalArchivedZero++;
+                    dateArchivedZero++;
+                }
+            } catch (Exception e) {
+                archiveErrors.add(targetDate + "_" + systemType + "_" + energyType + ":" + (e.getMessage() != null ? e.getMessage() : "写入失败"));
+            }
+        }
+        if (dateArchived > 0 || dateSkippedExisting > 0) {
+            processedDates.add(targetDate + "（写入" + dateArchived + "条，其中有效值" + dateArchivedWithData + "条、0值" + dateArchivedZero + "条，已存在跳过" + dateSkippedExisting + "条）");
         }
     }
-    
-    // 计算年热量
-    if (day_of_month == 2 && monthOfYear == 1) {
-        // 1月2号重置年热量，重置为1号的日热量
-        writeData.put(primarySystemYearlyHeatingEnergyTag, primaryHeatDay.setScale(2, RoundingMode.HALF_UP).toString());
-        writeData.put(primarySystemYearlyCoolingEnergyTag, primaryCoolDay.setScale(2, RoundingMode.HALF_UP).toString());
-        writeData.put(secondarySystemYearlyHeatingEnergyTag, secondaryHeatDay.setScale(2, RoundingMode.HALF_UP).toString());
-        writeData.put(secondarySystemYearlyCoolingEnergyTag, secondaryCoolDay.setScale(2, RoundingMode.HALF_UP).toString());
+
+    if (archiveErrors.isEmpty()) {
+        data.put("result", "热量归档成功，共写入 " + totalArchived + " 条日热量明细（有效值 " + totalArchivedWithData + " 条，0值 " + totalArchivedZero + " 条），跳过已存在 " + totalSkippedExisting + " 条");
     } else {
-        String primarySystemYearlyHeatingEnergyTagChart = "Sys\\FinforWorx\\EnergyCostChart\\Primary_System_Yearly_Heating_Energy_Chart";
-        String primarySystemYearlyCoolingEnergyTagChart = "Sys\\FinforWorx\\EnergyCostChart\\Primary_System_Yearly_Cooling_Energy_Chart";
-        String secondarySystemYearlyHeatingEnergyTagChart = "Sys\\FinforWorx\\EnergyCostChart\\Secondary_System_Yearly_Heating_Energy_Chart";
-        String secondarySystemYearlyCoolingEnergyTagChart = "Sys\\FinforWorx\\EnergyCostChart\\Secondary_System_Yearly_Cooling_Energy_Chart";
-        // 其他日期累加年热量
-        try {
-            String yearTagEscaped = primarySystemYearlyHeatingEnergyTag.replace("'", "''");
-            String sql = "select a.taglongname,a.times,a.realval,a.quality from psrealdata as a where a.taglongname in ('" + yearTagEscaped + "')";
-            DataTable dt = dataService.queryListDataBySql(sql);
-            if (dt.getRows().size() > 0) {
-                DataRow dataRow = dt.getDataRow(0);
-                Object realvalObj = dataRow.getValue(2);
-                if (realvalObj != null) {
-                    BigDecimal value = new BigDecimal(realvalObj.toString()).setScale(2, RoundingMode.HALF_UP);
-                    BigDecimal newValue = value.add(primaryHeatDay).setScale(2, RoundingMode.HALF_UP);
-                    writeData.put(primarySystemYearlyHeatingEnergyTag, newValue.toString());
-                    if(day_of_month == 1 && monthOfYear == 1){
-                        writeData.put(primarySystemYearlyHeatingEnergyTagChart, newValue.toString());
-                    }
-                }
-            }
-        } catch (Exception e) {
-            // 异常时，不更新，保持原值，避免丢失之前的累计值
-        }
-        
-        try {
-            String yearTagEscaped = primarySystemYearlyCoolingEnergyTag.replace("'", "''");
-            String sql = "select a.taglongname,a.times,a.realval,a.quality from psrealdata as a where a.taglongname in ('" + yearTagEscaped + "')";
-            DataTable dt = dataService.queryListDataBySql(sql);
-            if (dt.getRows().size() > 0) {
-                DataRow dataRow = dt.getDataRow(0);
-                Object realvalObj = dataRow.getValue(2);
-                if (realvalObj != null) {
-                    BigDecimal value = new BigDecimal(realvalObj.toString()).setScale(2, RoundingMode.HALF_UP);
-                    writeData.put(primarySystemYearlyCoolingEnergyTag, value.add(primaryCoolDay).setScale(2, RoundingMode.HALF_UP).toString());
-                    if(day_of_month == 1 && monthOfYear == 1){
-                        writeData.put(primarySystemYearlyCoolingEnergyTagChart, newValue.toString());
-                    }
-                }
-            }
-        } catch (Exception e) {
-            // 异常时，不更新，保持原值，避免丢失之前的累计值
-        }
-
-        try {
-            String yearTagEscaped = secondarySystemYearlyHeatingEnergyTag.replace("'", "''");
-            String sql = "select a.taglongname,a.times,a.realval,a.quality from psrealdata as a where a.taglongname in ('" + yearTagEscaped + "')";
-            DataTable dt = dataService.queryListDataBySql(sql);
-            if (dt.getRows().size() > 0) {
-                DataRow dataRow = dt.getDataRow(0);
-                Object realvalObj = dataRow.getValue(2);
-                if (realvalObj != null) {
-                    BigDecimal value = new BigDecimal(realvalObj.toString()).setScale(2, RoundingMode.HALF_UP);
-                    BigDecimal newValue = value.add(secondaryHeatDay).setScale(2, RoundingMode.HALF_UP);
-                    writeData.put(secondarySystemYearlyHeatingEnergyTag, newValue.toString());
-                    if(day_of_month == 1 && monthOfYear == 1){
-                        writeData.put(secondarySystemYearlyHeatingEnergyTagChart, newValue.toString());
-                    }
-                }
-            }
-        } catch (Exception e) {
-            // 异常时，不更新，保持原值，避免丢失之前的累计值
-        }
-
-        try {
-            String yearTagEscaped = secondarySystemYearlyCoolingEnergyTag.replace("'", "''");
-            String sql = "select a.taglongname,a.times,a.realval,a.quality from psrealdata as a where a.taglongname in ('" + yearTagEscaped + "')";
-            DataTable dt = dataService.queryListDataBySql(sql);
-            if (dt.getRows().size() > 0) {
-                DataRow dataRow = dt.getDataRow(0);
-                Object realvalObj = dataRow.getValue(2);
-                if (realvalObj != null) {
-                    BigDecimal value = new BigDecimal(realvalObj.toString()).setScale(2, RoundingMode.HALF_UP);
-                    BigDecimal newValue = value.add(secondaryCoolDay).setScale(2, RoundingMode.HALF_UP);
-                    writeData.put(secondarySystemYearlyCoolingEnergyTag, newValue.toString());
-                    if(day_of_month == 1 && monthOfYear == 1){
-                        writeData.put(secondarySystemYearlyCoolingEnergyTagChart, newValue.toString());
-                    }
-                }
-            }
-        } catch (Exception e) {
-            // 异常时，不更新，保持原值，避免丢失之前的累计值
-        }
+        data.put("result", "热量归档完成，写入 " + totalArchived + " 条（有效值 " + totalArchivedWithData + " 条，0值 " + totalArchivedZero + " 条），跳过已存在 " + totalSkippedExisting + " 条，部分异常: " + String.join("; ", archiveErrors));
     }
-
-
-    // 下置日数据到chart点位（使用已获取的日数据变量）
-    String primarySystemDailyHeatingEnergyTagChart = "Sys\\FinforWorx\\EnergyCostChart\\Primary_System_Daily_Heating_Energy_Chart";
-    String primarySystemDailyCoolingEnergyTagChart = "Sys\\FinforWorx\\EnergyCostChart\\Primary_System_Daily_Cooling_Energy_Chart";
-    String secondarySystemDailyHeatingEnergyTagChart = "Sys\\FinforWorx\\EnergyCostChart\\Secondary_System_Daily_Heating_Energy_Chart";
-    String secondarySystemDailyCoolingEnergyTagChart = "Sys\\FinforWorx\\EnergyCostChart\\Secondary_System_Daily_Cooling_Energy_Chart";
-    if (primaryHeatDay != null) {
-        writeData.put(primarySystemDailyHeatingEnergyTagChart, primaryHeatDay.setScale(2, RoundingMode.HALF_UP).toString());
-    }
-    if (primaryCoolDay != null) {
-        writeData.put(primarySystemDailyCoolingEnergyTagChart, primaryCoolDay.setScale(2, RoundingMode.HALF_UP).toString());
-    }
-    if (secondaryHeatDay != null) {
-        writeData.put(secondarySystemDailyHeatingEnergyTagChart, secondaryHeatDay.setScale(2, RoundingMode.HALF_UP).toString());
-    }
-    if (secondaryCoolDay != null) {
-        writeData.put(secondarySystemDailyCoolingEnergyTagChart, secondaryCoolDay.setScale(2, RoundingMode.HALF_UP).toString());
-    }
-}
-
-// 执行下置业务编排（只有当writeData不为空时才执行）
-if (writeData != null && writeData.size() > 0) {
-    paramMap_write.put("writeData", JSON.toJSONString(writeData));
-    paramData_write.put("data", paramMap_write);
-    param_write.setParam(paramData_write);
-    sol.execute(param_write);
-    data.put("result", "下置成功，共下置 " + writeData.size() + " 个点位");
-    data.put("writeData", writeData);
+    data.put("processedDates", processedDates);
+    data.put("skippedExistingDates", skippedExistingDates);
+    data.put("statDate", yesterdayStr);
+    data.put("archiveCount", totalArchived);
 } else {
-    data.put("result", "没有数据需要下置，writeData为空");
-    data.put("writeData", writeData);
+    data.put("result", "非0点，不执行热量归档");
 }
+
 return data;

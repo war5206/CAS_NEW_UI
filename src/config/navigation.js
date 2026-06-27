@@ -157,7 +157,7 @@ const BASE_MODULES = [
       { id: 'power', label: '用电统计', path: 'power-statistics', tabs: [] },
       { id: 'water', label: '用水统计', path: 'water-statistics', tabs: [] },
       { id: 'heat', label: '热量统计', path: 'heat-statistics', tabs: [] },
-      // { id: 'cold', label: '冷量统计', path: 'cold-statistics', tabs: [] }, // 暂时隐藏
+      { id: 'cold', label: '冷量统计', path: 'cold-statistics', tabs: [] },
       { id: 'cost', label: '费用分析', path: 'cost-analysis', tabs: [] },
     ],
   },

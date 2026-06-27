@@ -1,14 +1,13 @@
-/* algorithmProcessId: queryCopConsumption
+/* algorithmProcessId: queryHeatProduction
  *
- * 数据综述 COP 图表查询：按日/月/年返回 COP 趋势；支持环比/同比。
- * 数据源：sjmg_cop_detail（由 timingCOPJTLConsumption.groovy 定时归档）。
+ * 热量统计查询：按日/月/年返回热量产量趋势；支持环比/同比。
  *
  * 入参：
  * - cycle: 日 | 月 | 年
  * - startDate: 日=YYYY-MM，月=YYYY-MM，年=YYYY
  * - endDate: 月/年时使用
+ * - type: 一次系统制热量 | 二次系统制热量 | 一次系统制冷量 | 二次系统制冷量
  * - comparison: QOQ | YOY | 空
- * - copType: system-cop | heat-cop | cold-cop
  */
 
 import com.sunwayland.common.core.pojo.PtUser;
@@ -34,14 +33,14 @@ if ("base".equals(dbCode)) {
 String cycle = data.get("cycle") != null ? data.get("cycle").toString() : "日";
 String startDate = data.get("startDate") != null ? data.get("startDate").toString().trim() : "";
 String endDate = data.get("endDate") != null ? data.get("endDate").toString().trim() : "";
+String type = data.get("type") != null ? data.get("type").toString().trim() : "一次系统制热量";
 String comparison = data.get("comparison") != null ? data.get("comparison").toString().trim() : "";
-String copType = data.get("copType") != null ? data.get("copType").toString().trim() : "system-cop";
 
 data.remove("cycle");
 data.remove("startDate");
 data.remove("endDate");
+data.remove("type");
 data.remove("comparison");
-data.remove("copType");
 
 // ---------- 工具方法 ----------
 
@@ -67,57 +66,24 @@ def toScaledDouble(Object value) {
     }
 }
 
-// ---------- 项目系统类型 ----------
+// ---------- type 解析为 system_type / energy_type ----------
 
-String systemTypeUuid = "1";
-try {
-    String projectSql = "SELECT system_type_uuid FROM sjmg_project_data LIMIT 1";
-    List<Map<String, Object>> projectRows = dynamicDataSource.excuteTenantSqlQuery(projectSql, dbCode);
-    if (projectRows != null && !projectRows.isEmpty()) {
-        Map<String, Object> row = projectRows.get(0);
-        if (row.get("system_type_uuid") != null) {
-            systemTypeUuid = row.get("system_type_uuid").toString();
-        }
+def resolveSystemType(String typeName) {
+    if (typeName.contains("二次")) {
+        return "SECONDARY";
     }
-} catch (Exception ignored) {
-}
-String systemType = "2".equals(systemTypeUuid) ? "SECONDARY" : "PRIMARY";
-
-// ---------- cycle / copType 解析 ----------
-
-def resolveCycleType(String cycleName) {
-    if ("月".equals(cycleName)) return "MONTHLY";
-    if ("年".equals(cycleName)) return "YEARLY";
-    return "DAILY";
+    return "PRIMARY";
 }
 
-String cycleType = resolveCycleType(cycle);
-boolean isDaily = "DAILY".equals(cycleType);
-
-// 前端 copType → 后端 cop_type；system 在月/年视图下由 HEAT + COLD 汇总
-List<String> resolveCopTypes(String type, String cycleType) {
-    List<String> types = new ArrayList<>();
-    boolean isSystem = "system-cop".equals(type);
-    if ("DAILY".equals(cycleType) && isSystem) {
-        types.add("SYSTEM");
-    } else if (isSystem) {
-        // 月/年系统 COP = 制热 COP + 制冷 COP
-        types.add("HEAT");
-        types.add("COLD");
-    } else if ("heat-cop".equals(type)) {
-        types.add("HEAT");
-    } else if ("cold-cop".equals(type)) {
-        types.add("COLD");
-    } else {
-        // 默认兜底
-        types.add("SYSTEM");
+def resolveEnergyType(String typeName) {
+    if (typeName.contains("制冷") || typeName.contains("冷量")) {
+        return "COOLING";
     }
-    return types;
+    return "HEATING";
 }
 
-List<String> targetCopTypes = resolveCopTypes(copType, cycleType);
-String copTypeIn = "'" + String.join("','", targetCopTypes.collect { escapeSql(it) }) + "'";
-String systemTypeCondition = isDaily ? "AND system_type IS NULL" : "AND system_type = '" + escapeSql(systemType) + "'";
+String systemType = resolveSystemType(type);
+String energyType = resolveEnergyType(type);
 
 // ---------- 解析当前周期 ----------
 
@@ -180,13 +146,12 @@ for (int i = 0; i < pointCount; i++) {
 }
 
 try {
-    String detailSql = "SELECT stat_date, cop_type, SUM(cop_value) AS cop_value " +
-            "FROM sjmg_cop_detail " +
-            "WHERE cycle_type = '" + escapeSql(cycleType) + "' " +
-            "AND stat_date >= '" + escapeSql(formatDate(currentStart)) + "' AND stat_date <= '" + escapeSql(formatDate(currentEnd)) + "' " +
-            "AND cop_type IN (" + copTypeIn + ") " +
-            systemTypeCondition + " " +
-            "GROUP BY stat_date, cop_type " +
+    String detailSql = "SELECT stat_date, SUM(heat_value) AS heat_value " +
+            "FROM sjmg_heat_daily_detail " +
+            "WHERE stat_date >= '" + escapeSql(formatDate(currentStart)) + "' AND stat_date <= '" + escapeSql(formatDate(currentEnd)) + "' " +
+            "AND system_type = '" + escapeSql(systemType) + "' " +
+            "AND energy_type = '" + escapeSql(energyType) + "' " +
+            "GROUP BY stat_date " +
             "ORDER BY stat_date";
     List<Map<String, Object>> rows = dynamicDataSource.excuteTenantSqlQuery(detailSql, dbCode);
 
@@ -204,13 +169,13 @@ try {
         }
         if (idx == null) continue;
 
-        Double copValue = toScaledDouble(row.get("cop_value"));
-        if (copValue == null) continue;
-        currentTotals.set(idx, currentTotals.get(idx) + copValue);
+        Double heatValue = toScaledDouble(row.get("heat_value"));
+        if (heatValue == null) continue;
+        currentTotals.set(idx, currentTotals.get(idx) + heatValue);
     }
 } catch (Exception e) {
     data.put("state", "fail");
-    data.put("message", "查询 COP 明细失败: " + (e.getMessage() != null ? e.getMessage() : "未知错误"));
+    data.put("message", "查询热量产量明细失败: " + (e.getMessage() != null ? e.getMessage() : "未知错误"));
     return data;
 }
 
@@ -256,13 +221,12 @@ if ("QOQ".equals(comparison) || "YOY".equals(comparison)) {
     }
 
     try {
-        String prevSql = "SELECT stat_date, cop_type, SUM(cop_value) AS cop_value " +
-                "FROM sjmg_cop_detail " +
-                "WHERE cycle_type = '" + escapeSql(cycleType) + "' " +
-                "AND stat_date >= '" + escapeSql(formatDate(prevStart)) + "' AND stat_date <= '" + escapeSql(formatDate(prevEnd)) + "' " +
-                "AND cop_type IN (" + copTypeIn + ") " +
-                systemTypeCondition + " " +
-                "GROUP BY stat_date, cop_type " +
+        String prevSql = "SELECT stat_date, SUM(heat_value) AS heat_value " +
+                "FROM sjmg_heat_daily_detail " +
+                "WHERE stat_date >= '" + escapeSql(formatDate(prevStart)) + "' AND stat_date <= '" + escapeSql(formatDate(prevEnd)) + "' " +
+                "AND system_type = '" + escapeSql(systemType) + "' " +
+                "AND energy_type = '" + escapeSql(energyType) + "' " +
+                "GROUP BY stat_date " +
                 "ORDER BY stat_date";
         List<Map<String, Object>> prevRows = dynamicDataSource.excuteTenantSqlQuery(prevSql, dbCode);
 
@@ -279,9 +243,9 @@ if ("QOQ".equals(comparison) || "YOY".equals(comparison)) {
             } else {
                 key = String.valueOf(statDate.getYear());
             }
-            Double copValue = toScaledDouble(row.get("cop_value"));
-            if (copValue == null) continue;
-            prevMap.put(key, (prevMap.containsKey(key) ? prevMap.get(key) : 0D) + copValue);
+            Double heatValue = toScaledDouble(row.get("heat_value"));
+            if (heatValue == null) continue;
+            prevMap.put(key, (prevMap.containsKey(key) ? prevMap.get(key) : 0D) + heatValue);
         }
 
         for (int i = 0; i < pointCount; i++) {
@@ -307,10 +271,22 @@ if ("QOQ".equals(comparison) || "YOY".equals(comparison)) {
         }
     } catch (Exception e) {
         data.put("state", "fail");
-        data.put("message", "查询对比 COP 数据失败: " + (e.getMessage() != null ? e.getMessage() : "未知错误"));
+        data.put("message", "查询对比热量产量失败: " + (e.getMessage() != null ? e.getMessage() : "未知错误"));
         return data;
     }
 }
+
+// ---------- 汇总值 ----------
+
+double allValue = 0D;
+int validCount = 0;
+for (Double total : currentTotals) {
+    if (total != null && total > 0) {
+        allValue += total;
+        validCount++;
+    }
+}
+double avgValue = validCount > 0 ? allValue / validCount : 0D;
 
 // ---------- 组装返回值 ----------
 
@@ -320,6 +296,8 @@ if (previousTotals != null) {
     yMap.put("y1PreviousList", previousTotals);
 }
 
+data.put("allValue", new BigDecimal(allValue).setScale(2, RoundingMode.HALF_UP).toPlainString());
+data.put("avgValue", new BigDecimal(avgValue).setScale(2, RoundingMode.HALF_UP).toPlainString());
 data.put("xList", xList);
 data.put("yMap", yMap);
 data.put("state", "success");

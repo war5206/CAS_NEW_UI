@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import DataOverviewFilterBar from '../components/DataOverviewFilterBar'
 import DataOverviewChart from '../components/DataOverviewChart'
 import { syncMonthRange, addCalendarMonths, getDefaultCalendarMonthValue } from '../utils/analysisFilterUtils'
@@ -42,8 +42,25 @@ function PowerStatisticsPage() {
   const [equipmentType, setEquipmentType] = useState('total-power')
   const [filters, setFilters] = useState(DEFAULT_FILTERS)
   const projectContext = useAnalysisProjectContextQuery()
+  const { isHeatingCooling } = projectContext.data
 
-  const heatPumpLabel = projectContext.data.isHPHeating ? '热泵（制热）' : '热泵（制冷）'
+  const titleOptions = useMemo(() => {
+    const options = [{ label: '总用电', value: 'total-power' }]
+    if (isHeatingCooling) {
+      options.push({ label: '热泵（制热）', value: 'heat-pump-heating' })
+      options.push({ label: '热泵（制冷）', value: 'heat-pump-cooling' })
+    } else {
+      options.push({ label: '热泵（制热）', value: 'heat-pump-heating' })
+    }
+    options.push({ label: '水泵', value: 'water-pump' })
+    options.push({ label: '耦合能源', value: 'coupling-energy' })
+    return options
+  }, [isHeatingCooling])
+
+  const effectiveEquipmentType = useMemo(
+    () => (titleOptions.some((option) => option.value === equipmentType) ? equipmentType : 'total-power'),
+    [titleOptions, equipmentType],
+  )
 
   const activeRange = period === '日' ? filters.day : period === '月' ? filters.month : filters.year
   const viewModelQuery = useAnalysisTrendQuery({
@@ -51,7 +68,7 @@ function PowerStatisticsPage() {
     period,
     compareMode,
     range: activeRange,
-    titleValue: equipmentType,
+    titleValue: effectiveEquipmentType,
   })
 
   const handleFilterChange = (nextRange) => {
@@ -86,13 +103,8 @@ function PowerStatisticsPage() {
 
       <DataOverviewFilterBar
         className="power-statistics-filter-bar"
-        titleOptions={[
-          { label: '总用电', value: 'total-power' },
-          { label: heatPumpLabel, value: 'heat-pump' },
-          { label: '水泵', value: 'water-pump' },
-          { label: '耦合能源', value: 'coupling-energy' },
-        ]}
-        titleValue={equipmentType}
+        titleOptions={titleOptions}
+        titleValue={effectiveEquipmentType}
         onTitleChange={setEquipmentType}
         titleAriaLabel="选择用电统计对象"
         period={period}

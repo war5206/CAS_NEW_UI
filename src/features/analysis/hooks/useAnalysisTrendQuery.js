@@ -52,7 +52,8 @@ const PAGE_CONFIGS = {
 
 const POWER_TYPE_MAP = {
   'total-power': '所有设备',
-  'heat-pump': '热泵',
+  'heat-pump-heating': '热泵（制热）',
+  'heat-pump-cooling': '热泵（制冷）',
   'water-pump': '水泵',
   'coupling-energy': '耦合能源',
 }
@@ -94,6 +95,9 @@ function resolveTypeParam(pageType, titleValue) {
   }
   if (pageType === 'cost') {
     return COST_TYPE_MAP[titleValue] || COST_TYPE_MAP['total-cost']
+  }
+  if (pageType === 'heat') {
+    return titleValue || '一次系统制热量'
   }
   return undefined
 }

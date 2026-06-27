@@ -42,7 +42,7 @@ function ResourceStatisticsPage({ pageType, titleOverride }) {
       : pageType === 'heat'
         ? { title: titleOverride || '耗热量', titleOptions: [] }
         : pageType === 'cold'
-          ? { title: '制冷量', titleOptions: [] }
+          ? { title: titleOverride || '制冷量', titleOptions: [] }
           : {
               title: '总费用',
               titleOptions: [
@@ -55,7 +55,9 @@ function ResourceStatisticsPage({ pageType, titleOverride }) {
   const [period, setPeriod] = useState('日')
   const [compareMode, setCompareMode] = useState('none')
   const [filters, setFilters] = useState(DEFAULT_FILTERS)
-  const [titleValue, setTitleValue] = useState(pageConfig.titleOptions[0]?.value ?? '')
+  const [titleValue, setTitleValue] = useState(
+    pageConfig.titleOptions[0]?.value ?? titleOverride ?? '',
+  )
 
   const activeRange = period === '日' ? filters.day : period === '月' ? filters.month : filters.year
   const queryPageType = pageType === 'cold' ? 'heat' : pageType
