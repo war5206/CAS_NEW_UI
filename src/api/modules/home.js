@@ -2,6 +2,9 @@ import { post } from '../client/http'
 import { getApiBaseUrl, getAlgorithmProcessPath, ALGORITHM_PROCESS_IDS } from '../client/config'
 import { adaptSetOperationPasswordResponse, adaptLoginVerificationResponse } from '../adapters/auth'
 import { adaptGuideResponse } from '../adapters/guide'
+import { queryRealvalByLongNames } from './settings'
+import { COUPLING_ENERGY_REALVAL_LONG_NAMES } from '@/config/couplingEnergyTypes'
+import { extractRealvalMap } from '@/utils/realvalMap'
 
 async function callAlgorithmProcess(algorithmProcessId, paramData = {}) {
   return post(getAlgorithmProcessPath(), {
@@ -179,6 +182,22 @@ export async function writeLockStatus(status = '1') {
 
 export async function querySystemConfig() {
   return callAlgorithmProcess(ALGORITHM_PROCESS_IDS.QUERY_SYSTEM_CONFIG, {})
+}
+
+/**
+ * 查询系统配置，并以 PLC 实时点位 OHType/OHNumber 作为耦合能源类型的真实来源。
+ * querySystemConfig 返回的 projectData.couple_energy_type_uuid 可能滞后，
+ * 因此同时读取 PLC 长名并一起返回，供适配器优先使用。
+ */
+export async function querySystemConfigWithCouplingEnergy() {
+  const [systemConfigRes, couplingEnergyRes] = await Promise.all([
+    querySystemConfig(),
+    queryRealvalByLongNames(COUPLING_ENERGY_REALVAL_LONG_NAMES),
+  ])
+  return {
+    data: systemConfigRes.data,
+    couplingEnergyValueMap: extractRealvalMap(couplingEnergyRes),
+  }
 }
 
 export async function saveEnergyPrice(energyPrice = []) {

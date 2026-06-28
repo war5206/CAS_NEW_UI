@@ -2,7 +2,7 @@ import { useEffect, useRef } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { getStoredToken } from '@/api/client/auth'
 import { adaptSystemConfig } from '@/api/adapters/home'
-import { querySystemConfig } from '@/api/modules/home'
+import { querySystemConfigWithCouplingEnergy } from '@/api/modules/home'
 import { resetSystemConfigState, setSystemConfigState } from '@/features/system/store/systemConfigStore'
 
 const POLL_INTERVAL_MS = 60_000
@@ -17,7 +17,7 @@ export function useGlobalSystemConfigPoll() {
 
   const query = useQuery({
     queryKey: ['system-config'],
-    queryFn: querySystemConfig,
+    queryFn: querySystemConfigWithCouplingEnergy,
     enabled: hasToken,
     refetchInterval: POLL_INTERVAL_MS,
     refetchIntervalInBackground: true,

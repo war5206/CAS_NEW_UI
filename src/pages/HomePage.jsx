@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation } from 'react-router-dom'
 import standardSystemMap from '../assets/home/system.png'
 import dajuyuanSystemMap from '../assets/home/dajuyuan-system.png'
@@ -39,6 +39,7 @@ import { useHomeOverviewQuery } from '../features/home/hooks/useHomeOverviewQuer
 import { useSystemConfigQuery } from '../features/home/hooks/useSystemConfigQuery'
 import { useTemp24HourQuery } from '../features/home/hooks/useTemp24HourQuery'
 import { useHomeFeatureSettings } from '@/features/home/store/homeFeatureSettingsStore'
+import { useSystemConfigStore } from '@/features/system/store/systemConfigStore'
 
 const HOME_PAGE_VIEW = {
   DASHBOARD: 'dashboard',
@@ -110,9 +111,9 @@ const HOME_TEXT = {
 
 const COUPLE_DEVICE_IMAGE_MAP = {
   '1': { src: coupleElectricBoilerIcon, alt: HOME_TEXT.TERMINAL_DEVICE_ELECTRIC_BOILER },
-  '2': { src: coupleGasBoilerIcon, alt: HOME_TEXT.TERMINAL_DEVICE_GAS_BOILER },
-  '3': { src: coupleWaterSourceHeatPumpIcon, alt: HOME_TEXT.TERMINAL_DEVICE_WATER_SOURCE_HEAT_PUMP },
-  '4': { src: coupleAirCooledModuleIcon, alt: HOME_TEXT.TERMINAL_DEVICE_AIR_COOLED_MODULE },
+  '2': { src: coupleWaterSourceHeatPumpIcon, alt: HOME_TEXT.TERMINAL_DEVICE_WATER_SOURCE_HEAT_PUMP },
+  '3': { src: coupleAirCooledModuleIcon, alt: HOME_TEXT.TERMINAL_DEVICE_AIR_COOLED_MODULE },
+  '4': { src: coupleGasBoilerIcon, alt: HOME_TEXT.TERMINAL_DEVICE_GAS_BOILER },
 }
 
 const COUPLE_DEVICE_LAYOUT_MAP = {
@@ -121,16 +122,16 @@ const COUPLE_DEVICE_LAYOUT_MAP = {
     couplingEnergyNode: { left: '76.5%', top: '33%' },
   },
   '2': {
-    banner: { top: '280px', left: '750px' },
-    couplingEnergyNode: { left: '73.5%', top: '25%' },
-  },
-  '3': {
     banner: { top: '255px', left: '750px' },
     couplingEnergyNode: { left: '73%', top: '23%' },
   },
-  '4': {
+  '3': {
     banner: { top: '220px', left: '750px' },
     couplingEnergyNode: { left: '74.5%', top: '19%' },
+  },
+  '4': {
+    banner: { top: '280px', left: '750px' },
+    couplingEnergyNode: { left: '73.5%', top: '25%' },
   },
 }
 
@@ -154,7 +155,20 @@ function HomePage({ onActivePageChange, committedUnitLayoutSlots }) {
   const { refetch: refetchSystemConfig } = systemConfigQuery
   const temp24HourQuery = useTemp24HourQuery({ enabled: isHomeRoute && isHomeDashboard })
   const homeOverview = homeOverviewQuery.data
-  const systemConfig = systemConfigQuery.data
+  const systemConfigStore = useSystemConfigStore()
+  const systemConfig = useMemo(
+    () => ({
+      ...systemConfigQuery.data,
+      ...(systemConfigStore.hasFetched
+        ? {
+            systemTypeUuid: systemConfigStore.systemTypeUuid,
+            terminalTypeUuid: systemConfigStore.terminalTypeUuid,
+            coupleEnergyTypeUuid: systemConfigStore.coupleEnergyTypeUuid,
+          }
+        : {}),
+    }),
+    [systemConfigQuery.data, systemConfigStore],
+  )
   const temp24HourTrend = temp24HourQuery.data
   const homeFeatureSettings = useHomeFeatureSettings()
   const wasHomeRouteRef = useRef(isHomeRoute)
@@ -169,7 +183,7 @@ function HomePage({ onActivePageChange, committedUnitLayoutSlots }) {
   const isAirCooledModuleCoupling = coupleEnergyTypeUuid === COUPLE_ENERGY_TYPE_AIR_COOLED_MODULE_ID
   const coupleDevice = COUPLE_DEVICE_IMAGE_MAP[coupleEnergyTypeUuid] ?? null
   const coupleDeviceLayout = COUPLE_DEVICE_LAYOUT_MAP[coupleEnergyTypeUuid] ?? null
-  const shouldShowCouplingEnergy = Boolean(coupleDevice && coupleDeviceLayout) && !isAirCooledModuleCoupling
+  const shouldShowCouplingEnergy = Boolean(coupleDevice && coupleDeviceLayout)
   const shouldShowAirCooledModuleOnDiagram =
     isAirCooledModuleCoupling && SHOW_HOME_AIR_COOLED_STATUS_BLOCK
   const coupleDeviceBannerStyle = coupleDeviceLayout

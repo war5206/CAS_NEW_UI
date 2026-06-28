@@ -31,9 +31,9 @@ export function useSystemConfigStore() {
  * @param {{ systemTypeUuid?: string, terminalTypeUuid?: string, coupleEnergyTypeUuid?: string }} nextConfig
  */
 export function setSystemConfigState(nextConfig) {
-  const systemTypeUuid = String(nextConfig?.systemTypeUuid ?? '1')
-  const terminalTypeUuid = String(nextConfig?.terminalTypeUuid ?? '5')
-  const coupleEnergyTypeUuid = String(nextConfig?.coupleEnergyTypeUuid ?? '')
+  const systemTypeUuid = String(nextConfig?.systemTypeUuid ?? state.systemTypeUuid)
+  const terminalTypeUuid = String(nextConfig?.terminalTypeUuid ?? state.terminalTypeUuid)
+  const coupleEnergyTypeUuid = String(nextConfig?.coupleEnergyTypeUuid ?? state.coupleEnergyTypeUuid)
 
   if (
     state.hasFetched &&

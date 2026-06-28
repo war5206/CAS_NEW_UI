@@ -1,14 +1,14 @@
 import { useRef } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { adaptSystemConfig, createDefaultSystemConfig } from '@/api/adapters/home'
-import { querySystemConfig } from '@/api/modules/home'
+import { querySystemConfigWithCouplingEnergy } from '@/api/modules/home'
 
 export function useSystemConfigQuery({ enabled = true } = {}) {
   const lastSuccessRef = useRef(null)
 
   const query = useQuery({
     queryKey: ['system-config'],
-    queryFn: querySystemConfig,
+    queryFn: querySystemConfigWithCouplingEnergy,
     select: (response) => adaptSystemConfig(response?.data ?? response),
     enabled,
     retry: 2,

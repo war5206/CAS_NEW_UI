@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useQueryClient } from '@tanstack/react-query'
 import SelectDropdown from '../components/SelectDropdown'
 import NumericKeypadModal from '../components/NumericKeypadModal'
 import TimePickerModal from '../components/TimePickerModal'
@@ -17,11 +18,11 @@ import {
 } from '@/api/adapters/systemParamsProject'
 import {
   COUPLING_ENERGY_LABEL_TO_ID,
+  COUPLING_ENERGY_ID_TO_LABEL,
   COUPLING_ENERGY_TYPE_OPTIONS,
   COUPLE_ENERGY_TYPE_NONE_ID,
   adaptCouplingEnergyFromRealvalMap,
   COUPLING_ENERGY_REALVAL_LONG_NAMES,
-  toCouplingEnergyRealvalWriteData,
 } from '@/config/couplingEnergyTypes'
 import {
   MAINBOARD_OPTIONS,
@@ -32,14 +33,17 @@ import {
 } from '@/config/mainboardTypes'
 import {
   queryCirculationPump,
+  queryCoupleEnergy,
   queryProjectData,
   queryRealvalByLongNames,
   saveCirculationPump,
+  saveCoupleEnergy,
   saveProjectData,
   writeRealvalByLongNames,
 } from '@/api/modules/settings'
 import { extractRealvalMap } from '@/utils/realvalMap'
 import { isWriteSuccess, useWriteWithDelayedVerify } from '@/hooks/useWriteWithDelayedVerify'
+import { setSystemConfigState } from '@/features/system/store/systemConfigStore'
 import basicSettingWaterPumpIcon from '../assets/basic-setting-water-pump.svg'
 import basicSettingHpPositionIcon from '../assets/basic-setting-hp-position.svg'
 import basicSettingSystemTypeIcon from '../assets/basic-setting-system-type.svg'
@@ -175,6 +179,7 @@ function SystemParamsPage({
   onDetailBreadcrumbChange,
   onUnitLayoutCommitted,
 }) {
+  const queryClient = useQueryClient()
   const [activeView, setActiveView] = useState('overview')
   const [mainboard, setMainboard] = useState('')
   const [mainboardDataLoading, setMainboardDataLoading] = useState(false)
@@ -187,6 +192,7 @@ function SystemParamsPage({
   const [savedSimpleForms, setSavedSimpleForms] = useState(() => deepClone(initialSimpleForms))
   const [couplingEnergyState, setCouplingEnergyState] = useState(() => deepClone(initialCouplingEnergyState))
   const [savedCouplingEnergyState, setSavedCouplingEnergyState] = useState(() => deepClone(initialCouplingEnergyState))
+  const [coupleEnergyIds, setCoupleEnergyIds] = useState({ id: '', projectId: '' })
   const [couplingEnergySaveLoading, setCouplingEnergySaveLoading] = useState(false)
   const [keypadState, setKeypadState] = useState({ open: false, field: null, moduleKey: null })
   const [datePickerField, setDatePickerField] = useState(null)
@@ -237,19 +243,96 @@ function SystemParamsPage({
     return parseMonthDay(projectForm[datePickerField])
   }, [datePickerField, projectForm])
 
-  const loadCouplingEnergy = useCallback(async () => {
-    const response = await queryRealvalByLongNames(COUPLING_ENERGY_REALVAL_LONG_NAMES)
-    const valueMap = extractRealvalMap(response)
-    const next = adaptCouplingEnergyFromRealvalMap(valueMap)
+  const adaptCouplingEnergyFromQueryResponse = (response) => {
+    const payload = response?.data
+    if (!payload || payload.success === false) {
+      return null
+    }
+    const data = payload.data ?? payload.result ?? payload
+    if (!data || typeof data !== 'object') {
+      return null
+    }
+
+    // 后端可能把耦合能源数据放在不同位置：data.coupleEnergy、data.projectData 或直接平铺
+    let source = data.coupleEnergy
+    if (!source || typeof source !== 'object') {
+      source = data.projectData
+    }
+    if (!source || typeof source !== 'object') {
+      source = data
+    }
+
+    const typeId = String(
+      source?.coupleEnergyTypeId ??
+        source?.couple_energy_type_uuid ??
+        source?.coupleEnergyTypeUuid ??
+        source?.couple_energy_type_id ??
+        '',
+    )
+    const count = String(
+      source?.coupleEnergyNumber ?? source?.couple_energy_number ?? source?.coupleEnergyCount ?? '0',
+    )
+    const rawId =
+      source?.id ??
+      source?.coupleEnergyId ??
+      source?.couple_energy_id ??
+      source?.coupleEnergyRelationId ??
+      source?.couple_energy_relation_id ??
+      ''
+    const rawProjectId =
+      source?.projectId ??
+      source?.project_id ??
+      source?.projectUuid ??
+      source?.project_uuid ??
+      source?.projectIdUuid ??
+      ''
+    // 后端可能把 null 当成有效值返回，统一过滤掉
+    const id = rawId == null || String(rawId).toLowerCase() === 'null' ? '' : String(rawId)
+    const projectId = rawProjectId == null || String(rawProjectId).toLowerCase() === 'null' ? '' : String(rawProjectId)
+
+    const typeLabel = COUPLING_ENERGY_ID_TO_LABEL[typeId] ?? COUPLING_ENERGY_ID_TO_LABEL[COUPLE_ENERGY_TYPE_NONE_ID]
+    return {
+      id,
+      projectId,
+      typeId,
+      type: typeLabel,
+      count: typeId === COUPLE_ENERGY_TYPE_NONE_ID ? '0' : count,
+    }
+  }
+
+  const loadCouplingEnergy = useCallback(async (expectedState = null) => {
+    const [plcResponse, dbResponse] = await Promise.all([
+      queryRealvalByLongNames(COUPLING_ENERGY_REALVAL_LONG_NAMES),
+      queryCoupleEnergy(),
+    ])
+
+    const dbNext = adaptCouplingEnergyFromQueryResponse(dbResponse)
+    if (dbNext) {
+      setCoupleEnergyIds({ id: dbNext.id, projectId: dbNext.projectId })
+    }
+
+    const valueMap = extractRealvalMap(plcResponse)
+    const plcNext = adaptCouplingEnergyFromRealvalMap(valueMap)
+    const next = plcNext ?? dbNext
     if (!next) {
       return null
     }
+
     const nextState = {
       type: next.type,
       count: next.count,
     }
+    if (
+      expectedState &&
+      (String(nextState.type) !== String(expectedState.type) ||
+        String(nextState.count) !== String(expectedState.count))
+    ) {
+      // PLC 点位生效有延迟，回读值与期望值不一致时不覆盖本地状态
+      return { ...nextState, stale: true }
+    }
     setCouplingEnergyState(nextState)
     setSavedCouplingEnergyState(deepClone(nextState))
+    setSystemConfigState({ coupleEnergyTypeUuid: next.typeId })
     return nextState
   }, [])
 
@@ -416,6 +499,7 @@ function SystemParamsPage({
         }
         setProjectForm(next)
         setSavedProjectForm(deepClone(next))
+        setSystemConfigState({ systemTypeUuid: next.systemType })
       } catch {
         // 保留当前表单，使用上次成功或默认
       } finally {
@@ -444,6 +528,7 @@ function SystemParamsPage({
         }
         setLoopPumpForm(next)
         setSavedLoopPumpForm(deepClone(next))
+        setSystemConfigState({ systemTypeUuid: next.systemTypeUuid })
       } catch {
         // 保留当前表单
       } finally {
@@ -653,6 +738,8 @@ function SystemParamsPage({
             } else {
               setSavedProjectForm(deepClone(projectForm))
             }
+            setSystemConfigState({ systemTypeUuid: next?.systemType ?? projectForm.systemType })
+            void queryClient.invalidateQueries({ queryKey: ['system-config'] })
             closeConfirmDialog()
             setConfirmDialog({
               open: true,
@@ -706,9 +793,12 @@ function SystemParamsPage({
             if (next) {
               setLoopPumpForm(next)
               setSavedLoopPumpForm(deepClone(next))
+              setSystemConfigState({ systemTypeUuid: next.systemTypeUuid })
             } else {
               setSavedLoopPumpForm(deepClone(loopPumpForm))
+              setSystemConfigState({ systemTypeUuid: loopPumpForm.systemTypeUuid })
             }
+            void queryClient.invalidateQueries({ queryKey: ['system-config'] })
             closeConfirmDialog()
             setConfirmDialog({
               open: true,
@@ -768,8 +858,37 @@ function SystemParamsPage({
               type: couplingEnergyState.type,
               count: selectedTypeId === COUPLE_ENERGY_TYPE_NONE_ID ? '0' : String(couplingEnergyState.count ?? '0'),
             }
-            const writePayload = toCouplingEnergyRealvalWriteData(selectedTypeId, normalizedState.count)
-            const saveRes = await writeRealvalByLongNames(writePayload)
+
+            let currentIds = coupleEnergyIds
+            if (!currentIds.id || !currentIds.projectId) {
+              const dbInfo = adaptCouplingEnergyFromQueryResponse(await queryCoupleEnergy())
+              if (dbInfo) {
+                currentIds = {
+                  id: dbInfo.id || currentIds.id,
+                  projectId: dbInfo.projectId || currentIds.projectId,
+                }
+                setCoupleEnergyIds(currentIds)
+              }
+            }
+
+            // 优先使用已获取到的 ID；如果后端查询未返回 ID，也允许直接调用 saveCoupleEnergy，
+            // 由后端根据项目上下文定位记录，避免前端因缺少 ID 完全无法保存。
+            const savePayload = {
+              coupleEnergyTypeId: selectedTypeId,
+              coupleEnergyNumber: normalizedState.count,
+            }
+            if (currentIds.id) {
+              savePayload.id = currentIds.id
+            }
+            if (currentIds.projectId) {
+              savePayload.projectId = currentIds.projectId
+            }
+
+            if (import.meta.env.DEV) {
+              console.log('[coupling-energy] save payload:', savePayload)
+            }
+
+            const saveRes = await saveCoupleEnergy(savePayload)
             if (!isWriteSuccess(saveRes)) {
               setConfirmDialog({
                 open: true,
@@ -782,8 +901,13 @@ function SystemParamsPage({
             }
             setCouplingEnergyState(normalizedState)
             setSavedCouplingEnergyState(deepClone(normalizedState))
+            setSystemConfigState({ coupleEnergyTypeUuid: selectedTypeId })
             try {
-              await loadCouplingEnergy()
+              const refreshed = await loadCouplingEnergy(normalizedState)
+              if (refreshed?.stale) {
+                // 回读尚未生效，store 仍应使用刚保存的值
+                setSystemConfigState({ coupleEnergyTypeUuid: selectedTypeId })
+              }
             } catch {
               // 回读失败时保留已下置的本地状态
             }

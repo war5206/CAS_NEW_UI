@@ -16,6 +16,7 @@ import { USE_FIXED_UNIT_LAYOUT } from '@/config/projectProfile'
 import { createUnitDeviceDetailsFromParam } from '@/config/unitDeviceParamPoints'
 import { isOnValue } from '@/utils/realvalMap'
 import { resolveHeatPumpStatusFromRuntime } from '@/utils/heatPumpRuntimeStatus'
+import { adaptCouplingEnergyFromRealvalMap } from '@/config/couplingEnergyTypes'
 
 const DEFAULT_TEMPERATURE_LABELS = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9']
 const DEFAULT_SUPPLY_DATA = [42, 43, 44, 38, 37, 42, 43, 40, 36, 35]
@@ -273,7 +274,13 @@ export function createDefaultSystemConfig() {
 export function adaptSystemConfig(rawData) {
   const responseData = rawData?.data ?? rawData
   const projectData = responseData?.data?.projectData ?? responseData?.projectData ?? {}
+
+  const couplingEnergyFromPlc = rawData?.couplingEnergyValueMap
+    ? adaptCouplingEnergyFromRealvalMap(rawData.couplingEnergyValueMap)
+    : null
+
   const coupleEnergyTypeUuid =
+    couplingEnergyFromPlc?.typeId ??
     projectData.couple_energy_type_uuid ??
     projectData.coupleEnergyTypeUuid ??
     responseData?.data?.couple_energy_type_uuid ??

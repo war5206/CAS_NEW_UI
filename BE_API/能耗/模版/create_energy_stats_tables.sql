@@ -30,6 +30,17 @@ CREATE TABLE IF NOT EXISTS sjmg_heat_daily_detail (
   KEY idx_stat_date (stat_date)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='日热量明细';
 
+-- 日用水明细
+CREATE TABLE IF NOT EXISTS sjmg_water_daily_detail (
+  id          VARCHAR(64)   NOT NULL COMMENT '主键',
+  stat_date   DATE          NOT NULL COMMENT '统计日',
+  water_value DECIMAL(12,2) NOT NULL COMMENT '日用水量(t)',
+  create_time DATETIME      DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (id),
+  UNIQUE KEY uk_stat_date (stat_date),
+  KEY idx_stat_date (stat_date)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='日用水明细';
+
 -- COP 明细
 CREATE TABLE IF NOT EXISTS sjmg_cop_detail (
   id           VARCHAR(64)   NOT NULL COMMENT '主键',

@@ -52,9 +52,9 @@ function LoginPage() {
           try {
             await setInitState()
           } catch {
-            // 跳过向导时仍进入首页；initState 写入失败由 InitEntry 兜底
+            // initState 写入失败由 InitEntry 兜底，仍尝试进入引导流程
           }
-          navigate('/home')
+          navigate('/guide/system-config')
         }
       } else {
         incrementLoginFailCount()
