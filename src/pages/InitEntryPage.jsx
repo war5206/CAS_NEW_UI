@@ -6,7 +6,20 @@ import { acquireSystemToken } from '@/api/modules/auth'
 import { getStoredToken, setStoredToken } from '@/api/client/auth'
 import { markAuthGuardLockCheckComplete } from '@/components/AuthGuard'
 import { useHomeRouteCacheControls } from '@/context/HomeRouteCacheContext'
+import welcomeImg from '@/assets/home/welcome.png'
 import './InitEntryPage.css'
+
+/** 首次请求 + 失败后重试 12 次 = 共 13 次 */
+const MAX_INIT_ATTEMPTS = 1 + 12
+const INIT_RETRY_INTERVAL_MS = 30 * 1000
+/** 欢迎图最短展示时长 */
+const MIN_WELCOME_DISPLAY_MS = 2500
+
+function sleep(ms) {
+  return new Promise((resolve) => {
+    setTimeout(resolve, ms)
+  })
+}
 
 function normalizePathname(pathname) {
   if (pathname === '/') {
@@ -63,8 +76,15 @@ function InitEntryLayout() {
   const [initBody, setInitBody] = useState(null)
   const [fetchVersion, setFetchVersion] = useState(0)
   const [aligned, setAligned] = useState(false)
+  const [welcomeMinPassed, setWelcomeMinPassed] = useState(false)
 
   const initFetchedRef = useRef(0)
+
+  // 欢迎图至少展示 2.5s 后才允许进入系统
+  useEffect(() => {
+    const timer = setTimeout(() => setWelcomeMinPassed(true), MIN_WELCOME_DISPLAY_MS)
+    return () => clearTimeout(timer)
+  }, [])
 
   useEffect(() => {
     if (!skipInitGate) {
@@ -92,29 +112,49 @@ function InitEntryLayout() {
     }
     initFetchedRef.current = fetchVersion + 1
 
+    let cancelled = false
+
     async function fetchInit() {
       setError(null)
       setInitBody(null)
       setAligned(false)
-      try {
-        if (!getStoredToken()) {
-          const tokenRes = await acquireSystemToken()
-          if (tokenRes.data?.code === '200' && tokenRes.data?.token) {
-            setStoredToken(tokenRes.data.token)
-          } else {
-            throw new Error('获取系统令牌失败')
+
+      for (let attempt = 1; attempt <= MAX_INIT_ATTEMPTS; attempt += 1) {
+        try {
+          if (!getStoredToken()) {
+            const tokenRes = await acquireSystemToken()
+            if (tokenRes.data?.code === '200' && tokenRes.data?.token) {
+              setStoredToken(tokenRes.data.token)
+            } else {
+              throw new Error('获取系统令牌失败')
+            }
+          }
+
+          const res = await queryInitState()
+          if (!cancelled) {
+            setInitBody(res.data)
+          }
+          return
+        } catch (e) {
+          console.error(`System initialization attempt ${attempt} failed:`, e)
+          if (attempt >= MAX_INIT_ATTEMPTS) {
+            if (!cancelled) {
+              setError(e)
+            }
+            return
+          }
+          await sleep(INIT_RETRY_INTERVAL_MS)
+          if (cancelled) {
+            return
           }
         }
-
-        const res = await queryInitState()
-        setInitBody(res.data)
-      } catch (e) {
-        console.error('System initialization failed:', e)
-        setError(e)
       }
     }
 
     fetchInit()
+    return () => {
+      cancelled = true
+    }
   }, [fetchVersion, skipInitGate])
 
   useEffect(() => {
@@ -143,7 +183,7 @@ function InitEntryLayout() {
     setFetchVersion((v) => v + 1)
   }, [])
 
-  const ready = skipInitGate ? aligned : error == null && initBody != null && aligned
+  const ready = welcomeMinPassed && (skipInitGate ? aligned : error == null && initBody != null && aligned)
 
   useEffect(() => {
     setHomeCacheAllowed(ready)
@@ -162,9 +202,9 @@ function InitEntryLayout() {
 
   if (!ready) {
     return (
-      <div className="init-entry-page" aria-busy="true">
+      <div className="init-entry-page init-entry-page--welcome" aria-busy="true">
+        <img className="init-entry-page__welcome" src={welcomeImg} alt="欢迎进入系统" />
         <div className="init-entry-page__spinner" aria-hidden />
-        <p className="init-entry-page__hint">正在进入系统…</p>
       </div>
     )
   }

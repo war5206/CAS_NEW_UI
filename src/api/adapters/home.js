@@ -3,7 +3,6 @@ import {
   HEAT_PUMP_GRID_COLS,
   HEAT_PUMP_GRID_ROWS,
   HEAT_PUMP_STATUS,
-  HEAT_PUMP_DETAIL_LABEL,
   getHeatPumpStatusSummary,
 } from '@/config/homeHeatPumps'
 import {
@@ -15,7 +14,10 @@ import {
 import { USE_FIXED_UNIT_LAYOUT } from '@/config/projectProfile'
 import { createUnitDeviceDetailsFromParam } from '@/config/unitDeviceParamPoints'
 import { isOnValue } from '@/utils/realvalMap'
-import { resolveHeatPumpStatusFromRuntime } from '@/utils/heatPumpRuntimeStatus'
+import {
+  buildRuntimeStateText,
+  resolveHeatPumpStatusFromRuntime,
+} from '@/utils/heatPumpRuntimeStatus'
 import { adaptCouplingEnergyFromRealvalMap } from '@/config/couplingEnergyTypes'
 
 const DEFAULT_TEMPERATURE_LABELS = ['0', '1', '2', '3', '4', '5', '6', '7', '8', '9']
@@ -166,31 +168,8 @@ function toHeatPumpLabelFromName(name, fallbackIndex) {
   return String(fallbackIndex).padStart(2, '0')
 }
 
-function createStandardHeatPumpDetailsFromParam(heatPumpData = {}, stateFallback = '') {
-  return [
-    { label: HEAT_PUMP_DETAIL_LABEL.INLET_TEMP, value: toText(heatPumpData['进水温度'], '--') },
-    { label: HEAT_PUMP_DETAIL_LABEL.OUTLET_TEMP, value: toText(heatPumpData['出水温度'], '--') },
-    { label: HEAT_PUMP_DETAIL_LABEL.AMBIENT_TEMP, value: toText(heatPumpData['环境温度'], '--') },
-    { label: HEAT_PUMP_DETAIL_LABEL.CUMULATIVE_RUNTIME, value: toText(heatPumpData['累积运行时长(H)'], '--') },
-    { label: HEAT_PUMP_DETAIL_LABEL.CONTINUOUS_RUNTIME, value: toText(heatPumpData['持续运行时长(H)'], '--') },
-    { label: HEAT_PUMP_DETAIL_LABEL.COMPRESSOR_1_CURRENT, value: toText(heatPumpData['压缩机1电流(A)'], '--') },
-    { label: HEAT_PUMP_DETAIL_LABEL.COMPRESSOR_2_CURRENT, value: toText(heatPumpData['压缩机2电流(A)'], '--') },
-    { label: HEAT_PUMP_DETAIL_LABEL.ANTI_FREEZE_STATUS, value: toText(heatPumpData['防冻状态'], '--') },
-    {
-      label: HEAT_PUMP_DETAIL_LABEL.MODE_STATUS,
-      value: toText(heatPumpData['模式状态'], toText(stateFallback, '--')),
-    },
-    { label: HEAT_PUMP_DETAIL_LABEL.DEFROST_STATUS, value: toText(heatPumpData['化霜状态'], '--') },
-    { label: HEAT_PUMP_DETAIL_LABEL.MAINBOARD_POWER_SIGNAL_STATUS, value: toText(heatPumpData['主板开机信号状态'], '--') },
-    { label: HEAT_PUMP_DETAIL_LABEL.FAULT_STATUS, value: toText(heatPumpData['故障状态'], '--') },
-  ]
-}
-
-function createHeatPumpDetailsFromParam(heatPumpData = {}, stateFallback = '') {
-  if (USE_FIXED_UNIT_LAYOUT) {
-    return createUnitDeviceDetailsFromParam(heatPumpData)
-  }
-  return createStandardHeatPumpDetailsFromParam(heatPumpData, stateFallback)
+function createHeatPumpDetailsFromParam(heatPumpData = {}) {
+  return createUnitDeviceDetailsFromParam(heatPumpData)
 }
 
 function buildFallbackLoopPumpItems() {
@@ -455,7 +434,8 @@ export function adaptHeatPumpParam(rawData, fallbackPump = {}) {
   const alarm = toBoolean(source?.alarm, fallbackPump?.alarm ?? false)
   const run = toBoolean(source?.run, fallbackPump?.run ?? false)
   const defrost = toBoolean(source?.defrost, fallbackPump?.defrost ?? false)
-  const state = toText(source?.state, fallbackPump?.state ?? '')
+  const rawState = toText(source?.state, fallbackPump?.state ?? '')
+  const state = buildRuntimeStateText({ run, defrost, fault: alarm })
 
   return {
     ...fallbackPump,
@@ -463,7 +443,7 @@ export function adaptHeatPumpParam(rawData, fallbackPump = {}) {
     run,
     defrost,
     state,
-    status: resolveHeatPumpStatusFromRuntime({ alarm, run, state, defrost }),
+    status: resolveHeatPumpStatusFromRuntime({ alarm, run, state: rawState, defrost }),
     details: createHeatPumpDetailsFromParam(heatPumpData, state),
   }
 }

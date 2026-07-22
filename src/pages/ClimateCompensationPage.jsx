@@ -1,4 +1,4 @@
-﻿import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import * as echarts from 'echarts'
 import AttentionModal from '../components/AttentionModal'
 import FeatureInfoCard from '../components/FeatureInfoCard'
@@ -179,6 +179,7 @@ function ClimateCompensationPage() {
   const [draftActiveAdvancedCurveId, setDraftActiveAdvancedCurveId] = useState(null)
   const [isSavingAdvancedCurve, setIsSavingAdvancedCurve] = useState(false)
   const [constantReturnTemp, setConstantReturnTemp] = useState('10')
+  const [isSavingGear, setIsSavingGear] = useState(false)
   const [pendingLevelSubmitMessage, setPendingLevelSubmitMessage] = useState('')
   const [weatherCurveId, setWeatherCurveId] = useState('')
   const [outdoorTemperature, setOutdoorTemperature] = useState('--')
@@ -200,7 +201,8 @@ function ClimateCompensationPage() {
   const chartRef = useRef(null)
   const shouldInitChart = useDeferredVisible(chartRef)
   const levelRatio = (levelValue - 1) / (levelLabels.length - 1)
-  const isLevelSliderDisabled = regulateType === 'smart' && smartAdjustType === 'auto-calibration'
+  const isLevelSliderDisabled =
+    isSavingGear || (regulateType === 'smart' && smartAdjustType === 'auto-calibration')
   const curveTotalPages = Math.ceil(curveXAxisList.length / CURVE_PAGE_SIZE)
   const safeCurvePageIndex = Math.min(curvePageIndex, Math.max(0, curveTotalPages - 1))
   const curveStartIndex = safeCurvePageIndex * CURVE_PAGE_SIZE
@@ -815,6 +817,7 @@ function ClimateCompensationPage() {
     requestConfirm(
       { message: `确认将温度档位设定为 ${nextValue} 档吗？` },
       async () => {
+        setIsSavingGear(true)
         setPendingLevelSubmitMessage('档位下置中...')
         try {
           const response = await saveWeatherCompensateGear(nextValue)
@@ -833,6 +836,7 @@ function ClimateCompensationPage() {
           setAttentionMessage('下置档位失败')
           setLevelValue(previousValue)
         } finally {
+          setIsSavingGear(false)
           setPendingLevelSubmitMessage('')
         }
       },
@@ -1328,7 +1332,7 @@ function ClimateCompensationPage() {
         >
           <header className="climate-page__advanced-modal-header">
             <h3 className="climate-page__advanced-modal-title">高级调节</h3>
-            <button type="button" className="climate-page__advanced-modal-close" aria-label="关闭" onClick={closeAdvancedModal}>
+            <button type="button" className="climate-page__advanced-modal-close" aria-label="关闭" onClick={closeAdvancedModal} disabled={isSavingAdvancedCurve}>
               <img src={closeIcon} alt="" aria-hidden="true" />
             </button>
           </header>
@@ -1341,10 +1345,11 @@ function ClimateCompensationPage() {
                 onToggle={() => setDraftAdvancedEnabled((previous) => !previous)}
                 className="climate-page__advanced-switch"
                 ariaLabel={`高级调节${draftAdvancedEnabled ? '关闭' : '开启'}`}
+                disabled={isSavingAdvancedCurve}
               />
             </div>
 
-            <div className={`climate-page__advanced-editor${!draftAdvancedEnabled ? ' is-disabled' : ''}`}>
+            <div className={`climate-page__advanced-editor${!draftAdvancedEnabled || isSavingAdvancedCurve ? ' is-disabled' : ''}`}>
               <div className="climate-page__advanced-tabs-row">
                 <div className="climate-page__advanced-tabs">
                   {draftAdvancedCurves.length > 0 ? (
@@ -1354,7 +1359,7 @@ function ClimateCompensationPage() {
                         type="button"
                         className={`climate-page__advanced-tab${curve.id === draftActiveAdvancedCurveId ? ' is-active' : ''}`}
                         onClick={() => setDraftActiveAdvancedCurveId(curve.id)}
-                        disabled={!draftAdvancedEnabled}
+                        disabled={!draftAdvancedEnabled || isSavingAdvancedCurve}
                       >
                         {ADVANCED_CURVE_LABELS[index] ?? `曲线${index + 1}`}
                       </button>
@@ -1369,7 +1374,7 @@ function ClimateCompensationPage() {
                   type="button"
                   className="climate-page__advanced-add-btn"
                   onClick={handleAddAdvancedCurve}
-                  disabled={!draftAdvancedEnabled || draftAdvancedCurves.length >= ADVANCED_CURVE_MAX_COUNT}
+                  disabled={!draftAdvancedEnabled || isSavingAdvancedCurve || draftAdvancedCurves.length >= ADVANCED_CURVE_MAX_COUNT}
                 >
                   <span className="climate-page__advanced-add-icon" aria-hidden="true">+</span>
                   新增
@@ -1400,14 +1405,14 @@ function ClimateCompensationPage() {
                     {visibleDraftCurveItems.map((item) => (
                       <div key={`advanced-${item.outdoorTemp}`} className="climate-page__curve-column">
                         <div
-                          className={`climate-page__curve-bar-area${!draftAdvancedEnabled || !hasDraftAdvancedCurve ? ' is-disabled' : ''}`}
+                          className={`climate-page__curve-bar-area${!draftAdvancedEnabled || isSavingAdvancedCurve || !hasDraftAdvancedCurve ? ' is-disabled' : ''}`}
                           onPointerDown={handleAdvancedCurveBarPointerDown(item.index)}
                           role="slider"
                           aria-label={`${item.outdoorTemp}℃室外温度对应目标温度`}
                           aria-valuemin={curveTempMin}
                           aria-valuemax={curveTempMax}
                           aria-valuenow={item.value ?? curveTempMin}
-                          aria-disabled={!draftAdvancedEnabled || !hasDraftAdvancedCurve}
+                          aria-disabled={!draftAdvancedEnabled || isSavingAdvancedCurve || !hasDraftAdvancedCurve}
                         >
                           {item.value != null ? (
                             <div
@@ -1464,6 +1469,7 @@ function ClimateCompensationPage() {
                   type="button"
                   className="climate-page__advanced-action-btn is-cancel"
                   onClick={closeAdvancedModal}
+                  disabled={isSavingAdvancedCurve}
                 >
                   取消
                 </button>

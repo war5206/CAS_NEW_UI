@@ -93,14 +93,13 @@ export function formatUnitDeviceParamValue(valueType, rawValue) {
 }
 
 export function buildCombinedUnitDeviceStateText({ run = false, defrost = false, fault = false } = {}) {
-  const parts = [run ? '运行' : '待机']
-  if (defrost) {
-    parts.push('化霜')
-  }
   if (fault) {
-    parts.push('故障')
+    return '故障'
   }
-  return parts.join('/')
+  if (defrost) {
+    return '化霜'
+  }
+  return run ? '运行' : '待机'
 }
 
 export function createUnitDeviceDetailsFromParam(heatPumpData = {}) {

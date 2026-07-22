@@ -2,14 +2,13 @@ import { HEAT_PUMP_STATUS } from '@/config/homeHeatPumps'
 import { isOnValue } from '@/utils/realvalMap'
 
 export function buildRuntimeStateText({ run = false, defrost = false, fault = false } = {}) {
-  const parts = [run ? '运行' : '待机']
-  if (defrost) {
-    parts.push('化霜')
-  }
   if (fault) {
-    parts.push('故障')
+    return '故障'
   }
-  return parts.join('/')
+  if (defrost) {
+    return '化霜'
+  }
+  return run ? '运行' : '待机'
 }
 
 /** Comm_Status 为 1 / "1" 表示通讯正常 */

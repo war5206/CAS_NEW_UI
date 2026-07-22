@@ -23,6 +23,7 @@ import heatPumpShutdownIcon from '../assets/heat-pump/hp-shutdown.svg'
 import waterPumpIcon from '../assets/water-pump.svg'
 import { useActionConfirm } from '../hooks/useActionConfirm'
 import { SHOW_MANUAL_AIR_COOLED_CONTROL } from '@/config/projectProfile'
+import { useSystemConfigStore } from '@/features/system/store/systemConfigStore'
 import { useWriteWithDelayedVerify } from '../hooks/useWriteWithDelayedVerify'
 import { getStoredClimateMode, setStoredClimateMode } from '../utils/climateModeState'
 import { getStoredTemperatureMode, setStoredTemperatureMode } from '../utils/temperatureModeState'
@@ -123,20 +124,17 @@ const INITIAL_CARD_SWITCH_STATE = {
 const STANDARD_MANUAL_TYPE_OPTIONS = [
   { value: 'heat-pump', label: '热泵' },
   { value: 'heat-pump-loop-pump', label: '热泵循环泵' },
+  { value: 'terminal-loop-pump', label: '末端循环泵' },
   { value: 'heating-tape', label: '伴热带' },
   { value: 'drain-valve', label: '排污阀' },
   { value: 'relief-valve', label: '泄压阀' },
   { value: 'constant-pressure-water-pump', label: '定压补水泵' },
 ]
 
-const DAJUYUAN_MANUAL_TYPE_OPTIONS = [
+const DAJUYUAN_manualTypeOptions = [
   { value: 'heat-pump', label: '热泵' },
   { value: 'air-cooled-module', label: '风冷模块' },
 ]
-
-const MANUAL_TYPE_OPTIONS = SHOW_MANUAL_AIR_COOLED_CONTROL
-  ? DAJUYUAN_MANUAL_TYPE_OPTIONS
-  : STANDARD_MANUAL_TYPE_OPTIONS
 
 const STANDARD_MANUAL_DEVICE_TYPE_PARAM_MAP = {
   'heat-pump': '热泵',
@@ -145,6 +143,7 @@ const STANDARD_MANUAL_DEVICE_TYPE_PARAM_MAP = {
   'drain-valve': '排污阀',
   'relief-valve': '蓄热阀门',
   'constant-pressure-water-pump': '定压泵',
+  'terminal-loop-pump': '末端循环泵',
 }
 
 const MANUAL_DEVICE_ICON_MAP = {
@@ -154,6 +153,7 @@ const MANUAL_DEVICE_ICON_MAP = {
   'drain-valve': heatPumpShutdownIcon,
   'relief-valve': heatPumpShutdownIcon,
   'constant-pressure-water-pump': waterPumpIcon,
+  'terminal-loop-pump': waterPumpIcon,
   'air-cooled-module': heatPumpShutdownIcon,
 }
 
@@ -358,6 +358,19 @@ function ModeSelectPage() {
   const { requestConfirm, confirmModal } = useActionConfirm()
   const queryClient = useQueryClient()
   const navigate = useNavigate()
+  const { systemTypeUuid } = useSystemConfigStore()
+  const isSecondarySystem = String(systemTypeUuid) === '2'
+
+  const manualTypeOptions = useMemo(() => {
+    if (SHOW_MANUAL_AIR_COOLED_CONTROL) {
+      return DAJUYUAN_manualTypeOptions
+    }
+    if (!isSecondarySystem) {
+      return STANDARD_MANUAL_TYPE_OPTIONS.filter((item) => item.value !== 'terminal-loop-pump')
+    }
+    return STANDARD_MANUAL_TYPE_OPTIONS
+  }, [isSecondarySystem])
+
   const [isInitialSyncing, setIsInitialSyncing] = useState(true)
   const [featureMode, setFeatureMode] = useState('smart')
   const [temperatureMode, setTemperatureMode] = useState(() => getStoredTemperatureMode())
@@ -365,12 +378,24 @@ function ModeSelectPage() {
     ...INITIAL_CARD_SWITCH_STATE,
     climate: getStoredClimateMode() === 'climate',
   }))
-  const [manualDeviceType, setManualDeviceType] = useState(MANUAL_TYPE_OPTIONS[0].value)
+  const [manualDeviceType, setManualDeviceType] = useState(() => manualTypeOptions[0].value)
   const [manualDeviceList, setManualDeviceList] = useState([])
   const [attentionMessage, setAttentionMessage] = useState('')
   const [isRunModeSwitching, setIsRunModeSwitching] = useState(false)
   /** 下置进行中：轮询回读时跳过这些点位，避免用旧实值冲掉刚点的蓝/灰 */
   const manualTogglePendingRef = useRef(new Set())
+
+  // 系统类型变化导致当前手动设备类型不在选项中时，回退到第一项
+  useEffect(() => {
+    if (manualTypeOptions.some((item) => item.value === manualDeviceType)) {
+      return
+    }
+    const fallbackType = manualTypeOptions[0]?.value
+    if (fallbackType) {
+      setManualDeviceType(fallbackType)
+      setManualDeviceList([])
+    }
+  }, [manualTypeOptions, manualDeviceType])
 
   const onWriteNotify = useCallback((message) => {
     setAttentionMessage(message)
@@ -592,7 +617,7 @@ function ModeSelectPage() {
             setFeatureMode(nextFeatureId)
             invalidateHomeOverview()
             if (nextFeatureId === 'manual') {
-              const initialManualType = MANUAL_TYPE_OPTIONS[0].value
+              const initialManualType = manualTypeOptions[0].value
               setManualDeviceType(initialManualType)
               if (SHOW_MANUAL_AIR_COOLED_CONTROL) {
                 setManualDeviceList(createDefaultManualDeviceList(initialManualType))
@@ -608,7 +633,7 @@ function ModeSelectPage() {
             if (nextFeatureId === 'smart') {
               await fetchRealvals(SETTING_SWITCH_LONG_NAMES)
             } else {
-              const initialManualType = MANUAL_TYPE_OPTIONS[0].value
+              const initialManualType = manualTypeOptions[0].value
               if (usesManualSwitchApi(initialManualType)) {
                 await fetchManualSwitch(initialManualType)
               } else {
@@ -619,7 +644,15 @@ function ModeSelectPage() {
         },
       )
     },
-    [featureMode, fetchManualSwitch, fetchRealvals, invalidateHomeOverview, performWrite, refreshManualPoweronStates],
+    [
+      featureMode,
+      fetchManualSwitch,
+      fetchRealvals,
+      invalidateHomeOverview,
+      manualTypeOptions,
+      performWrite,
+      refreshManualPoweronStates,
+    ],
   )
 
   // 点击制热/制冷
@@ -815,13 +848,13 @@ function ModeSelectPage() {
             triggerClassName="mode-select-page__manual-type-trigger"
             dropdownClassName="mode-select-page__manual-type-dropdown"
             optionClassName="mode-select-page__manual-type-option"
-            options={MANUAL_TYPE_OPTIONS}
+            options={manualTypeOptions}
             value={manualDeviceType}
             onChange={handleManualDeviceTypeChange}
             triggerAriaLabel="选择设备类型"
             listAriaLabel="设备类型列表"
             confirmConfig={({ nextValue }) => {
-              const nextOption = MANUAL_TYPE_OPTIONS.find((item) => item.value === nextValue)
+              const nextOption = manualTypeOptions.find((item) => item.value === nextValue)
               return nextOption ? { message: `确认切换控制设备为${nextOption.label}吗？` } : null
             }}
           />

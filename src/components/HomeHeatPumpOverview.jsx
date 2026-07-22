@@ -18,7 +18,6 @@ import {
   HEAT_PUMP_GRID_ROWS,
   HEAT_PUMP_STATUS,
   HEAT_PUMP_STATUS_LABEL,
-  HEAT_PUMP_DETAIL_LABEL,
 } from '../config/homeHeatPumps'
 import { USE_FIXED_UNIT_LAYOUT } from '@/config/projectProfile'
 import { createUnitGridItem, resolveUnitDisplayLabelFromCode, toUnitDeviceCode } from '../config/projectUnitDevices'
@@ -48,10 +47,7 @@ const stopPointerEvent = (event) => {
 }
 
 const HEAT_PUMP_OVERVIEW_PAGE_SIZE = 10
-const STANDARD_OVERVIEW_TABLE_METRIC_LABELS = Object.values(HEAT_PUMP_DETAIL_LABEL)
-const OVERVIEW_TABLE_METRIC_LABELS = USE_FIXED_UNIT_LAYOUT
-  ? UNIT_DEVICE_OVERVIEW_METRIC_KEYS
-  : STANDARD_OVERVIEW_TABLE_METRIC_LABELS
+const OVERVIEW_TABLE_METRIC_LABELS = UNIT_DEVICE_OVERVIEW_METRIC_KEYS
 const EMPTY_GRID_ITEMS = Array.from({ length: HEAT_PUMP_GRID_ROWS * HEAT_PUMP_GRID_COLS }, (_, index) => {
   const row = Math.floor(index / HEAT_PUMP_GRID_COLS) + 1
   const col = (index % HEAT_PUMP_GRID_COLS) + 1
@@ -76,6 +72,8 @@ const HEAT_PUMP_OVERVIEW_TEXT = {
   NEXT_PAGE: '下一页',
   PAGE_PREFIX: '第',
   PAGE_SUFFIX: '页',
+  TOTAL_PAGE_PREFIX: '共',
+  TOTAL_PAGE_SUFFIX: '页',
   CLOSE: '关闭',
   BACK_HOME: '返回主页',
   EMPTY_PUMP: '无热泵',
@@ -113,7 +111,7 @@ function HomeHeatPumpOverview({ onBack, committedUnitLayoutSlots, heatPumpItems:
   const [isOverviewModalOpen, setIsOverviewModalOpen] = useState(false)
   const [overviewPage, setOverviewPage] = useState(1)
   const { data: arrangedHeatPumpItems } = useHeatPumpArrangeQuery()
-  const liveStatusByCode = useHeatPumpBoardStatusPoll({ enabled: USE_FIXED_UNIT_LAYOUT })
+  const liveStatusByCode = useHeatPumpBoardStatusPoll({ enabled: true })
   const { data: pendingPumpWithParam, isError: isPumpParamError } = useHeatPumpParamQuery({
     pump: pendingPump,
     enabled: Boolean(pendingPump),
@@ -180,9 +178,7 @@ function HomeHeatPumpOverview({ onBack, committedUnitLayoutSlots, heatPumpItems:
 
   const boardHeatPumpItems = useMemo(() => {
     if (Array.isArray(arrangedHeatPumpItems) && arrangedHeatPumpItems.length > 0) {
-      return USE_FIXED_UNIT_LAYOUT
-        ? arrangedHeatPumpItems.map((item) => applyLiveStatusToBoardItem(item, liveStatusByCode))
-        : arrangedHeatPumpItems
+      return arrangedHeatPumpItems.map((item) => applyLiveStatusToBoardItem(item, liveStatusByCode))
     }
 
     if (!Array.isArray(committedUnitLayoutSlots) || committedUnitLayoutSlots.length === 0) {
@@ -249,7 +245,7 @@ function HomeHeatPumpOverview({ onBack, committedUnitLayoutSlots, heatPumpItems:
         name: null,
         details: [],
       }
-    })
+    }).map((item) => applyLiveStatusToBoardItem(item, liveStatusByCode))
   }, [arrangedHeatPumpItems, committedUnitLayoutSlots, liveStatusByCode])
 
   const totalOverviewPages = Math.max(1, overviewPageData.totalPages || 1)
@@ -383,7 +379,13 @@ function HomeHeatPumpOverview({ onBack, committedUnitLayoutSlots, heatPumpItems:
                     aria-hidden="true"
                     className="home-hp-modal-status-icon"
                   />
-                  <span>{activePump.state || HEAT_PUMP_STATUS_LABEL[activePump.status]}</span>
+                  <span>
+                    {activePump.status === HEAT_PUMP_STATUS.MALFUNCTION
+                      ? HEAT_PUMP_STATUS_LABEL[HEAT_PUMP_STATUS.MALFUNCTION]
+                      : activePump.status === HEAT_PUMP_STATUS.DEFROSTING
+                        ? '化霜'
+                        : activePump.state || HEAT_PUMP_STATUS_LABEL[activePump.status]}
+                  </span>
                 </div>
 
                 <div className="home-hp-modal-metrics-scroll">
@@ -487,7 +489,7 @@ function HomeHeatPumpOverview({ onBack, committedUnitLayoutSlots, heatPumpItems:
                     {HEAT_PUMP_OVERVIEW_TEXT.PREV_PAGE}
                   </button>
                   <span className="home-hp-summary-page-indicator">
-                    {`${HEAT_PUMP_OVERVIEW_TEXT.PAGE_PREFIX}${overviewPage}${HEAT_PUMP_OVERVIEW_TEXT.PAGE_SUFFIX}`}
+                    {`${HEAT_PUMP_OVERVIEW_TEXT.PAGE_PREFIX}${overviewPage}${HEAT_PUMP_OVERVIEW_TEXT.PAGE_SUFFIX} / ${HEAT_PUMP_OVERVIEW_TEXT.TOTAL_PAGE_PREFIX}${totalOverviewPages}${HEAT_PUMP_OVERVIEW_TEXT.TOTAL_PAGE_SUFFIX}`}
                   </span>
                   <button
                     type="button"
