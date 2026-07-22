@@ -871,7 +871,9 @@ function SmartTimerPage() {
           const currentPeriod = nextPeriods[periodIndex]
           const minBoundary = parseTimeToMinutes(currentPeriod.start) + 1
           const maxBoundary = TOTAL_DAY_MINUTES - (lastIndex - periodIndex)
-          const safeBoundary = clampMinutesValue(inputMinutes, minBoundary, maxBoundary)
+          // 结束时间的 00:00 表示“到一天结束”，按 24:00（1440 分钟）处理
+          const effectiveInputMinutes = inputMinutes === 0 ? TOTAL_DAY_MINUTES : inputMinutes
+          const safeBoundary = clampMinutesValue(effectiveInputMinutes, minBoundary, maxBoundary)
           const boundaryText = formatMinutesToTimeValue(safeBoundary)
 
           nextPeriods[periodIndex].end = boundaryText
