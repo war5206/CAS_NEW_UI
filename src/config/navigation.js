@@ -3,7 +3,7 @@ import iconSetting from '../assets/navigation/setting.svg'
 import iconAlert from '../assets/navigation/alert.svg'
 import iconAnalysis from '../assets/navigation/analysis.svg'
 import iconOps from '../assets/navigation/ops.svg'
-import iconMonitor from '../assets/navigation/cctv.svg'
+// import iconMonitor from '../assets/navigation/cctv.svg'
 import iconModeSelect from '../assets/navigation/modeSelect.svg'
 import iconModeSetting from '../assets/navigation/modeSetting.svg'
 import iconDeviceParam from '../assets/navigation/deviceParam.svg'
@@ -195,13 +195,13 @@ const BASE_MODULES = [
       { id: 'manual', label: '系统说明书', path: 'system-manual', tabs: [] },
     ],
   },
-  {
-    id: 'monitor',
-    label: '监控',
-    path: 'monitor',
-    icon: iconMonitor,
-    sections: [],
-  },
+  // {
+  //   id: 'monitor',
+  //   label: '监控',
+  //   path: 'monitor',
+  //   icon: iconMonitor,
+  //   sections: [],
+  // },
 ]
 
 export const modules = applyProjectProfileToModules(BASE_MODULES)
