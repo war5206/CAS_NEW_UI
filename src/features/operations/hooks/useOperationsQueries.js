@@ -4,14 +4,12 @@ import {
   adaptOpsCurveData,
   adaptOpsDeviceRows,
   adaptOpsHeatPumpOptions,
-  adaptOpsHeatPumpSingleMetrics,
   adaptOpsSystemConfigMetrics,
   adaptOpsSystemStateMetrics,
   adaptOpsSystemType,
   adaptOpsUnitDeviceMetrics,
   createDefaultOpsDeviceRows,
   createDefaultOpsHeatPumpOptions,
-  createDefaultOpsHeatPumpSingleMetrics,
   createDefaultOpsUnitDeviceMetrics,
   createDefaultOpsSystemConfigMetrics,
   createDefaultOpsSystemStateMetrics,
@@ -22,7 +20,6 @@ import {
   heatPumpOperatingTime,
   queryCurveByLongName,
   queryHeatPumpList,
-  queryHeatPumpSingle,
   querySystemConfigSingle,
   querySystemStateData,
   querySystemType,
@@ -52,10 +49,10 @@ export function useOpsHeatPumpListQuery({ enabled = true } = {}) {
 export function useOpsHeatPumpSingleQuery(code, { enabled = true } = {}) {
   return usePollingQuery({
     queryKey: ['ops', 'heat-pump-single', code],
-    queryFn: () => queryHeatPumpSingle(code),
+    queryFn: () => queryHeatPumpParam({ code }),
     enabled: enabled && Boolean(code),
-    select: (response) => adaptOpsHeatPumpSingleMetrics(response?.data ?? response),
-    placeholderData: createDefaultOpsHeatPumpSingleMetrics(),
+    select: (response) => adaptOpsUnitDeviceMetrics(response?.data ?? response, code),
+    placeholderData: createDefaultOpsUnitDeviceMetrics(),
   })
 }
 

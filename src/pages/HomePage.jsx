@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { useLocation } from 'react-router-dom'
+import { useLocation, useNavigate } from 'react-router-dom'
 import standardSystemMap from '../assets/home/system.png'
 import dajuyuanSystemMap from '../assets/home/dajuyuan-system.png'
 import systemMap2 from '../assets/home/system2.png'
@@ -90,6 +90,12 @@ const HOME_TEXT = {
   HEAT_PUMP_PAGE_TIP: '点击查看详情',
   ENTER_HEAT_PUMP_PAGE: '进入热泵总览页面',
   ENTER_TERMINAL_PAGE: '进入末端建筑页面',
+  ENTER_HEAT_TRACE_PAGE: '进入伴热带设置页面',
+  ENTER_LOOP_PUMP_PAGE: '进入热泵循环泵设置页面',
+  ENTER_TERMINAL_LOOP_PUMP_PAGE: '进入末端循环泵设置页面',
+  ENTER_DRAIN_VALVE_PAGE: '进入排污阀设置页面',
+  ENTER_RELIEF_VALVE_PAGE: '进入泄压阀设置页面',
+  ENTER_CONSTANT_PRESSURE_PAGE: '进入定压补水泵设置页面',
   MODE_STATUS: '模式状态',
   SMART_MODE_RUNNING: '智能模式运行中',
   COST_NOTE: '注：费用结算自2026年3月15日至今日',
@@ -142,6 +148,7 @@ const SYSTEM_IMAGE_BY_PROFILE = SYSTEM_DIAGRAM_KEY === 'dajuyuan' ? SYSTEM_IMAGE
 
 function HomePage({ onActivePageChange, committedUnitLayoutSlots }) {
   const location = useLocation()
+  const navigate = useNavigate()
   const [activePage, setActivePage] = useState(HOME_PAGE_VIEW.DASHBOARD)
   const [isSystemImageLoaded, setIsSystemImageLoaded] = useState(false)
   const isHomeRoute = location.pathname === '/home' || location.pathname === '/home/'
@@ -216,7 +223,8 @@ function HomePage({ onActivePageChange, committedUnitLayoutSlots }) {
 
   const goBackHome = () => setActivePage(HOME_PAGE_VIEW.DASHBOARD)
   const goToHeatPumpOverview = () => setActivePage(HOME_PAGE_VIEW.HEAT_PUMP_OVERVIEW)
-  const goToTerminalBuilding = () => setActivePage(HOME_PAGE_VIEW.TERMINAL_BUILDING)
+  // 末端建筑入口暂时隐藏，恢复遮罩层时一并恢复
+  // const goToTerminalBuilding = () => setActivePage(HOME_PAGE_VIEW.TERMINAL_BUILDING)
   const heatPumpOverlaySummary = homeUnitStatusPoll.heatPump.summary
   const airCooledModuleStatus = homeUnitStatusPoll.airCooledModule.summary
   const deviceStatusHeatPumpData = homeUnitStatusPoll.heatPump.chartData
@@ -459,7 +467,9 @@ function HomePage({ onActivePageChange, committedUnitLayoutSlots }) {
                   </>
                 ) : null}
                 <div className="home-system-node home-system-node--terminal-building">{HOME_TEXT.TERMINAL_BUILDING}</div>
+                {/* 末端建筑查看详情暂时不用，隐藏提示与遮罩层（保留代码便于恢复）
                 <div className="home-system-node home-system-node--terminal-building-tip">{HOME_TEXT.TERMINAL_BUILDING_TIP}</div>
+                */}
                 <div className="home-system-node home-system-node--heat-pump-click-tip">{HOME_TEXT.HEAT_PUMP_PAGE_TIP}</div>
                 <button
                   type="button"
@@ -467,12 +477,57 @@ function HomePage({ onActivePageChange, committedUnitLayoutSlots }) {
                   onClick={goToHeatPumpOverview}
                   aria-label={HOME_TEXT.ENTER_HEAT_PUMP_PAGE}
                 />
+                {/* 末端建筑遮罩层暂时不用
                 <button
                   type="button"
                   className="home-system-hitbox home-system-hitbox--terminal-building-icon"
                   onClick={goToTerminalBuilding}
                   aria-label={HOME_TEXT.ENTER_TERMINAL_PAGE}
                 />
+                */}
+                {/* 设备参数跳转遮罩：left/top/width/height 在 App.css 中按原理图实际位置调整 */}
+                {!isDajuyuanProfile ? (
+                  <>
+                    <button
+                      type="button"
+                      className="home-system-hitbox home-system-hitbox--heat-trace"
+                      onClick={() => navigate('/settings/device-params/heat-trace')}
+                      aria-label={HOME_TEXT.ENTER_HEAT_TRACE_PAGE}
+                    />
+                    <button
+                      type="button"
+                      className="home-system-hitbox home-system-hitbox--heat-pump-loop-pump"
+                      onClick={() => navigate('/settings/device-params/heat-pump-loop-pump')}
+                      aria-label={HOME_TEXT.ENTER_LOOP_PUMP_PAGE}
+                    />
+                    {isSystemType2 ? (
+                      <button
+                        type="button"
+                        className="home-system-hitbox home-system-hitbox--terminal-loop-pump"
+                        onClick={() => navigate('/settings/device-params/terminal-loop-pump')}
+                        aria-label={HOME_TEXT.ENTER_TERMINAL_LOOP_PUMP_PAGE}
+                      />
+                    ) : null}
+                    <button
+                      type="button"
+                      className="home-system-hitbox home-system-hitbox--drain-valve"
+                      onClick={() => navigate('/settings/device-params/drain-valve')}
+                      aria-label={HOME_TEXT.ENTER_DRAIN_VALVE_PAGE}
+                    />
+                    <button
+                      type="button"
+                      className="home-system-hitbox home-system-hitbox--relief-valve"
+                      onClick={() => navigate('/settings/device-params/relief-valve')}
+                      aria-label={HOME_TEXT.ENTER_RELIEF_VALVE_PAGE}
+                    />
+                    <button
+                      type="button"
+                      className="home-system-hitbox home-system-hitbox--constant-pressure-pump"
+                      onClick={() => navigate('/settings/device-params/constant-pressure-pump')}
+                      aria-label={HOME_TEXT.ENTER_CONSTANT_PRESSURE_PAGE}
+                    />
+                  </>
+                ) : null}
               </div>
               <div className="home-canvas-mask" />
             </div>

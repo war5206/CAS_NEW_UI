@@ -54,6 +54,18 @@
   }
 }
 
+.init-entry-page__first-start-tip {
+  position: absolute;
+  left: 50%;
+  top: 72%;
+  transform: translateX(-50%);
+  margin: 0;
+  font-size: 16px;
+  color: rgba(233, 241, 255, 0.85);
+  text-align: center;
+  white-space: nowrap;
+}
+
 .init-entry-page__retry {
   padding: 12px 32px;
   font-size: 16px;

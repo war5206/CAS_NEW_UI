@@ -32,6 +32,8 @@ const DATETIME_HOURS = Array.from({ length: 24 }, (_, index) => index)
 const DATETIME_MINUTES = Array.from({ length: 60 }, (_, index) => index)
 const HOUR_IN_MS = 60 * 60 * 1000
 const DAY_IN_MS = 24 * HOUR_IN_MS
+/** 运维历史曲线查询范围上限：最长 3 天（含） */
+const MAX_TREND_RANGE_MS = 3 * DAY_IN_MS
 
 const SETTING_OPTIONS = [
   { value: 'mode-select', label: '模式选择' },
@@ -197,6 +199,15 @@ function formatDateTimeParts(value) {
 function normalizeDateTime(value) {
   const [year, month, day, hour, minute] = parseDateTime(value)
   return `${year}-${padNumber(month)}-${padNumber(day)} ${padNumber(hour)}:${padNumber(minute)}:00`
+}
+
+/** 将 yyyy-MM-dd HH:mm(:ss) 时间串平移指定毫秒后重新规范化 */
+function shiftDateTime(value, offsetMs) {
+  const [year, month, day, hour, minute] = parseDateTime(value)
+  const shifted = new Date(new Date(year, month - 1, day, hour, minute).getTime() + offsetMs)
+  return normalizeDateTime(
+    `${shifted.getFullYear()}-${padNumber(shifted.getMonth() + 1)}-${padNumber(shifted.getDate())} ${padNumber(shifted.getHours())}:${padNumber(shifted.getMinutes())}`,
+  )
 }
 
 function formatSeriesLabel(timestamp, span) {
@@ -1415,6 +1426,8 @@ function OperationsSystemManagementPage({ tabId }) {
   const defaultTrendTimeRange = useMemo(() => getDefaultTrendTimeRange(), [])
   const [startTime, setStartTime] = useState(defaultTrendTimeRange.startTime)
   const [endTime, setEndTime] = useState(defaultTrendTimeRange.endTime)
+  // 已生效的查询范围：只有点击「查询」时才从草稿时间同步，驱动曲线请求
+  const [appliedRange, setAppliedRange] = useState(defaultTrendTimeRange)
   const isAirCooledUnitTab = USE_SPLIT_OPS_UNIT_DATA_TABS && tabId === 'unit-data-air-cooled'
   const isUnitDataTab = tabId === 'unit-data' || tabId === 'unit-data-heat-pump' || isAirCooledUnitTab
   const heatPumpUnitOptions = useMemo(() => createDefaultOpsHeatPumpUnitOptions(), [])
@@ -1451,8 +1464,8 @@ function OperationsSystemManagementPage({ tabId }) {
     isError: isCurveError,
   } = useOpsCurveQuery({
     longName: activeMetric?.longName,
-    startTime,
-    endTime,
+    startTime: appliedRange.startTime,
+    endTime: appliedRange.endTime,
     enabled: Boolean(activeMetric?.longName),
   })
   const isCurveLoading = Boolean(activeMetric?.longName) && (isCurveFetching || isCurvePending)
@@ -1537,6 +1550,7 @@ function OperationsSystemManagementPage({ tabId }) {
     const nextRange = getDefaultTrendTimeRange()
     setStartTime(nextRange.startTime)
     setEndTime(nextRange.endTime)
+    setAppliedRange(nextRange)
     setActiveMetric(item)
   }
 
@@ -1544,6 +1558,11 @@ function OperationsSystemManagementPage({ tabId }) {
     setStartTime(nextValue)
     if (nextValue > endTime) {
       setEndTime(nextValue)
+      return
+    }
+    const maxEndTime = shiftDateTime(nextValue, MAX_TREND_RANGE_MS)
+    if (endTime > maxEndTime) {
+      setEndTime(maxEndTime)
     }
   }
 
@@ -1551,6 +1570,11 @@ function OperationsSystemManagementPage({ tabId }) {
     setEndTime(nextValue)
     if (nextValue < startTime) {
       setStartTime(nextValue)
+      return
+    }
+    const minStartTime = shiftDateTime(nextValue, -MAX_TREND_RANGE_MS)
+    if (startTime < minStartTime) {
+      setStartTime(minStartTime)
     }
   }
 
@@ -1558,7 +1582,11 @@ function OperationsSystemManagementPage({ tabId }) {
     if (!activeMetric?.longName) {
       return
     }
-    refetchCurve()
+    if (appliedRange.startTime === startTime && appliedRange.endTime === endTime) {
+      refetchCurve()
+      return
+    }
+    setAppliedRange({ startTime, endTime })
   }
 
   return (

@@ -8,7 +8,7 @@ export const UNIT_DEVICE_STATUS_SUFFIX = {
   OPERATION: 'Machine_Operation',
   DEFROSTING: 'Systematic_Defrosting',
   FAULT: 'Fault_Alarm',
-  COMM_STATUS: 'Comm_Status',
+  COMM_STATUS: 'DeviceStatus',
 }
 
 /** 热泵 / 风冷模块共用 16 项详情（dataKey 与后端 heatPumpData 键一致） */

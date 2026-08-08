@@ -11,12 +11,12 @@ export function buildRuntimeStateText({ run = false, defrost = false, fault = fa
   return run ? '运行' : '待机'
 }
 
-/** Comm_Status 为 1 / "1" 表示通讯正常 */
+/** DeviceStatus 为 1 / "1" 表示通讯正常 */
 export function isCommStatusNormal(value) {
   return isOnValue(value)
 }
 
-/** Fault_Alarm=1，或 Comm_Status 非 1，均视为故障 */
+/** Fault_Alarm=1，或 DeviceStatus 非 1，均视为故障 */
 export function hasRuntimeFault({ faultAlarm, commStatus, includeCommStatus = false } = {}) {
   if (isOnValue(faultAlarm)) {
     return true

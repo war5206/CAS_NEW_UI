@@ -136,7 +136,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  margin-top: 16px;
+  margin-top: auto;
   margin-bottom: 40px;
   cursor: pointer;
 }
@@ -897,6 +897,56 @@
   border-radius: 5%;
 }
 
+/* 设备参数跳转遮罩：位置尺寸按 standard 原理图设备位置初始标定，可按项目实际微调 */
+.home-system-overlay--standard .home-system-hitbox--heat-trace {
+  left: 17.5%;
+  top: 28.5%;
+  width: 7.8%;
+  height: 3.5%;
+  border-radius: 5%;
+}
+
+.home-system-overlay--standard .home-system-hitbox--heat-pump-loop-pump {
+  left: 6.5%;
+  top: 58%;
+  width: 7.5%;
+  height: 14.5%;
+  border-radius: 5%;
+}
+
+/* 二次系统（system2.png）供水干管上的二次侧末端循环泵；一次系统无此设备，不渲染 */
+.home-system-overlay--standard .home-system-hitbox--terminal-loop-pump {
+  left: 45.5%;
+  top: 42.5%;
+  width: 6.5%;
+  height: 12.5%;
+  border-radius: 5%;
+}
+
+.home-system-overlay--standard .home-system-hitbox--drain-valve {
+  left: 64%;
+  top: 63%;
+  width: 6%;
+  height: 8%;
+  border-radius: 5%;
+}
+
+.home-system-overlay--standard .home-system-hitbox--relief-valve {
+  left: 29.5%;
+  top: 81%;
+  width: 5%;
+  height: 7.8%;
+  border-radius: 5%;
+}
+
+.home-system-overlay--standard .home-system-hitbox--constant-pressure-pump {
+  left: 50.5%;
+  top: 78.5%;
+  width: 7.5%;
+  height: 13.5%;
+  border-radius: 5%;
+}
+
 .home-system-overlay--dajuyuan .home-system-hitbox--heat-pump-icon {
   left: -0.1%;
   top: 20%;
@@ -1074,7 +1124,7 @@
 }
 
 .home-system-overlay--standard .home-system-node--terminal-loop-pump {
-  left: 40%;
+  left: 39.5%;
   top: 38%;
 }
 
@@ -1753,6 +1803,26 @@
 .home-hp-summary-table td:first-child {
   text-align: center;
   padding-left: 22px;
+  position: sticky;
+  left: 0;
+  z-index: 2;
+}
+
+.home-hp-summary-table th:first-child {
+  z-index: 3;
+  background: #22262D;
+}
+
+.home-hp-summary-table tbody tr:nth-child(odd) td:first-child {
+  background: #0E0E14;
+}
+
+.home-hp-summary-table tbody tr:nth-child(even) td:first-child {
+  background: #22262D;
+}
+
+.home-hp-summary-table tbody tr:hover td:first-child {
+  background: rgba(60, 75, 98, 0.92);
 }
 
 .home-hp-summary-table tbody tr {

@@ -16,6 +16,7 @@ import com.sunwayland.common.core.pojo.PtUser;
 import com.sunwayland.common.core.utils.ThreadLocalUtil;
 
 def dataService = ApplicationContextProvider.getBean(DataService.class);
+def dynamicDataSource = ApplicationContextProvider.getBean(DynamicDataSource.class);
 
 PtUser ptUser = ThreadLocalUtil.getCurrentUser();
 String dbCode = ptUser.dbCode;
@@ -26,7 +27,21 @@ if (dbCode.equals("base")) {
 String structure = "HeatPump\\";
 String brand = "SJMG\\";
 
-int[] fixedDeviceNos = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42];
+// 热泵总台数从数据库获取
+int heatPumpCount = 0;
+try {
+    List<Map<String, Object>> heatPumpList = dynamicDataSource.excuteTenantSqlQuery("SELECT heat_pump FROM sjmg_project_data", dbCode);
+    if (heatPumpList.size() >= 1 && heatPumpList.get(0).get("heat_pump") != null) {
+        heatPumpCount = Integer.parseInt(heatPumpList.get(0).get("heat_pump").toString());
+    }
+} catch (Exception e) {
+    heatPumpCount = 0;
+}
+
+List<Integer> deviceNos = new ArrayList<>();
+for (int i = 1; i <= heatPumpCount; i++) {
+    deviceNos.add(i);
+}
 
 Map<String, String> dataMap = new LinkedHashMap<>();
 dataMap.put("回水温度", "\\TT_ReturnWater");
@@ -46,22 +61,46 @@ dataMap.put("外环境温度", "\\TT_Outdoor");
 dataMap.put("累积运行时长", "\\RunTimeHour1");
 dataMap.put("持续运行时长", "\\RunTimeHour2");
 
-def getPointRealVal = { String taglongname ->
-    String realVal = "";
-    String querySql = "SELECT a.taglongname,a.times,a.realval,a.quality FROM psrealdata AS a WHERE a.taglongname IN ('" + taglongname + "')";
+/* 批量查询：一次 IN 查询取回本页全部点位，避免逐点 SELECT（10 台 × 16 项 = 160 条 SQL） */
+def getPointsRealValMap = { List<String> taglongnames ->
+    Map<String, String> valMap = new HashMap<>();
+    if (taglongnames == null || taglongnames.isEmpty()) {
+        return valMap;
+    }
+    StringBuilder inClause = new StringBuilder();
+    for (String name : taglongnames) {
+        if (inClause.length() > 0) {
+            inClause.append(",");
+        }
+        inClause.append("'").append(name).append("'");
+    }
+    String querySql = "SELECT a.taglongname,a.times,a.realval,a.quality FROM psrealdata AS a WHERE a.taglongname IN (" + inClause.toString() + ")";
     DataTable pointDt = dataService.queryListDataBySql(querySql);
-    if (pointDt.getRows().size() == 1) {
-        for (int c = 0; c < pointDt.getColumns().size(); c++) {
-            if (pointDt.getColumns().get(c).getColumnName() == "realval") {
-                try {
-                    realVal = pointDt.getValue(0, c).toString().trim();
-                } catch (Exception e) {
-                    realVal = "";
+    int tagCol = -1;
+    int valCol = -1;
+    for (int c = 0; c < pointDt.getColumns().size(); c++) {
+        String colName = pointDt.getColumns().get(c).getColumnName();
+        if (colName == "taglongname") {
+            tagCol = c;
+        } else if (colName == "realval") {
+            valCol = c;
+        }
+    }
+    if (tagCol >= 0 && valCol >= 0) {
+        for (int r = 0; r < pointDt.getRows().size(); r++) {
+            try {
+                Object tagObj = pointDt.getValue(r, tagCol);
+                if (tagObj == null) {
+                    continue;
                 }
+                Object valObj = pointDt.getValue(r, valCol);
+                valMap.put(tagObj.toString().trim(), valObj == null ? "" : valObj.toString().trim());
+            } catch (Exception e) {
+                // 单行解析失败跳过，不影响其他点位
             }
         }
     }
-    return realVal;
+    return valMap;
 };
 
 def isPointValueOne = { String pointValue ->
@@ -111,9 +150,6 @@ def formatParamValue = { String key, String rawVal ->
 };
 
 def buildDisplayName = { int deviceNo ->
-    if (deviceNo >= 31) {
-        return "风冷模块" + (deviceNo - 30);
-    }
     return "热泵" + deviceNo;
 };
 
@@ -125,7 +161,7 @@ try {
     pageNum = 1;
 }
 
-int total = fixedDeviceNos.length;
+int total = deviceNos.size();
 int totalPages = (int) Math.ceil(total / (double) pageSize);
 if (totalPages == 0) {
     totalPages = 1;
@@ -137,9 +173,19 @@ if (pageNum > totalPages) {
 int startIndex = (pageNum - 1) * pageSize;
 int endIndex = Math.min(startIndex + pageSize, total);
 
+// 本页全部点位一次性批量查询（原实现为逐点查询，每页 160 条 SELECT）
+List<String> pageLongNames = new ArrayList<>();
+for (int i = startIndex; i < endIndex; i++) {
+    String deviceCode = "No" + deviceNos.get(i);
+    for (String key : dataMap.keySet()) {
+        pageLongNames.add(structure + brand + deviceCode + dataMap.get(key));
+    }
+}
+Map<String, String> realValMap = getPointsRealValMap(pageLongNames);
+
 List<Map<String, String>> heatPumpDataList = new ArrayList<>();
 for (int i = startIndex; i < endIndex; i++) {
-    int deviceNo = fixedDeviceNos[i];
+    int deviceNo = deviceNos.get(i);
     String deviceCode = "No" + deviceNo;
     String displayName = buildDisplayName(deviceNo);
 
@@ -151,7 +197,7 @@ for (int i = startIndex; i < endIndex; i++) {
 
     for (String key : dataMap.keySet()) {
         String longName = structure + brand + deviceCode + dataMap.get(key);
-        String rawVal = getPointRealVal(longName);
+        String rawVal = realValMap.getOrDefault(longName, "");
         heatPumpDataMap.put(key, formatParamValue(key, rawVal));
     }
 

@@ -109,7 +109,7 @@ String structure = "HeatPump\\";
 // 品牌
 String brand = "SJMG";
 // 设备在线状态点
-String onlineStatus = "\\Comm_Status";
+String onlineStatus = "\\DeviceStatus";
 // 风机开关状态点 StartStopControl
 String switchStatus = "\\FanControl";
 // 查询实时数据

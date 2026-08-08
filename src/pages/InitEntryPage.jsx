@@ -9,9 +9,9 @@ import { useHomeRouteCacheControls } from '@/context/HomeRouteCacheContext'
 import welcomeImg from '@/assets/home/welcome.png'
 import './InitEntryPage.css'
 
-/** 首次请求 + 失败后重试 12 次 = 共 13 次 */
-const MAX_INIT_ATTEMPTS = 1 + 12
-const INIT_RETRY_INTERVAL_MS = 30 * 1000
+/** 首次请求 + 失败后重试 19 次 = 共 20 次 */
+const MAX_INIT_ATTEMPTS = 1 + 19
+const INIT_RETRY_INTERVAL_MS = 20 * 1000
 /** 欢迎图最短展示时长 */
 const MIN_WELCOME_DISPLAY_MS = 2500
 
@@ -77,6 +77,7 @@ function InitEntryLayout() {
   const [fetchVersion, setFetchVersion] = useState(0)
   const [aligned, setAligned] = useState(false)
   const [welcomeMinPassed, setWelcomeMinPassed] = useState(false)
+  const [failedAttempts, setFailedAttempts] = useState(0)
 
   const initFetchedRef = useRef(0)
 
@@ -118,6 +119,7 @@ function InitEntryLayout() {
       setError(null)
       setInitBody(null)
       setAligned(false)
+      setFailedAttempts(0)
 
       for (let attempt = 1; attempt <= MAX_INIT_ATTEMPTS; attempt += 1) {
         try {
@@ -137,6 +139,9 @@ function InitEntryLayout() {
           return
         } catch (e) {
           console.error(`System initialization attempt ${attempt} failed:`, e)
+          if (!cancelled) {
+            setFailedAttempts(attempt)
+          }
           if (attempt >= MAX_INIT_ATTEMPTS) {
             if (!cancelled) {
               setError(e)
@@ -205,6 +210,9 @@ function InitEntryLayout() {
       <div className="init-entry-page init-entry-page--welcome" aria-busy="true">
         <img className="init-entry-page__welcome" src={welcomeImg} alt="欢迎进入系统" />
         <div className="init-entry-page__spinner" aria-hidden />
+        {failedAttempts >= 3 ? (
+          <p className="init-entry-page__first-start-tip">首次启动系统，大约需要5分钟，请耐心等待...</p>
+        ) : null}
       </div>
     )
   }

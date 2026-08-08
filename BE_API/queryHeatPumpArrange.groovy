@@ -104,8 +104,8 @@ for (Map<String,Object> arrangeMap : arrangeList) {
     boolean run = isPointValueOne(getPointRealVal(structure + brand + deviceCode + "\\Machine_Operation"));
     boolean defrost = isPointValueOne(getPointRealVal(structure + brand + deviceCode + "\\Systematic_Defrosting"));
     boolean faultAlarm = isPointValueOne(getPointRealVal(structure + brand + deviceCode + "\\Fault_Alarm"));
-    // Comm_Status 不为 1 视为通讯故障
-    boolean commNormal = isPointValueOne(getPointRealVal(structure + brand + deviceCode + "\\Comm_Status"));
+    // DeviceStatus 不为 1 视为通讯故障
+    boolean commNormal = isPointValueOne(getPointRealVal(structure + brand + deviceCode + "\\DeviceStatus"));
     boolean fault = faultAlarm || !commNormal;
 
     Map<String, Object> heatPumpMap = new HashMap<>();

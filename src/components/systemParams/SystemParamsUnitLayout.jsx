@@ -11,12 +11,11 @@ import longArrowDownBlueIcon from '../../assets/long-arrow-down-blue.svg'
 import longArrowDownGrayIcon from '../../assets/long-arrow-down-gray.svg'
 import {
   buildUnitDeviceIds,
-  buildUnitDeviceIdSet,
   COUPLE_ENERGY_TYPE_NONE_ID,
   createFixedUnitLayoutState,
   getFixedUnitLayoutLabel,
   getTotalUnitCount,
-  parseUnitDeviceCode,
+  parseUnitDeviceCodeLoose,
   toUnitDeviceCode,
   toUnitNoLabel,
   USE_FIXED_UNIT_LAYOUT,
@@ -58,10 +57,6 @@ function createAppliedFixedUnitLayoutState() {
     numberingMap: {},
     showOriginalNo: false,
   }
-}
-
-function createParsePumpId(allowedIdSet) {
-  return (value) => parseUnitDeviceCode(value, allowedIdSet)
 }
 
 function cloneUnitLayoutState(state) {
@@ -132,7 +127,7 @@ const SystemParamsUnitLayout = forwardRef(function SystemParamsUnitLayout(
   const manualDraggingPumpIdRef = useRef(null)
   const pendingListRef = useRef(null)
   const unitLayoutLockedRef = useRef(unitLayoutLocked)
-  const allowedUnitIdSetRef = useRef(new Set())
+  const draggableUnitIdSetRef = useRef(new Set())
   const movePumpToSlotRef = useRef(null)
   const dragStartPointRef = useRef({ x: 0, y: 0 })
   const dragPreviewOffsetRef = useRef({ x: 52, y: 50 })
@@ -151,15 +146,13 @@ const SystemParamsUnitLayout = forwardRef(function SystemParamsUnitLayout(
     () => buildUnitDeviceIds(heatPumpCount, coupleEnergyTypeId, coupleEnergyNumber),
     [heatPumpCount, coupleEnergyTypeId, coupleEnergyNumber],
   )
-  const allowedUnitIdSet = useMemo(
-    () => buildUnitDeviceIdSet(heatPumpCount, coupleEnergyTypeId, coupleEnergyNumber),
-    [heatPumpCount, coupleEnergyTypeId, coupleEnergyNumber],
-  )
-  const parsePumpId = useMemo(() => createParsePumpId(allowedUnitIdSet), [allowedUnitIdSet])
-  const totalUnitCount = useMemo(
+  // 扫描/回显确定出的机组总台数；为 null 时回退到「热泵台数」配置
+  const [unitCountOverride, setUnitCountOverride] = useState(null)
+  const configuredUnitCount = useMemo(
     () => getTotalUnitCount(heatPumpCount, coupleEnergyTypeId, coupleEnergyNumber),
     [heatPumpCount, coupleEnergyTypeId, coupleEnergyNumber],
   )
+  const totalUnitCount = unitCountOverride ?? configuredUnitCount
 
   const addedUnitIds = useMemo(() => unitSlots.filter((id) => id != null), [unitSlots])
   const nextUnitNumber = useMemo(() => Object.keys(unitNumberingMap).length + 1, [unitNumberingMap])
@@ -241,7 +234,7 @@ const SystemParamsUnitLayout = forwardRef(function SystemParamsUnitLayout(
         return
       }
 
-      if (allowedUnitIdSetRef.current.has(dragId)) {
+      if (draggableUnitIdSetRef.current.has(dragId)) {
         movePumpToSlotRef.current?.(dragId, slotIndex)
       }
     }
@@ -337,9 +330,10 @@ const SystemParamsUnitLayout = forwardRef(function SystemParamsUnitLayout(
     unitLayoutLockedRef.current = unitLayoutLocked
   }, [unitLayoutLocked])
 
+  // 可拖拽机组 = 当前待添加列表 + 已排布到网格里的机组，与「热泵台数」配置无关
   useEffect(() => {
-    allowedUnitIdSetRef.current = allowedUnitIdSet
-  }, [allowedUnitIdSet])
+    draggableUnitIdSetRef.current = new Set([...pendingUnitIds, ...unitSlots.filter((id) => id != null)])
+  }, [pendingUnitIds, unitSlots])
 
   useEffect(() => {
     manualDraggingPumpIdRef.current = manualDraggingPumpId
@@ -359,6 +353,7 @@ const SystemParamsUnitLayout = forwardRef(function SystemParamsUnitLayout(
     setManualDraggingPumpId(null)
     setManualDraggingSource(null)
     draggingPumpIdRef.current = null
+    setUnitCountOverride(null)
     setSavedUnitLayoutState(cloneUnitLayoutState(nextState))
   }, [])
 
@@ -379,7 +374,9 @@ const SystemParamsUnitLayout = forwardRef(function SystemParamsUnitLayout(
     let maxArrangeCode = 0
 
     arrangeList.forEach((item) => {
-      const pumpId = parsePumpId(item?.device_uuid)
+      // 回显已保存排布时不按「热泵台数」配置过滤：接口返回的机组全部展示，
+      // 避免台数配置与已保存排布不一致时页面显示为空
+      const pumpId = parseUnitDeviceCodeLoose(item?.device_uuid)
       const rowNumber = Number(item?.row_number)
       const columnNumber = Number(item?.column_number)
       if (!pumpId) {
@@ -423,6 +420,7 @@ const SystemParamsUnitLayout = forwardRef(function SystemParamsUnitLayout(
         setManualDraggingPumpId(null)
         setManualDraggingSource(null)
         draggingPumpIdRef.current = null
+        setUnitCountOverride(null)
         setSavedUnitLayoutState(cloneUnitLayoutState(fixedState))
         return
       }
@@ -441,6 +439,7 @@ const SystemParamsUnitLayout = forwardRef(function SystemParamsUnitLayout(
       setManualDraggingPumpId(null)
       setManualDraggingSource(null)
       draggingPumpIdRef.current = null
+      setUnitCountOverride(null)
       setSavedUnitLayoutState(cloneUnitLayoutState(freshState))
       return
     }
@@ -472,14 +471,16 @@ const SystemParamsUnitLayout = forwardRef(function SystemParamsUnitLayout(
     setManualDraggingPumpId(null)
     setManualDraggingSource(null)
     draggingPumpIdRef.current = null
+    setUnitCountOverride(placedCount + pendingIds.length)
     setSavedUnitLayoutState(cloneUnitLayoutState(nextState))
-  }, [coupleEnergyNumber, coupleEnergyTypeId, heatPumpCount, parsePumpId])
+  }, [coupleEnergyNumber, coupleEnergyTypeId, heatPumpCount])
 
   const queryArrangeFetchedRef = useRef(false)
   const unitConfigKey = `${heatPumpCount}-${coupleEnergyTypeId}-${coupleEnergyNumber}`
 
   useEffect(() => {
     queryArrangeFetchedRef.current = false
+    setUnitCountOverride(null)
   }, [unitConfigKey])
 
   useEffect(() => {
@@ -531,11 +532,14 @@ const SystemParamsUnitLayout = forwardRef(function SystemParamsUnitLayout(
         return
       }
       const scannedDeviceList = Array.isArray(data?.device) ? data.device : []
+      // 扫描结果不按「热泵台数」配置过滤：后端扫描到的设备全部进入待添加列表
       const scannedIds = scannedDeviceList
-        .map((item) => parsePumpId(item?.code))
+        .map((item) => parseUnitDeviceCodeLoose(item?.code))
         .filter((id) => id != null)
         .sort((a, b) => a - b)
       const allCurrentIds = [...new Set(scannedIds)].sort((a, b) => a - b)
+      // 扫到的机组总数即机组总台数
+      setUnitCountOverride(allCurrentIds.length)
       setPendingUnitIds(allCurrentIds)
       setUnitSlots(Array.from({ length: UNIT_LAYOUT_COLS * UNIT_LAYOUT_ROWS }, () => null))
       setUnitLayoutLocked(false)
@@ -579,8 +583,9 @@ const SystemParamsUnitLayout = forwardRef(function SystemParamsUnitLayout(
         return
       }
       const scannedDeviceList = Array.isArray(data?.device) ? data.device : []
+      // 扫描结果不按「热泵台数」配置过滤：后端扫描到的设备全部生效
       scannedIds = scannedDeviceList
-        .map((item) => parsePumpId(item?.code))
+        .map((item) => parseUnitDeviceCodeLoose(item?.code))
         .filter((id) => id != null)
     } catch (error) {
       openAlertDialog('提示', error?.message || '智能扫描失败，请稍后重试。')
@@ -589,51 +594,21 @@ const SystemParamsUnitLayout = forwardRef(function SystemParamsUnitLayout(
       setIsOperating(false)
     }
 
-    const targetCount = totalUnitCount
+    // 智能扫描接口只返回「尚未排布过的新设备」，这里将新设备合并进待添加列表，
+    // 已排布和已待添加的机组保持不动
     const availableIds = Array.from(new Set(scannedIds))
-      .filter((id) => allowedUnitIdSet.has(id))
-      .slice(0, targetCount)
-
-    const currentAddedIds = unitSlots.filter((id) => id != null && allowedUnitIdSet.has(id))
-    const currentPendingIds = pendingUnitIds.filter((id) => allowedUnitIdSet.has(id))
-    const currentAllIds = [...new Set([...currentAddedIds, ...currentPendingIds])]
-
-    let nextPendingIds = [...currentPendingIds]
-    let nextSlots = [...unitSlots]
-
-    if (currentAllIds.length < targetCount) {
-      const missingCount = targetCount - currentAllIds.length
-      const idsToAdd = availableIds.filter((id) => !currentAllIds.includes(id)).slice(0, missingCount)
-      nextPendingIds = [...nextPendingIds, ...idsToAdd]
-    } else if (currentAllIds.length > targetCount) {
-      let removeCount = currentAllIds.length - targetCount
-
-      const removablePending = [...nextPendingIds].sort((a, b) => b - a)
-      while (removeCount > 0 && removablePending.length > 0) {
-        const removingId = removablePending.shift()
-        nextPendingIds = nextPendingIds.filter((id) => id !== removingId)
-        removeCount -= 1
-      }
-
-      if (removeCount > 0) {
-        const removableAdded = [...new Set(currentAddedIds)].sort((a, b) => b - a)
-        for (let index = 0; index < removableAdded.length && removeCount > 0; index += 1) {
-          const removingId = removableAdded[index]
-          nextSlots = nextSlots.map((id) => (id === removingId ? null : id))
-          removeCount -= 1
-        }
-      }
+    if (availableIds.length === 0) {
+      openAlertDialog('提示', '未扫描到新设备。')
+      return
     }
 
-    // 智能扫描仅采用后端返回设备，移除任何不在扫描列表中的本地占位数据。
-    const scannedSet = new Set(availableIds)
-    nextPendingIds = nextPendingIds.filter((id) => scannedSet.has(id))
-    nextSlots = nextSlots.map((id) => (id != null && scannedSet.has(id) ? id : null))
+    const currentAllIds = new Set([...unitSlots.filter((id) => id != null), ...pendingUnitIds])
+    const idsToAdd = availableIds.filter((id) => !currentAllIds.has(id))
+    const finalPendingIds = Array.from(new Set([...pendingUnitIds, ...idsToAdd])).sort((a, b) => a - b)
 
-    const finalPendingIds = Array.from(new Set(nextPendingIds)).sort((a, b) => a - b)
-
+    // 总台数 = 网格中已排布 + 合并后的待添加
+    setUnitCountOverride(unitSlots.filter((id) => id != null).length + finalPendingIds.length)
     setPendingUnitIds(finalPendingIds)
-    setUnitSlots(nextSlots)
     setUnitLayoutLocked(false)
     setUnitNumberingDone(false)
     setUnitNumberingMap({})
