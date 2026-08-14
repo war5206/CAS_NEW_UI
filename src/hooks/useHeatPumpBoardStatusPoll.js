@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { queryRealvalByLongNames } from '@/api/modules/settings'
 import { buildHomeUnitStatusPollLongNames } from '@/config/heatPumpUnitStatusPoints'
 import { resolveBoardStatusDeviceIds, resolveHeatPumpCountFromValueMap, toUnitDeviceCode } from '@/config/projectUnitDevices'
-import { STANDARD_DEFAULT_HEAT_PUMP_COUNT, USE_FIXED_UNIT_LAYOUT } from '@/config/projectProfile'
+import { STANDARD_DEFAULT_HEAT_PUMP_COUNT } from '@/config/projectProfile'
 import { getUnitDeviceStatusLongNames } from '@/config/unitDeviceParamPoints'
 import { extractRealvalMap } from '@/utils/realvalMap'
 import { resolveRuntimeStatusFromPoints } from '@/utils/heatPumpRuntimeStatus'
@@ -58,9 +58,9 @@ async function queryBoardStatusMap(heatPumpCount) {
 
 /**
  * 热泵总览网格：轮询 Machine_Operation / Systematic_Defrosting / Fault_Alarm 实时状态。
- * 标准款轮询范围由 Sys\FinforWorx\HPTotalNumber 决定。
+ * 轮询范围由 Sys\FinforWorx\HPTotalNumber 决定。
  */
-export function useHeatPumpBoardStatusPoll({ enabled = USE_FIXED_UNIT_LAYOUT } = {}) {
+export function useHeatPumpBoardStatusPoll({ enabled = true } = {}) {
   const heatPumpCountRef = useRef(STANDARD_DEFAULT_HEAT_PUMP_COUNT)
   const [liveStatusByCode, setLiveStatusByCode] = useState(() => new Map())
 

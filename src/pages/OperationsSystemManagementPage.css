@@ -15,6 +15,28 @@
   margin-bottom: 26px;
 }
 
+.ops-system-page__back {
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 14px;
+  background: #22262d;
+  color: rgba(255, 255, 255, 0.85);
+  font-size: 18px;
+  padding: 10px 26px;
+  cursor: pointer;
+  transition: border-color 0.2s ease, background 0.2s ease;
+}
+
+.ops-system-page__back:hover {
+  border-color: rgba(67, 112, 184, 0.4);
+}
+
+.ops-system-page__meter-title {
+  margin-left: 18px;
+  color: #ffffff;
+  font-size: 22px;
+  font-weight: 500;
+}
+
 .ops-system-page__select {
   width: 328px;
   max-width: 100%;

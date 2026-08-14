@@ -23,7 +23,6 @@ const DEFAULT_PRESENTATION = {
 function createDefaultHomeUnitStatusState() {
   return {
     heatPump: { ...DEFAULT_PRESENTATION },
-    airCooledModule: { ...DEFAULT_PRESENTATION },
   }
 }
 
@@ -51,16 +50,13 @@ async function queryHomeUnitStatusState(heatPumpCount) {
   const nextState = {
     heatPump: buildHomeUnitStatusPresentation(valueMap, statusGroups.heatPump),
   }
-  if (statusGroups.airCooledModule) {
-    nextState.airCooledModule = buildHomeUnitStatusPresentation(valueMap, statusGroups.airCooledModule)
-  }
 
   return { nextState, resolvedCount }
 }
 
 /**
- * 首页轮询热泵/风冷模块运行状态。
- * 标准款热泵台数来自 Sys\FinforWorx\HPTotalNumber；大剧院固定 No1-13、No31-42。
+ * 首页轮询热泵运行状态。
+ * 热泵台数来自 Sys\FinforWorx\HPTotalNumber。
  */
 export function useHomeUnitStatusPoll({ enabled = true } = {}) {
   const heatPumpCountRef = useRef(STANDARD_DEFAULT_HEAT_PUMP_COUNT)
@@ -84,12 +80,8 @@ export function useHomeUnitStatusPoll({ enabled = true } = {}) {
         }
 
         heatPumpCountRef.current = result.resolvedCount
-        const nextState = {
-          ...result.nextState,
-          airCooledModule: result.nextState.airCooledModule ?? lastSuccessRef.current.airCooledModule,
-        }
-        lastSuccessRef.current = nextState
-        setUnitStatus(nextState)
+        lastSuccessRef.current = result.nextState
+        setUnitStatus(result.nextState)
       } catch {
         // 保留上次成功值
       } finally {
@@ -111,7 +103,6 @@ export function useHomeUnitStatusPoll({ enabled = true } = {}) {
 
   return {
     heatPump: unitStatus.heatPump,
-    airCooledModule: unitStatus.airCooledModule,
     isInitialAttemptDone,
   }
 }

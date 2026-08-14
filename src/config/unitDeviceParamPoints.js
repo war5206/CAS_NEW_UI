@@ -1,5 +1,4 @@
 import { isOnValue } from '@/utils/realvalMap'
-import { FIXED_UNIT_DEVICE_IDS } from './projectUnitDevices'
 
 /** PLC 长名前缀：HeatPump\SJMG\No{编号}\ */
 export const UNIT_DEVICE_POINT_PREFIX = 'HeatPump\\SJMG\\'
@@ -11,7 +10,7 @@ export const UNIT_DEVICE_STATUS_SUFFIX = {
   COMM_STATUS: 'DeviceStatus',
 }
 
-/** 热泵 / 风冷模块共用 16 项详情（dataKey 与后端 heatPumpData 键一致） */
+/** 热泵共用 16 项详情（dataKey 与后端 heatPumpData 键一致） */
 export const UNIT_DEVICE_PARAM_FIELD_DEFS = [
   { dataKey: '回水温度', suffix: 'TT_ReturnWater', label: '回水温度（℃）', valueType: 'raw' },
   { dataKey: '供水温度', suffix: 'TT_OutletWater', label: '供水温度（℃）', valueType: 'raw' },
@@ -32,10 +31,6 @@ export const UNIT_DEVICE_PARAM_FIELD_DEFS = [
 ]
 
 export const UNIT_DEVICE_OVERVIEW_METRIC_KEYS = UNIT_DEVICE_PARAM_FIELD_DEFS.map((item) => item.dataKey)
-
-export function getFixedUnitDevicePointNos() {
-  return [...FIXED_UNIT_DEVICE_IDS]
-}
 
 export function buildUnitDeviceLongName(pointNo, suffix) {
   return `${UNIT_DEVICE_POINT_PREFIX}No${pointNo}\\${suffix}`

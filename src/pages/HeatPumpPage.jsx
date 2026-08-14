@@ -12,19 +12,12 @@ import {
 } from '../api/modules/settings'
 import { HEAT_PUMP_STATUS, HEAT_PUMP_STATUS_LABEL } from '../config/homeHeatPumps'
 import {
-  getFixedAirCooledModuleDeviceCodes,
-  getFixedAirCooledModuleDeviceIds,
-  getFixedHeatPumpDeviceCodes,
-  getFixedHeatPumpDeviceIds,
   getUnitCompactDisplayName,
   getUnitDisplayName,
-  isAirCooledModuleDeviceCode,
   isHeatPumpModuleDeviceCode,
   parseUnitDeviceCodeLoose,
-  remapAirCooledModuleDeviceCode,
   toUnitDeviceCode,
 } from '../config/projectUnitDevices'
-import { USE_FIXED_UNIT_LAYOUT } from '@/config/projectProfile'
 import { extractRealvalMap } from '../utils/realvalMap'
 import { isWriteSuccess, useWriteWithDelayedVerify } from '../hooks/useWriteWithDelayedVerify'
 import { useUnitDeviceStatusPoll } from '../hooks/useUnitDeviceStatusPoll'
@@ -37,45 +30,19 @@ import checkMarkIcon from '../assets/icons/check-mark.svg'
 import './HeatPumpPage.css'
 
 const FALLBACK_HEAT_PUMP_DEVICE_CODES = ['No1']
+const DEVICE_LABEL = '热泵'
+const DEFAULT_SELECTED_CODE = 'No1'
 
 function getDefaultHeatPumpDeviceIds() {
-  return USE_FIXED_UNIT_LAYOUT ? getFixedHeatPumpDeviceIds() : []
+  return []
 }
 
 function getDefaultHeatPumpDeviceCodes() {
-  return USE_FIXED_UNIT_LAYOUT ? getFixedHeatPumpDeviceCodes() : [...FALLBACK_HEAT_PUMP_DEVICE_CODES]
+  return [...FALLBACK_HEAT_PUMP_DEVICE_CODES]
 }
 
-const DEVICE_MODULE_CONFIGS = {
-  'heat-pump': {
-    deviceLabel: '热泵',
-    getDefaultDeviceIds: getDefaultHeatPumpDeviceIds,
-    getDefaultDeviceCodes: getDefaultHeatPumpDeviceCodes,
-    isDeviceCode: isHeatPumpModuleDeviceCode,
-    defaultSelectedCode: 'No1',
-    groupControlIconAlt: '热泵群控',
-    groupControlTitle: '热泵批量控制',
-    groupControlDescription: '开启后，所有的热泵均以相同的参数下发',
-  },
-  'air-cooled-module': {
-    deviceLabel: '风冷模块',
-    getDefaultDeviceIds: getFixedAirCooledModuleDeviceIds,
-    getDefaultDeviceCodes: getFixedAirCooledModuleDeviceCodes,
-    isDeviceCode: isAirCooledModuleDeviceCode,
-    useFixedSelectOptions: true,
-    defaultSelectedCode: 'No31',
-    groupControlIconAlt: '风冷模块群控',
-    groupControlTitle: '风冷模块批量控制',
-    groupControlDescription: '开启后，所有的风冷模块均以相同的参数下发',
-  },
-}
-
-function getDeviceModuleConfig(deviceModuleType) {
-  return DEVICE_MODULE_CONFIGS[deviceModuleType] ?? DEVICE_MODULE_CONFIGS['heat-pump']
-}
-
-function getDefaultSelectOptions(config) {
-  const ids = config.getDefaultDeviceIds()
+function getDefaultSelectOptions() {
+  const ids = getDefaultHeatPumpDeviceIds()
   if (ids.length > 0) {
     return ids.map((id) => ({
       value: toUnitDeviceCode(id),
@@ -86,7 +53,7 @@ function getDefaultSelectOptions(config) {
     const id = parseUnitDeviceCodeLoose(code)
     return {
       value: code,
-      label: id != null ? getUnitDisplayName(id) : config.deviceLabel,
+      label: id != null ? getUnitDisplayName(id) : DEVICE_LABEL,
     }
   })
 }
@@ -99,7 +66,7 @@ const FIXED_DEVICE_PARAM_ROWS = [
   { id: 'htfMax', pointSuffix: 'HTF_Max', label: '目标频率上限（Hz）', min: 0, max: 150, step: 1, suffix: 'Hz' },
 ]
 
-/** 仅批量控制：系统级统一点位，热泵 / 风冷模块共用 */
+/** 仅批量控制：系统级统一点位 */
 const LN_HPYXBH1 = 'Sys\\FinforWorx\\HPYXBH1'
 const LN_HPYXBH2 = 'Sys\\FinforWorx\\HPYXBH2'
 
@@ -132,29 +99,16 @@ function buildFixedParamLongNames(deviceCodes, pointSuffix) {
   return deviceCodes.map((deviceCode) => buildHeatPumpPointLongName(deviceCode, pointSuffix)).filter(Boolean)
 }
 
-function filterDeviceCodes(codes, config) {
-  return codes.filter((code) => config.isDeviceCode(code))
+function filterDeviceCodes(codes) {
+  return codes.filter((code) => isHeatPumpModuleDeviceCode(code))
 }
 
-function resolveSelectItemDeviceCode(rawValue, config) {
-  const text = toDisplayValue(rawValue, '')
-  if (!text) return ''
-  if (config.useFixedSelectOptions) {
-    return remapAirCooledModuleDeviceCode(text) ?? ''
-  }
-  return text
-}
-
-function normalizeDeviceCodes(selectList, config) {
-  if (config.useFixedSelectOptions) {
-    return config.getDefaultDeviceCodes()
-  }
-  if (!Array.isArray(selectList)) return config.getDefaultDeviceCodes()
+function normalizeDeviceCodes(selectList) {
+  if (!Array.isArray(selectList)) return getDefaultHeatPumpDeviceCodes()
   const codes = filterDeviceCodes(
-    selectList.map((item) => resolveSelectItemDeviceCode(item?.value, config)).filter(Boolean),
-    config,
+    selectList.map((item) => toDisplayValue(item?.value, '')).filter(Boolean),
   )
-  return codes.length ? codes : config.getDefaultDeviceCodes()
+  return codes.length ? codes : getDefaultHeatPumpDeviceCodes()
 }
 
 const DEFAULT_METRICS = []
@@ -181,35 +135,31 @@ function toDisplayValue(value, fallback = '0') {
   return String(value)
 }
 
-function normalizeSelectOptions(selectList, config) {
-  const fallbackOptions = getDefaultSelectOptions(config)
-  if (config.useFixedSelectOptions) {
-    return fallbackOptions
-  }
+function normalizeSelectOptions(selectList) {
+  const fallbackOptions = getDefaultSelectOptions()
   if (!Array.isArray(selectList)) return fallbackOptions
   const options = selectList
     .map((item) => {
-      const value = resolveSelectItemDeviceCode(item?.value, config)
+      const value = toDisplayValue(item?.value, '')
       const id = parseUnitDeviceCodeLoose(value)
       return {
         value,
-        label: id != null && config.isDeviceCode(value) ? getUnitDisplayName(id) : toDisplayValue(item?.title, config.deviceLabel),
+        label: id != null && isHeatPumpModuleDeviceCode(value) ? getUnitDisplayName(id) : toDisplayValue(item?.title, DEVICE_LABEL),
       }
     })
-    .filter((item) => item.value && config.isDeviceCode(item.value))
+    .filter((item) => item.value && isHeatPumpModuleDeviceCode(item.value))
   return options.length ? options : fallbackOptions
 }
 
-function HeatPumpPage({ deviceModuleType = 'heat-pump' }) {
-  const config = useMemo(() => getDeviceModuleConfig(deviceModuleType), [deviceModuleType])
-  const defaultOptions = useMemo(() => getDefaultSelectOptions(config), [config])
+function HeatPumpPage() {
+  const defaultOptions = useMemo(() => getDefaultSelectOptions(), [])
 
   const [attentionMessage, setAttentionMessage] = useState('')
   const [isInitialAttemptDone, setIsInitialAttemptDone] = useState(false)
   const [isGroupControlEnabled, setIsGroupControlEnabled] = useState(true)
   const [heatPumpOptions, setHeatPumpOptions] = useState(defaultOptions)
-  const [selectedHeatPumpCode, setSelectedHeatPumpCode] = useState(config.defaultSelectedCode)
-  const [batchDeviceCodes, setBatchDeviceCodes] = useState(() => config.getDefaultDeviceCodes())
+  const [selectedHeatPumpCode, setSelectedHeatPumpCode] = useState(DEFAULT_SELECTED_CODE)
+  const [batchDeviceCodes, setBatchDeviceCodes] = useState(() => getDefaultHeatPumpDeviceCodes())
   const [parameters, setParameters] = useState({
     heatSetpoint: '50',
     coldSetpoint: '15',
@@ -322,16 +272,16 @@ function HeatPumpPage({ deviceModuleType = 'heat-pump' }) {
       const selectResponse = await queryHeatPumpSelect()
       const selectList = selectResponse?.data?.data?.selectList ?? []
       if (isMountedRef.current) {
-        setBatchDeviceCodes(normalizeDeviceCodes(selectList, config))
+        setBatchDeviceCodes(normalizeDeviceCodes(selectList))
         setIsInitialAttemptDone(true)
       }
     } catch {
-      onWriteNotify(`${config.deviceLabel}批量参数获取失败`)
+      onWriteNotify(`${DEVICE_LABEL}批量参数获取失败`)
       if (isMountedRef.current) {
         setIsInitialAttemptDone(true)
       }
     }
-  }, [config, isMountedRef, onWriteNotify])
+  }, [isMountedRef, onWriteNotify])
 
   const applySingleDeviceDetail = useCallback((adapted, heatPumpCode) => {
     setDetailMetrics(
@@ -374,7 +324,7 @@ function HeatPumpPage({ deviceModuleType = 'heat-pump' }) {
     try {
       const response = await queryHeatPumpSelect()
       const selectList = response?.data?.data?.selectList ?? []
-      const options = normalizeSelectOptions(selectList, config)
+      const options = normalizeSelectOptions(selectList)
       if (!isMountedRef.current) return
       setHeatPumpOptions(options)
       setSelectedHeatPumpCode((prev) => {
@@ -383,18 +333,18 @@ function HeatPumpPage({ deviceModuleType = 'heat-pump' }) {
         return options.find((item) => item.value)?.value ?? options[0]?.value ?? ''
       })
     } catch {
-      onWriteNotify(`${config.deviceLabel}下拉选项获取失败`)
+      onWriteNotify(`${DEVICE_LABEL}下拉选项获取失败`)
     }
-  }, [config, isMountedRef, onWriteNotify])
+  }, [isMountedRef, onWriteNotify])
 
   useEffect(() => {
     setHeatPumpOptions(defaultOptions)
-    setSelectedHeatPumpCode(config.defaultSelectedCode)
-    setBatchDeviceCodes(config.getDefaultDeviceCodes())
+    setSelectedHeatPumpCode(DEFAULT_SELECTED_CODE)
+    setBatchDeviceCodes(getDefaultHeatPumpDeviceCodes())
     setDetailMetrics(DEFAULT_METRICS)
     setDeviceRuntime(DEFAULT_DEVICE_RUNTIME)
     setIsInitialAttemptDone(false)
-  }, [config, defaultOptions])
+  }, [defaultOptions])
 
   useEffect(() => {
     if (isGroupControlEnabled) {
@@ -536,15 +486,15 @@ function HeatPumpPage({ deviceModuleType = 'heat-pump' }) {
     if (unitId != null) {
       return getUnitCompactDisplayName(unitId)
     }
-    return selectedHeatPumpLabel.replace(/^风冷模块/, '风冷')
+    return selectedHeatPumpLabel
   }, [selectedHeatPumpCode, selectedHeatPumpLabel])
 
   const detailTitle =
-    !isGroupControlEnabled && selectedHeatPumpLabel ? `${selectedHeatPumpLabel}详细参数` : `${config.deviceLabel}详细参数`
+    !isGroupControlEnabled && selectedHeatPumpLabel ? `${selectedHeatPumpLabel}详细参数` : `${DEVICE_LABEL}详细参数`
   const stateLabel =
     !isGroupControlEnabled && selectedStateLabelName
       ? `${selectedStateLabelName}状态`
-      : `${config.deviceLabel}状态`
+      : `${DEVICE_LABEL}状态`
   const parameterTitle =
     !isGroupControlEnabled && selectedHeatPumpLabel ? `${selectedHeatPumpLabel}参数设置` : '参数设置'
   const stateIcon = DEVICE_STATUS_ICON_MAP[displayDeviceRuntime.status] ?? standbyIcon
@@ -566,13 +516,13 @@ function HeatPumpPage({ deviceModuleType = 'heat-pump' }) {
     <main className="heat-pump-page">
       <FeatureInfoCard
         icon={groupControlIcon}
-        iconAlt={config.groupControlIconAlt}
-        title={config.groupControlTitle}
-        description={config.groupControlDescription}
+        iconAlt="热泵群控"
+        title="热泵批量控制"
+        description="开启后，所有的热泵均以相同的参数下发"
         selected={isGroupControlEnabled}
         onClick={() => setIsGroupControlEnabled((prev) => !prev)}
         confirmConfig={({ nextSelected }) => ({
-          message: `确认${nextSelected ? '开启' : '关闭'}${config.groupControlTitle}吗？`,
+          message: `确认${nextSelected ? '开启' : '关闭'}热泵批量控制吗？`,
         })}
       />
 
@@ -589,11 +539,11 @@ function HeatPumpPage({ deviceModuleType = 'heat-pump' }) {
               options={heatPumpOptions}
               value={selectedHeatPumpCode}
               onChange={setSelectedHeatPumpCode}
-              triggerAriaLabel={`选择${config.deviceLabel}`}
-              listAriaLabel={`${config.deviceLabel}列表`}
+              triggerAriaLabel={`选择${DEVICE_LABEL}`}
+              listAriaLabel={`${DEVICE_LABEL}列表`}
               confirmConfig={({ nextValue }) => {
                 const selected = heatPumpOptions.find((item) => item.value === nextValue)
-                return { message: `确认切换为${selected?.label ?? `所选${config.deviceLabel}`}吗？` }
+                return { message: `确认切换为${selected?.label ?? `所选${DEVICE_LABEL}`}吗？` }
               }}
             />
           </div>

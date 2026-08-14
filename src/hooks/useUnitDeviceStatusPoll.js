@@ -8,7 +8,7 @@ import { resolveRuntimeStatusFromPoints } from '@/utils/heatPumpRuntimeStatus'
 const DEFAULT_POLL_INTERVAL_MS = 10_000
 
 /**
- * 单台热泵/风冷模块：轮询 Machine_Operation、Systematic_Defrosting、Fault_Alarm、DeviceStatus。
+ * 单台热泵：轮询 Machine_Operation、Systematic_Defrosting、Fault_Alarm、DeviceStatus。
  */
 export function useUnitDeviceStatusPoll(deviceCode, { enabled = true, intervalMs = DEFAULT_POLL_INTERVAL_MS } = {}) {
   const lastSuccessRef = useRef(null)

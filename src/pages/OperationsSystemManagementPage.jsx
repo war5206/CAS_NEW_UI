@@ -6,19 +6,11 @@ import TimePickerModal from '../components/TimePickerModal'
 import dateIcon from '../assets/icons/date.svg'
 import closeIcon from '../assets/icons/close.svg'
 import {
-  createDefaultOpsAirCooledUnitOptions,
-  createDefaultOpsHeatPumpUnitOptions,
-} from '@/api/adapters/operations'
-import {
-  USE_SPLIT_OPS_UNIT_DATA_TABS,
-} from '@/config/projectProfile'
-import {
   useOpsCurveQuery,
   useOpsHeatPumpListQuery,
   useOpsHeatPumpSingleQuery,
   useOpsSystemConfigQuery,
   useOpsSystemStateQuery,
-  useOpsUnitDeviceParamQuery,
 } from '@/features/operations/hooks/useOperationsQueries'
 import { getStoredClimateMode } from '../utils/climateModeState'
 import { getStoredEnergyPriceState } from '../utils/energyPriceState'
@@ -51,12 +43,27 @@ const SETTING_OPTIONS = [
   { value: 'project-system-type', label: '项目系统类型' },
   { value: 'energy-price', label: '能源价格' },
   { value: 'system', label: '系统' },
-  { value: 'heat-pump-meter-1', label: '热泵电表1' },
-  { value: 'heat-pump-meter-2', label: '热泵电表2' },
+  { value: 'heat-pump-meter', label: '热泵电表' },
   { value: 'water-pump-meter', label: '水泵电表' },
+  { value: 'coupling-energy-meter', label: '耦合能源电表' },
   { value: 'water-meter', label: '水表' },
   { value: 'heat-meter', label: '热表' },
 ]
+
+/** 电表组设置项：选中后按数量展示电表卡片（如热泵电表1-10、热表1-3），点击卡片才调接口取数 */
+const METER_GROUP_SETTING_MAP = {
+  'heat-pump-meter': { prefix: '热泵电表', count: 10 },
+  'water-pump-meter': { prefix: '水泵电表', count: 10 },
+  'coupling-energy-meter': { prefix: '耦合能源电表', count: 10 },
+  'heat-meter': { prefix: '热表', count: 3 },
+}
+
+function createMeterGroupCards({ prefix, count }) {
+  return Array.from({ length: count }, (_, index) => {
+    const meterCode = `${prefix}${index + 1}`
+    return { key: `meter-${meterCode}`, label: meterCode, value: '', meterCode }
+  })
+}
 const PROJECT_TYPE_OPTIONS = [
   { value: 'heating', label: '采暖' },
   { value: 'cooling-heating', label: '冷暖' },
@@ -1409,10 +1416,12 @@ function formatOpsMetricCardValue(item) {
 }
 
 function MetricCard({ item, onClick }) {
+  // 电表组卡片没有数值，不渲染空的 value 元素，保证名称垂直居中
+  const hasValue = item.value !== '' && item.value !== null && item.value !== undefined
   return (
     <button type="button" className="ops-system-card" onClick={() => onClick(item)}>
       <span className="ops-system-card__label">{item.label}</span>
-      <strong className="ops-system-card__value">{formatOpsMetricCardValue(item)}</strong>
+      {hasValue ? <strong className="ops-system-card__value">{formatOpsMetricCardValue(item)}</strong> : null}
     </button>
   )
 }
@@ -1420,41 +1429,41 @@ function MetricCard({ item, onClick }) {
 function OperationsSystemManagementPage({ tabId }) {
   const [activeSetting, setActiveSetting] = useState(SETTING_OPTIONS[0].value)
   const [activeHeatPumpUnit, setActiveHeatPumpUnit] = useState('No1')
-  const [activeAirCooledUnit, setActiveAirCooledUnit] = useState('No31')
   const [activeMetric, setActiveMetric] = useState(null)
+  const [activeMeter, setActiveMeter] = useState(null)
   const [curveNoticeMessage, setCurveNoticeMessage] = useState('')
   const defaultTrendTimeRange = useMemo(() => getDefaultTrendTimeRange(), [])
   const [startTime, setStartTime] = useState(defaultTrendTimeRange.startTime)
   const [endTime, setEndTime] = useState(defaultTrendTimeRange.endTime)
   // 已生效的查询范围：只有点击「查询」时才从草稿时间同步，驱动曲线请求
   const [appliedRange, setAppliedRange] = useState(defaultTrendTimeRange)
-  const isAirCooledUnitTab = USE_SPLIT_OPS_UNIT_DATA_TABS && tabId === 'unit-data-air-cooled'
-  const isUnitDataTab = tabId === 'unit-data' || tabId === 'unit-data-heat-pump' || isAirCooledUnitTab
-  const heatPumpUnitOptions = useMemo(() => createDefaultOpsHeatPumpUnitOptions(), [])
-  const airCooledUnitOptions = useMemo(() => createDefaultOpsAirCooledUnitOptions(), [])
-  const { data: standardHeatPumpOptions = [] } = useOpsHeatPumpListQuery({
-    enabled: isUnitDataTab && !USE_SPLIT_OPS_UNIT_DATA_TABS,
+  const isUnitDataTab = tabId === 'unit-data-heat-pump'
+  const { data: unitOptions = [] } = useOpsHeatPumpListQuery({
+    enabled: isUnitDataTab,
   })
-  const legacyUnitOptions = isAirCooledUnitTab ? airCooledUnitOptions : heatPumpUnitOptions
-  const unitOptions = USE_SPLIT_OPS_UNIT_DATA_TABS ? legacyUnitOptions : standardHeatPumpOptions
-  const activeUnit = isAirCooledUnitTab ? activeAirCooledUnit : activeHeatPumpUnit
-  const setActiveUnit = isAirCooledUnitTab ? setActiveAirCooledUnit : setActiveHeatPumpUnit
-  const { data: legacyUnitMetrics = [] } = useOpsUnitDeviceParamQuery(activeUnit, {
-    enabled: isUnitDataTab && USE_SPLIT_OPS_UNIT_DATA_TABS,
+  const activeUnit = activeHeatPumpUnit
+  const setActiveUnit = setActiveHeatPumpUnit
+  const { data: unitMetrics = [] } = useOpsHeatPumpSingleQuery(activeUnit, {
+    enabled: isUnitDataTab,
   })
-  const { data: standardUnitMetrics = [] } = useOpsHeatPumpSingleQuery(activeUnit, {
-    enabled: isUnitDataTab && !USE_SPLIT_OPS_UNIT_DATA_TABS,
-  })
-  const unitMetrics = USE_SPLIT_OPS_UNIT_DATA_TABS ? legacyUnitMetrics : standardUnitMetrics
   const selectedSettingLabel = useMemo(
     () => SETTING_OPTIONS.find((item) => item.value === activeSetting)?.label ?? SETTING_OPTIONS[0].label,
     [activeSetting],
+  )
+  const meterGroup = METER_GROUP_SETTING_MAP[activeSetting] ?? null
+  const meterGroupCards = useMemo(
+    () => (meterGroup ? createMeterGroupCards(meterGroup) : []),
+    [meterGroup],
   )
   const { data: stateMetrics = [] } = useOpsSystemStateQuery({
     enabled: tabId === 'status-data',
   })
   const { data: configMetrics = [] } = useOpsSystemConfigQuery(selectedSettingLabel, {
-    enabled: tabId === 'setting-data',
+    enabled: tabId === 'setting-data' && !meterGroup,
+  })
+  // 电表详情页：按电表名称（如「热泵电表1」）查询该电表的数据卡片
+  const { data: meterDetailMetrics = [] } = useOpsSystemConfigQuery(activeMeter?.meterCode ?? '', {
+    enabled: Boolean(activeMeter),
   })
   const {
     data: chartData = [],
@@ -1472,6 +1481,7 @@ function OperationsSystemManagementPage({ tabId }) {
 
   useEffect(() => {
     setActiveMetric(null)
+    setActiveMeter(null)
   }, [activeSetting, activeUnit, tabId])
 
   useEffect(() => {
@@ -1507,11 +1517,11 @@ function OperationsSystemManagementPage({ tabId }) {
           />
         ),
         tip: '点击卡片查看历史状态数据曲线图',
-        items: configMetrics,
+        items: meterGroup ? meterGroupCards : configMetrics,
       }
     }
     const selectedUnit = unitOptions.find((item) => item.value === activeUnit) ?? unitOptions[0]
-    const unitSelectorLabel = isAirCooledUnitTab ? '风冷模块' : '热泵机组'
+    const unitSelectorLabel = '热泵机组'
     return {
       selector: (
         <SelectDropdown
@@ -1534,7 +1544,8 @@ function OperationsSystemManagementPage({ tabId }) {
     activeSetting,
     activeUnit,
     configMetrics,
-    isAirCooledUnitTab,
+    meterGroupCards,
+    meterGroup,
     setActiveUnit,
     stateMetrics,
     tabId,
@@ -1542,8 +1553,8 @@ function OperationsSystemManagementPage({ tabId }) {
     unitOptions,
   ])
 
-  const handleOpenMetric = (item) => {
-    if (!String(item?.longName ?? '').trim()) {
+  const openMetricTrend = (metric) => {
+    if (!String(metric?.longName ?? '').trim()) {
       setCurveNoticeMessage('该数据点暂无历史曲线')
       return
     }
@@ -1551,7 +1562,16 @@ function OperationsSystemManagementPage({ tabId }) {
     setStartTime(nextRange.startTime)
     setEndTime(nextRange.endTime)
     setAppliedRange(nextRange)
-    setActiveMetric(item)
+    setActiveMetric(metric)
+  }
+
+  const handleOpenMetric = (item) => {
+    // 电表组卡片：进入该电表的数据详情页，再点数据卡片才打开历史曲线
+    if (item?.meterCode) {
+      setActiveMeter(item)
+      return
+    }
+    openMetricTrend(item)
   }
 
   const handleStartTimeChange = (nextValue) => {
@@ -1592,15 +1612,36 @@ function OperationsSystemManagementPage({ tabId }) {
   return (
     <>
       <main className="ops-system-page">
-        {viewConfig.selector ? <div className="ops-system-page__toolbar">{viewConfig.selector}</div> : null}
+        {activeMeter ? (
+          <>
+            <div className="ops-system-page__toolbar">
+              <button type="button" className="ops-system-page__back" onClick={() => setActiveMeter(null)}>
+                返回
+              </button>
+              <span className="ops-system-page__meter-title">{activeMeter.label}</span>
+            </div>
 
-        <p className="ops-system-page__tip">{viewConfig.tip}</p>
+            <p className="ops-system-page__tip">点击卡片查看历史状态数据曲线图</p>
 
-        <section className="ops-system-page__grid">
-          {viewConfig.items.map((item) => (
-            <MetricCard key={item.key} item={item} onClick={handleOpenMetric} />
-          ))}
-        </section>
+            <section className="ops-system-page__grid">
+              {meterDetailMetrics.map((item) => (
+                <MetricCard key={item.key} item={item} onClick={handleOpenMetric} />
+              ))}
+            </section>
+          </>
+        ) : (
+          <>
+            {viewConfig.selector ? <div className="ops-system-page__toolbar">{viewConfig.selector}</div> : null}
+
+            <p className="ops-system-page__tip">{viewConfig.tip}</p>
+
+            <section className="ops-system-page__grid">
+              {viewConfig.items.map((item) => (
+                <MetricCard key={item.key} item={item} onClick={handleOpenMetric} />
+              ))}
+            </section>
+          </>
+        )}
       </main>
 
       {activeMetric ? (

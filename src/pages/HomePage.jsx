@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import standardSystemMap from '../assets/home/system.png'
-import dajuyuanSystemMap from '../assets/home/dajuyuan-system.png'
 import systemMap2 from '../assets/home/system2.png'
 import coupleGasBoilerIcon from '../assets/home/couple-gasboiler.png'
 import coupleWaterSourceHeatPumpIcon from '../assets/home/couple-wshp.png'
@@ -28,13 +27,6 @@ import RealTimeTemperatureChart from '../components/RealTimeTemperatureChart'
 import DeviceStatusPanel from '../components/DeviceStatusPanel'
 import HomeUnitStatusBlock from '../components/HomeUnitStatusBlock'
 import { useHomeUnitStatusPoll } from '../hooks/useHomeUnitStatusPoll'
-import { COUPLE_ENERGY_TYPE_AIR_COOLED_MODULE_ID } from '@/config/projectUnitDevices'
-import {
-  isDajuyuanProfile,
-  SHOW_DEVICE_STATUS_LOOP_PUMP_TAB,
-  SHOW_HOME_AIR_COOLED_STATUS_BLOCK,
-  SYSTEM_DIAGRAM_KEY,
-} from '@/config/projectProfile'
 import { useHomeOverviewQuery } from '../features/home/hooks/useHomeOverviewQuery'
 import { useSystemConfigQuery } from '../features/home/hooks/useSystemConfigQuery'
 import { useTemp24HourQuery } from '../features/home/hooks/useTemp24HourQuery'
@@ -142,9 +134,7 @@ const COUPLE_DEVICE_LAYOUT_MAP = {
 }
 
 const SYSTEM_IMAGE_STANDARD = standardSystemMap
-const SYSTEM_IMAGE_DAJUYUAN = dajuyuanSystemMap
 const SYSTEM_IMAGE_TYPE2 = systemMap2
-const SYSTEM_IMAGE_BY_PROFILE = SYSTEM_DIAGRAM_KEY === 'dajuyuan' ? SYSTEM_IMAGE_DAJUYUAN : SYSTEM_IMAGE_STANDARD
 
 function HomePage({ onActivePageChange, committedUnitLayoutSlots }) {
   const location = useLocation()
@@ -185,14 +175,11 @@ function HomePage({ onActivePageChange, committedUnitLayoutSlots }) {
     (!homeOverviewQuery.hasFetchedData || !systemConfigQuery.hasFetchedData || !temp24HourQuery.hasFetchedData)
 
   const isSystemType2 = systemConfig.systemTypeUuid === '2'
-  const resolvedSystemImage = isSystemType2 && SYSTEM_IMAGE_TYPE2 ? SYSTEM_IMAGE_TYPE2 : SYSTEM_IMAGE_BY_PROFILE
+  const resolvedSystemImage = isSystemType2 && SYSTEM_IMAGE_TYPE2 ? SYSTEM_IMAGE_TYPE2 : SYSTEM_IMAGE_STANDARD
   const coupleEnergyTypeUuid = systemConfig.coupleEnergyTypeUuid
-  const isAirCooledModuleCoupling = coupleEnergyTypeUuid === COUPLE_ENERGY_TYPE_AIR_COOLED_MODULE_ID
   const coupleDevice = COUPLE_DEVICE_IMAGE_MAP[coupleEnergyTypeUuid] ?? null
   const coupleDeviceLayout = COUPLE_DEVICE_LAYOUT_MAP[coupleEnergyTypeUuid] ?? null
   const shouldShowCouplingEnergy = Boolean(coupleDevice && coupleDeviceLayout)
-  const shouldShowAirCooledModuleOnDiagram =
-    isAirCooledModuleCoupling && SHOW_HOME_AIR_COOLED_STATUS_BLOCK
   const coupleDeviceBannerStyle = coupleDeviceLayout
     ? {
         ...coupleDeviceLayout.banner,
@@ -226,7 +213,6 @@ function HomePage({ onActivePageChange, committedUnitLayoutSlots }) {
   // 末端建筑入口暂时隐藏，恢复遮罩层时一并恢复
   // const goToTerminalBuilding = () => setActivePage(HOME_PAGE_VIEW.TERMINAL_BUILDING)
   const heatPumpOverlaySummary = homeUnitStatusPoll.heatPump.summary
-  const airCooledModuleStatus = homeUnitStatusPoll.airCooledModule.summary
   const deviceStatusHeatPumpData = homeUnitStatusPoll.heatPump.chartData
   const indoorTemperatures = homeOverview.system.indoorTemperatures
   const terminalCirculationPumps = homeOverview.system.terminalCirculationPumps
@@ -293,20 +279,13 @@ function HomePage({ onActivePageChange, committedUnitLayoutSlots }) {
                 onError={() => setIsSystemImageLoaded(true)}
               />
               <div
-                className={`home-system-overlay home-system-overlay--${SYSTEM_DIAGRAM_KEY}${isSystemImageLoaded ? ' is-ready' : ''}`}
+                className={`home-system-overlay home-system-overlay--standard${isSystemImageLoaded ? ' is-ready' : ''}`}
               >
                 <HomeUnitStatusBlock
                   title={HOME_TEXT.HEAT_PUMP_GROUP}
                   summary={heatPumpOverlaySummary}
                   className="home-system-node--heat-pump"
                 />
-                {shouldShowAirCooledModuleOnDiagram ? (
-                  <HomeUnitStatusBlock
-                    title={HOME_TEXT.AIR_COOLED_MODULE_GROUP}
-                    summary={airCooledModuleStatus}
-                    className="home-system-node--air-cooled-module"
-                  />
-                ) : null}
 
                 <div className="home-system-node home-system-node--outdoor-temperature home-system-inline">
                   <span className="home-system-caption">{HOME_TEXT.OUTDOOR_TEMP}</span>
@@ -314,21 +293,17 @@ function HomePage({ onActivePageChange, committedUnitLayoutSlots }) {
                   <span className="home-system-unit">{HOME_TEXT.CELSIUS}</span>
                 </div>
 
-                {!isDajuyuanProfile ? (
-                  <>
-                    <div className="home-system-node home-system-node--condensate">{HOME_TEXT.CONDENSATE_WATER}</div>
+                <div className="home-system-node home-system-node--condensate">{HOME_TEXT.CONDENSATE_WATER}</div>
 
-                    <div className="home-system-node home-system-node--heat-tracing home-system-inline">
-                      <span className="home-system-caption">{HOME_TEXT.HEAT_TRACING_BELT}</span>
-                      <span className={`home-system-state ${homeOverview.system.heatTracingEnabled ? 'is-on' : 'is-off'}`}>
-                        {homeOverview.system.heatTracingEnabled ? HOME_TEXT.ON : HOME_TEXT.OFF}
-                      </span>
-                      <span className="home-system-caption">{HOME_TEXT.CONDENSATE_PIPE}</span>
-                      <span className="home-system-value">{homeOverview.system.condensatePipeTemp}</span>
-                      <span className="home-system-unit">{HOME_TEXT.CELSIUS}</span>
-                    </div>
-                  </>
-                ) : null}
+                <div className="home-system-node home-system-node--heat-tracing home-system-inline">
+                  <span className="home-system-caption">{HOME_TEXT.HEAT_TRACING_BELT}</span>
+                  <span className={`home-system-state ${homeOverview.system.heatTracingEnabled ? 'is-on' : 'is-off'}`}>
+                    {homeOverview.system.heatTracingEnabled ? HOME_TEXT.ON : HOME_TEXT.OFF}
+                  </span>
+                  <span className="home-system-caption">{HOME_TEXT.CONDENSATE_PIPE}</span>
+                  <span className="home-system-value">{homeOverview.system.condensatePipeTemp}</span>
+                  <span className="home-system-unit">{HOME_TEXT.CELSIUS}</span>
+                </div>
 
                 {shouldShowCouplingEnergy && (
                   <div
@@ -370,7 +345,7 @@ function HomePage({ onActivePageChange, committedUnitLayoutSlots }) {
                           </span>
                         </div>
                       ))
-                    ) : !isDajuyuanProfile ? (
+                    ) : (
                       homeOverview.system.circulationPumps.slice(0, 3).map((pump) => (
                         <div key={`terminal-${pump.name}`} className="home-system-row">
                           <span className={`home-system-caption${pump.tone === 'fault' ? ' is-fault' : ''}`}>{pump.name}</span>
@@ -379,7 +354,7 @@ function HomePage({ onActivePageChange, committedUnitLayoutSlots }) {
                           </span>
                         </div>
                       ))
-                    ) : null}
+                    )}
                   </div>
                 )}
 
@@ -394,13 +369,13 @@ function HomePage({ onActivePageChange, committedUnitLayoutSlots }) {
                 <div className="home-system-node home-system-node--supply-pressure home-system-inline">
                   <span className="home-system-caption">{HOME_TEXT.SUPPLY_PRESSURE}</span>
                   <span className="home-system-value">{homeOverview.system.supplyPressure}</span>
-                  <span className="home-system-unit">Mpa</span>
+                  <span className="home-system-unit">kPa</span>
                 </div>
 
                 <div className="home-system-node home-system-node--return-pressure home-system-inline">
                   <span className="home-system-caption">{HOME_TEXT.RETURN_PRESSURE}</span>
                   <span className="home-system-value">{homeOverview.system.returnPressure}</span>
-                  <span className="home-system-unit">Mpa</span>
+                  <span className="home-system-unit">kPa</span>
                 </div>
 
                 <div className="home-system-node home-system-node--return-temperature home-system-inline">
@@ -411,21 +386,17 @@ function HomePage({ onActivePageChange, committedUnitLayoutSlots }) {
 
                 <div className="home-system-node home-system-node--circulation-pump">
                   <div className="home-system-caption home-system-caption--title">{HOME_TEXT.HEAT_PUMP_LOOP_PUMP}</div>
-                  {!isDajuyuanProfile
-                    ? homeOverview.system.circulationPumps.slice(0, 3).map((pump) => (
-                        <div key={pump.name} className="home-system-row">
-                          <span className={`home-system-caption${pump.tone === 'fault' ? ' is-fault' : ''}`}>{pump.name}</span>
-                          <span className={`home-system-state ${pump.tone === 'running' ? 'is-on' : pump.tone === 'fault' ? 'is-fault' : 'is-off'}`}>
-                            {pump.status}
-                          </span>
-                        </div>
-                      ))
-                    : null}
+                  {homeOverview.system.circulationPumps.slice(0, 3).map((pump) => (
+                    <div key={pump.name} className="home-system-row">
+                      <span className={`home-system-caption${pump.tone === 'fault' ? ' is-fault' : ''}`}>{pump.name}</span>
+                      <span className={`home-system-state ${pump.tone === 'running' ? 'is-on' : pump.tone === 'fault' ? 'is-fault' : 'is-off'}`}>
+                        {pump.status}
+                      </span>
+                    </div>
+                  ))}
                 </div>
 
-                {!isDajuyuanProfile ? (
-                  <div className="home-system-node home-system-node--bypass-valve">{HOME_TEXT.DIFFERENTIAL_BYPASS_VALVE}</div>
-                ) : null}
+                <div className="home-system-node home-system-node--bypass-valve">{HOME_TEXT.DIFFERENTIAL_BYPASS_VALVE}</div>
 
                 <div className="home-system-node home-system-node--drain-valve home-system-inline">
                   <span className="home-system-caption">{HOME_TEXT.DRAIN_VALVE}</span>
@@ -434,38 +405,34 @@ function HomePage({ onActivePageChange, committedUnitLayoutSlots }) {
                   </span>
                 </div>
 
-                {!isDajuyuanProfile ? (
-                  <>
-                    <div className="home-system-node home-system-node--pressure-tank">{HOME_TEXT.PRESSURE_TANK}</div>
+                <div className="home-system-node home-system-node--pressure-tank">{HOME_TEXT.PRESSURE_TANK}</div>
 
-                    <div className="home-system-node home-system-node--pressure-valve home-system-inline">
-                      <span className="home-system-caption">{HOME_TEXT.PRESSURE_VALVE}</span>
-                      <span className={`home-system-state ${homeOverview.system.pressureValveOpen ? 'is-on' : 'is-off'}`}>
-                        {homeOverview.system.pressureValveOpen ? HOME_TEXT.ON : HOME_TEXT.OFF}
+                <div className="home-system-node home-system-node--pressure-valve home-system-inline">
+                  <span className="home-system-caption">{HOME_TEXT.PRESSURE_VALVE}</span>
+                  <span className={`home-system-state ${homeOverview.system.pressureValveOpen ? 'is-on' : 'is-off'}`}>
+                    {homeOverview.system.pressureValveOpen ? HOME_TEXT.ON : HOME_TEXT.OFF}
+                  </span>
+                </div>
+
+                <div className="home-system-node home-system-node--makeup-pump">
+                  <div className="home-system-caption">{HOME_TEXT.MAKEUP_PUMP}</div>
+                  {homeOverview.system.makeupPumps.slice(0, 2).map((pump) => (
+                    <div key={pump.name} className="home-system-row">
+                      <span className={`home-system-caption${pump.tone === 'fault' ? ' is-fault' : ''}`}>{pump.name}</span>
+                      <span className={`home-system-state ${pump.tone === 'running' ? 'is-on' : pump.tone === 'fault' ? 'is-fault' : 'is-off'}`}>
+                        {pump.status}
                       </span>
                     </div>
+                  ))}
+                </div>
 
-                    <div className="home-system-node home-system-node--makeup-pump">
-                      <div className="home-system-caption">{HOME_TEXT.MAKEUP_PUMP}</div>
-                      {homeOverview.system.makeupPumps.slice(0, 2).map((pump) => (
-                        <div key={pump.name} className="home-system-row">
-                          <span className={`home-system-caption${pump.tone === 'fault' ? ' is-fault' : ''}`}>{pump.name}</span>
-                          <span className={`home-system-state ${pump.tone === 'running' ? 'is-on' : pump.tone === 'fault' ? 'is-fault' : 'is-off'}`}>
-                            {pump.status}
-                          </span>
-                        </div>
-                      ))}
-                    </div>
+                <div className="home-system-node home-system-node--water-tank home-system-inline">
+                  <span className="home-system-caption">{HOME_TEXT.WATER_TANK}</span>
+                  <span className="home-system-value">{homeOverview.system.waterTankLevel}</span>
+                  <span className="home-system-unit">%</span>
+                </div>
 
-                    <div className="home-system-node home-system-node--water-tank home-system-inline">
-                      <span className="home-system-caption">{HOME_TEXT.WATER_TANK}</span>
-                      <span className="home-system-value">{homeOverview.system.waterTankLevel}</span>
-                      <span className="home-system-unit">%</span>
-                    </div>
-
-                    <div className="home-system-node home-system-node--soft-water">{HOME_TEXT.SOFT_WATER}</div>
-                  </>
-                ) : null}
+                <div className="home-system-node home-system-node--soft-water">{HOME_TEXT.SOFT_WATER}</div>
                 <div className="home-system-node home-system-node--terminal-building">{HOME_TEXT.TERMINAL_BUILDING}</div>
                 {/* 末端建筑查看详情暂时不用，隐藏提示与遮罩层（保留代码便于恢复）
                 <div className="home-system-node home-system-node--terminal-building-tip">{HOME_TEXT.TERMINAL_BUILDING_TIP}</div>
@@ -486,48 +453,44 @@ function HomePage({ onActivePageChange, committedUnitLayoutSlots }) {
                 />
                 */}
                 {/* 设备参数跳转遮罩：left/top/width/height 在 App.css 中按原理图实际位置调整 */}
-                {!isDajuyuanProfile ? (
-                  <>
-                    <button
-                      type="button"
-                      className="home-system-hitbox home-system-hitbox--heat-trace"
-                      onClick={() => navigate('/settings/device-params/heat-trace')}
-                      aria-label={HOME_TEXT.ENTER_HEAT_TRACE_PAGE}
-                    />
-                    <button
-                      type="button"
-                      className="home-system-hitbox home-system-hitbox--heat-pump-loop-pump"
-                      onClick={() => navigate('/settings/device-params/heat-pump-loop-pump')}
-                      aria-label={HOME_TEXT.ENTER_LOOP_PUMP_PAGE}
-                    />
-                    {isSystemType2 ? (
-                      <button
-                        type="button"
-                        className="home-system-hitbox home-system-hitbox--terminal-loop-pump"
-                        onClick={() => navigate('/settings/device-params/terminal-loop-pump')}
-                        aria-label={HOME_TEXT.ENTER_TERMINAL_LOOP_PUMP_PAGE}
-                      />
-                    ) : null}
-                    <button
-                      type="button"
-                      className="home-system-hitbox home-system-hitbox--drain-valve"
-                      onClick={() => navigate('/settings/device-params/drain-valve')}
-                      aria-label={HOME_TEXT.ENTER_DRAIN_VALVE_PAGE}
-                    />
-                    <button
-                      type="button"
-                      className="home-system-hitbox home-system-hitbox--relief-valve"
-                      onClick={() => navigate('/settings/device-params/relief-valve')}
-                      aria-label={HOME_TEXT.ENTER_RELIEF_VALVE_PAGE}
-                    />
-                    <button
-                      type="button"
-                      className="home-system-hitbox home-system-hitbox--constant-pressure-pump"
-                      onClick={() => navigate('/settings/device-params/constant-pressure-pump')}
-                      aria-label={HOME_TEXT.ENTER_CONSTANT_PRESSURE_PAGE}
-                    />
-                  </>
+                <button
+                  type="button"
+                  className="home-system-hitbox home-system-hitbox--heat-trace"
+                  onClick={() => navigate('/settings/device-params/heat-trace')}
+                  aria-label={HOME_TEXT.ENTER_HEAT_TRACE_PAGE}
+                />
+                <button
+                  type="button"
+                  className="home-system-hitbox home-system-hitbox--heat-pump-loop-pump"
+                  onClick={() => navigate('/settings/device-params/heat-pump-loop-pump')}
+                  aria-label={HOME_TEXT.ENTER_LOOP_PUMP_PAGE}
+                />
+                {isSystemType2 ? (
+                  <button
+                    type="button"
+                    className="home-system-hitbox home-system-hitbox--terminal-loop-pump"
+                    onClick={() => navigate('/settings/device-params/terminal-loop-pump')}
+                    aria-label={HOME_TEXT.ENTER_TERMINAL_LOOP_PUMP_PAGE}
+                  />
                 ) : null}
+                <button
+                  type="button"
+                  className="home-system-hitbox home-system-hitbox--drain-valve"
+                  onClick={() => navigate('/settings/device-params/drain-valve')}
+                  aria-label={HOME_TEXT.ENTER_DRAIN_VALVE_PAGE}
+                />
+                <button
+                  type="button"
+                  className="home-system-hitbox home-system-hitbox--relief-valve"
+                  onClick={() => navigate('/settings/device-params/relief-valve')}
+                  aria-label={HOME_TEXT.ENTER_RELIEF_VALVE_PAGE}
+                />
+                <button
+                  type="button"
+                  className="home-system-hitbox home-system-hitbox--constant-pressure-pump"
+                  onClick={() => navigate('/settings/device-params/constant-pressure-pump')}
+                  aria-label={HOME_TEXT.ENTER_CONSTANT_PRESSURE_PAGE}
+                />
               </div>
               <div className="home-canvas-mask" />
             </div>
@@ -629,9 +592,7 @@ function HomePage({ onActivePageChange, committedUnitLayoutSlots }) {
                 <HomeWidget title={HOME_TEXT.DEVICE_STATUS} icon={deviceStatusIcon}>
                   <DeviceStatusPanel
                     heatPumpData={deviceStatusHeatPumpData}
-                    airCooledModuleData={homeUnitStatusPoll.airCooledModule?.chartData}
                     loopPumpData={homeOverview.deviceStatus.loopPumpItems}
-                    showLoopPumpTab={SHOW_DEVICE_STATUS_LOOP_PUMP_TAB}
                     showTerminalLoopPump={isSystemType2}
                     terminalLoopPumpData={terminalCirculationPumps}
                   />

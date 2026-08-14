@@ -4,7 +4,6 @@ import PageTransition from '../components/PageTransition'
 import { useSystemConfigStore } from '@/features/system/store/systemConfigStore'
 import { useAuthStore } from '@/features/auth/store/authStore'
 import { isRestrictedSettingsUser } from '@/features/auth/userRole'
-import { SHOW_AIR_COOLED_AS_STANDALONE_UNITS } from '@/config/projectProfile'
 
 const AlertsModulePage = lazy(() => import('./AlertsModulePage'))
 const ArchiveManagementPage = lazy(() => import('./ArchiveManagementPage'))
@@ -65,15 +64,7 @@ function ModulePage({
     }
 
     if (tab?.id === 'heat-pump') {
-      content = <HeatPumpPage deviceModuleType="heat-pump" />
-    }
-
-    if (tab?.id === 'air-cooled-module') {
-      content = SHOW_AIR_COOLED_AS_STANDALONE_UNITS ? (
-        <HeatPumpPage deviceModuleType="air-cooled-module" />
-      ) : (
-        <Navigate to="/settings/device-params/heat-pump" replace />
-      )
+      content = <HeatPumpPage />
     }
 
     if (tab?.id === 'heat-trace') {

@@ -1,7 +1,6 @@
 import {
   getHomeUnitStatusGroups,
   LONG_NAME_HP_TOTAL_NUMBER,
-  USE_FIXED_UNIT_LAYOUT,
 } from './projectUnitDevices'
 import {
   UNIT_DEVICE_STATUS_SUFFIX,
@@ -28,10 +27,10 @@ export function buildAllHomeUnitStatusLongNames({ heatPumpCount } = {}) {
   return buildHomeUnitStatusPollLongNames(heatPumpCount)
 }
 
-/** 首页状态轮询 longNames：标准款含 HPTotalNumber + No1~NoN 状态点 */
+/** 首页状态轮询 longNames：含 HPTotalNumber + No1~NoN 状态点 */
 export function buildHomeUnitStatusPollLongNames(heatPumpCount) {
   const groups = getHomeUnitStatusGroups({ heatPumpCount })
-  const longNames = USE_FIXED_UNIT_LAYOUT ? [] : [LONG_NAME_HP_TOTAL_NUMBER]
+  const longNames = [LONG_NAME_HP_TOTAL_NUMBER]
   longNames.push(
     ...Object.values(groups).flatMap((group) => buildUnitStatusLongNames(group.startNo, group.count)),
   )

@@ -5,14 +5,12 @@ import {
 } from '@/config/unitDeviceParamPoints'
 import {
   AIR_COOLED_MODULE_START_NO,
-  getFixedAirCooledModuleDeviceIds,
-  getFixedHeatPumpDeviceIds,
   getUnitDisplayName,
   parseUnitDeviceCodeLoose,
   remapAirCooledModuleDeviceCode,
   toUnitDeviceCode,
 } from '@/config/projectUnitDevices'
-import { STANDARD_DEFAULT_HEAT_PUMP_COUNT, USE_FIXED_UNIT_LAYOUT } from '@/config/projectProfile'
+import { STANDARD_DEFAULT_HEAT_PUMP_COUNT } from '@/config/projectProfile'
 
 function toText(value, fallback = '') {
   if (value == null || value === '') return fallback
@@ -82,9 +80,6 @@ function buildFixedOpsUnitOptions(deviceIds) {
 }
 
 function resolveOpsHeatPumpDeviceIds() {
-  if (USE_FIXED_UNIT_LAYOUT) {
-    return getFixedHeatPumpDeviceIds()
-  }
   return Array.from({ length: STANDARD_DEFAULT_HEAT_PUMP_COUNT }, (_, index) => index + 1)
 }
 
@@ -92,40 +87,27 @@ export function createDefaultOpsHeatPumpUnitOptions() {
   return buildFixedOpsUnitOptions(resolveOpsHeatPumpDeviceIds())
 }
 
-export function createDefaultOpsAirCooledUnitOptions() {
-  return buildFixedOpsUnitOptions(getFixedAirCooledModuleDeviceIds())
-}
-
 export function createDefaultOpsHeatPumpOptions() {
   return [{ value: 'No1', label: '热泵1' }]
 }
 
 export function adaptOpsHeatPumpOptions(rawData) {
-  if (USE_FIXED_UNIT_LAYOUT) {
-    return createDefaultOpsHeatPumpUnitOptions()
-  }
-
   const source = rawData?.data ?? rawData
   const list = Array.isArray(source?.heatPump) ? source.heatPump : []
   if (!list.length) {
     return createDefaultOpsHeatPumpOptions()
   }
 
-  return list
-    .map((item, index) => {
-      const codeText = toText(item?.code, `No${index + 1}`)
-      const unitId = parseUnitDeviceCodeLoose(codeText) ?? index + 1
-      if (unitId >= AIR_COOLED_MODULE_START_NO) {
-        return null
-      }
-      return {
-        value: codeText,
-        label: toText(item?.name, `热泵${unitId}`),
-        row: toNumberOrFallback(item?.row, 1),
-        column: toNumberOrFallback(item?.column, 1),
-      }
-    })
-    .filter(Boolean)
+  return list.map((item, index) => {
+    const codeText = toText(item?.code, `No${index + 1}`)
+    const unitId = parseUnitDeviceCodeLoose(codeText) ?? index + 1
+    return {
+      value: codeText,
+      label: toText(item?.name, `热泵${unitId}`),
+      row: toNumberOrFallback(item?.row, 1),
+      column: toNumberOrFallback(item?.column, 1),
+    }
+  })
 }
 
 export function createDefaultOpsHeatPumpSingleMetrics() {
@@ -217,7 +199,7 @@ export function adaptOpsDeviceRows(rawData) {
   }))
 }
 
-/** 后端偶发用热泵14-25 表示风冷模块1-12，统一归一到 No31-42 */
+/** 兼容后端偶发用热泵14-25 表示风冷模块1-12，统一归一到 No31-42 */
 function normalizeOpsDevicePointNo(pointNo) {
   if (pointNo >= 14 && pointNo <= 25) {
     return pointNo - 14 + AIR_COOLED_MODULE_START_NO
@@ -251,7 +233,7 @@ export function resolveOpsDeviceRowPointNo(row) {
   return null
 }
 
-/** 按点位展示名称：No31→风冷模块1，No42→风冷模块12；No1-13→热泵1-13 */
+/** 按点位展示名称：No1-13→热泵1-13；No31-42→耦合能源风冷模块1-12 */
 export function formatOpsDeviceRowDisplayName(row) {
   const pointNo = resolveOpsDeviceRowPointNo(row)
   if (pointNo == null) {

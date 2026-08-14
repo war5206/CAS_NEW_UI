@@ -22,7 +22,6 @@ import protectionStatusIconActive from '../assets/mode-select-heat-pump-protect-
 import heatPumpShutdownIcon from '../assets/heat-pump/hp-shutdown.svg'
 import waterPumpIcon from '../assets/water-pump.svg'
 import { useActionConfirm } from '../hooks/useActionConfirm'
-import { SHOW_MANUAL_AIR_COOLED_CONTROL } from '@/config/projectProfile'
 import { useSystemConfigStore } from '@/features/system/store/systemConfigStore'
 import { useWriteWithDelayedVerify } from '../hooks/useWriteWithDelayedVerify'
 import { getStoredClimateMode, setStoredClimateMode } from '../utils/climateModeState'
@@ -131,11 +130,6 @@ const STANDARD_MANUAL_TYPE_OPTIONS = [
   { value: 'constant-pressure-water-pump', label: '定压补水泵' },
 ]
 
-const DAJUYUAN_manualTypeOptions = [
-  { value: 'heat-pump', label: '热泵' },
-  { value: 'air-cooled-module', label: '风冷模块' },
-]
-
 const STANDARD_MANUAL_DEVICE_TYPE_PARAM_MAP = {
   'heat-pump': '热泵',
   'heat-pump-loop-pump': '热泵循环泵',
@@ -154,20 +148,14 @@ const MANUAL_DEVICE_ICON_MAP = {
   'relief-valve': heatPumpShutdownIcon,
   'constant-pressure-water-pump': waterPumpIcon,
   'terminal-loop-pump': waterPumpIcon,
-  'air-cooled-module': heatPumpShutdownIcon,
 }
 
-/** 手动模式 Poweron 控制：热泵 No1–No30，风冷模块 No31–No42 */
+/** 手动模式 Poweron 控制：热泵 No1–No30 */
 const MANUAL_POWERON_DEVICE_CONFIG = {
   'heat-pump': {
     startNo: 1,
     count: 30,
     getLabel: (displayIndex) => `No${displayIndex}`,
-  },
-  'air-cooled-module': {
-    startNo: 31,
-    count: 12,
-    getLabel: (displayIndex) => `风冷模块${displayIndex}`,
   },
 }
 
@@ -281,7 +269,7 @@ function extractManualSwitchList(response) {
 }
 
 function usesManualSwitchApi(deviceTypeValue) {
-  return !SHOW_MANUAL_AIR_COOLED_CONTROL && Boolean(STANDARD_MANUAL_DEVICE_TYPE_PARAM_MAP[deviceTypeValue])
+  return Boolean(STANDARD_MANUAL_DEVICE_TYPE_PARAM_MAP[deviceTypeValue])
 }
 
 function ModeSettingCard({
@@ -362,9 +350,6 @@ function ModeSelectPage() {
   const isSecondarySystem = String(systemTypeUuid) === '2'
 
   const manualTypeOptions = useMemo(() => {
-    if (SHOW_MANUAL_AIR_COOLED_CONTROL) {
-      return DAJUYUAN_manualTypeOptions
-    }
     if (!isSecondarySystem) {
       return STANDARD_MANUAL_TYPE_OPTIONS.filter((item) => item.value !== 'terminal-loop-pump')
     }
@@ -507,7 +492,7 @@ function ModeSelectPage() {
     }
   }, [])
 
-  // 热泵 / 风冷模块：直接读 Poweron 实值（与下置点位一致）
+  // 热泵：直接读 Poweron 实值（与下置点位一致）
   const refreshManualPoweronStates = useCallback(async (deviceTypeValue) => {
     if (!isPoweronManualDeviceType(deviceTypeValue)) return
     const longNames = getPoweronLongNamesForDeviceType(deviceTypeValue)
@@ -619,13 +604,8 @@ function ModeSelectPage() {
             if (nextFeatureId === 'manual') {
               const initialManualType = manualTypeOptions[0].value
               setManualDeviceType(initialManualType)
-              if (SHOW_MANUAL_AIR_COOLED_CONTROL) {
-                setManualDeviceList(createDefaultManualDeviceList(initialManualType))
-                refreshManualPoweronStates(initialManualType)
-              } else {
-                setManualDeviceList([])
-                fetchManualSwitch(initialManualType)
-              }
+              setManualDeviceList([])
+              fetchManualSwitch(initialManualType)
             }
           },
           delayedVerify: async () => {
@@ -709,11 +689,7 @@ function ModeSelectPage() {
     (nextValue) => {
       if (nextValue === manualDeviceType) return
       setManualDeviceType(nextValue)
-      if (SHOW_MANUAL_AIR_COOLED_CONTROL) {
-        setManualDeviceList(createDefaultManualDeviceList(nextValue))
-      } else {
-        setManualDeviceList([])
-      }
+      setManualDeviceList([])
       fetchManualDeviceList(nextValue)
     },
     [fetchManualDeviceList, manualDeviceType],

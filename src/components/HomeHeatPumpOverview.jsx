@@ -19,8 +19,7 @@ import {
   HEAT_PUMP_STATUS,
   HEAT_PUMP_STATUS_LABEL,
 } from '../config/homeHeatPumps'
-import { USE_FIXED_UNIT_LAYOUT } from '@/config/projectProfile'
-import { createUnitGridItem, resolveUnitDisplayLabelFromCode, toUnitDeviceCode } from '../config/projectUnitDevices'
+import { resolveUnitDisplayLabelFromCode, toUnitDeviceCode } from '../config/projectUnitDevices'
 import { UNIT_DEVICE_OVERVIEW_METRIC_KEYS } from '../config/unitDeviceParamPoints'
 import { useHeatPumpBoardStatusPoll } from '../hooks/useHeatPumpBoardStatusPoll'
 import { useHeatPumpArrangeQuery } from '../features/home/hooks/useHeatPumpArrangeQuery'
@@ -183,37 +182,6 @@ function HomeHeatPumpOverview({ onBack, committedUnitLayoutSlots, heatPumpItems:
 
     if (!Array.isArray(committedUnitLayoutSlots) || committedUnitLayoutSlots.length === 0) {
       return EMPTY_GRID_ITEMS
-    }
-
-    if (USE_FIXED_UNIT_LAYOUT) {
-      return Array.from({ length: HEAT_PUMP_GRID_ROWS * HEAT_PUMP_GRID_COLS }, (_, index) => {
-        const row = Math.floor(index / HEAT_PUMP_GRID_COLS) + 1
-        const col = (index % HEAT_PUMP_GRID_COLS) + 1
-        const pumpId = committedUnitLayoutSlots[index]
-
-        if (pumpId) {
-          const mapped = createUnitGridItem(pumpId)
-          return {
-            ...mapped,
-            row,
-            col,
-            code: toUnitDeviceCode(pumpId),
-            status: HEAT_PUMP_STATUS.EMPTY,
-            key: `hp-layout-${mapped.id}-${row}-${col}`,
-          }
-        }
-
-        return {
-          key: `hp-layout-empty-${row}-${col}`,
-          id: null,
-          row,
-          col,
-          status: HEAT_PUMP_STATUS.EMPTY,
-          label: null,
-          name: null,
-          details: [],
-        }
-      }).map((item) => applyLiveStatusToBoardItem(item, liveStatusByCode))
     }
 
     const baseById = new Map(
@@ -450,13 +418,9 @@ function HomeHeatPumpOverview({ onBack, committedUnitLayoutSlots, heatPumpItems:
                     </thead>
                     <tbody>
                       {pagedHeatPumps.map((pump) => {
-                        const heatPumpName = USE_FIXED_UNIT_LAYOUT
-                          ? resolveUnitDisplayLabelFromCode(
-                              pump?.heatPumpNo ?? pump?.热泵序号 ?? pump?.heatPumpCode ?? pump?.code,
-                            )
-                          : String(
-                              pump?.heatPumpNo ?? pump?.热泵序号 ?? pump?.heatPumpCode ?? pump?.code ?? '--',
-                            )
+                        const heatPumpName = String(
+                          pump?.heatPumpNo ?? pump?.热泵序号 ?? pump?.heatPumpCode ?? pump?.code ?? '--',
+                        )
 
                         return (
                           <tr key={`summary-row-${pump?.heatPumpCode ?? heatPumpName}`}>

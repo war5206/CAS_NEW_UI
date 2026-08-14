@@ -21,63 +21,6 @@ import iconSystemManagement from '../assets/navigation/systemManagement.svg'
 import iconDeviceManagement from '../assets/navigation/deviceManagement.svg'
 import iconDocManagement from '../assets/navigation/docManagement.svg'
 import iconSystemInstruction from '../assets/navigation/systemInstruction.svg'
-import {
-  SHOW_AIR_COOLED_AS_STANDALONE_UNITS,
-  USE_SPLIT_OPS_UNIT_DATA_TABS,
-} from '@/config/projectProfile'
-
-function filterTabs(tabs, hiddenTabIds) {
-  return tabs.filter((tab) => !hiddenTabIds.has(tab.id))
-}
-
-function applyProjectProfileToModules(baseModules) {
-  const hiddenDeviceParamTabs = SHOW_AIR_COOLED_AS_STANDALONE_UNITS ? new Set() : new Set(['air-cooled-module'])
-  const hiddenOpsDeviceTabs = SHOW_AIR_COOLED_AS_STANDALONE_UNITS ? new Set() : new Set(['ops-air-cooled-module'])
-
-  return baseModules.map((module) => {
-    if (!module.sections?.length) {
-      return module
-    }
-
-    return {
-      ...module,
-      sections: module.sections.map((section) => {
-        if (section.id === 'device-params' && section.tabs?.length) {
-          return {
-            ...section,
-            tabs: filterTabs(section.tabs, hiddenDeviceParamTabs),
-          }
-        }
-
-        if (section.id === 'device-management' && section.tabs?.length) {
-          return {
-            ...section,
-            tabs: filterTabs(section.tabs, hiddenOpsDeviceTabs),
-          }
-        }
-
-        if (section.id === 'system-management' && section.tabs?.length) {
-          if (USE_SPLIT_OPS_UNIT_DATA_TABS) {
-            return section
-          }
-
-          const mergedUnitDataTab = { id: 'unit-data', label: '机组数据', path: 'unit-data' }
-          const tabs = section.tabs.filter((tab) => tab.id !== 'unit-data-heat-pump' && tab.id !== 'unit-data-air-cooled')
-          const settingDataIndex = tabs.findIndex((tab) => tab.id === 'setting-data')
-          const insertIndex = settingDataIndex >= 0 ? settingDataIndex + 1 : tabs.length
-          tabs.splice(insertIndex, 0, mergedUnitDataTab)
-
-          return {
-            ...section,
-            tabs,
-          }
-        }
-
-        return section
-      }),
-    }
-  })
-}
 
 const BASE_MODULES = [
   {
@@ -113,7 +56,6 @@ const BASE_MODULES = [
         path: 'device-params',
         tabs: [
           { id: 'heat-pump', label: '热泵', path: 'heat-pump' },
-          { id: 'air-cooled-module', label: '风冷模块', path: 'air-cooled-module' },
           { id: 'hp-loop-pump', label: '热泵循环泵', path: 'heat-pump-loop-pump' },
           { id: 'terminal-loop-pump', label: '末端循环泵', path: 'terminal-loop-pump' },
           { id: 'heat-trace', label: '伴热带', path: 'heat-trace' },
@@ -176,7 +118,6 @@ const BASE_MODULES = [
           { id: 'status-data', label: '系统状态数据', path: 'system-status-data' },
           { id: 'setting-data', label: '系统设置数据', path: 'system-setting-data' },
           { id: 'unit-data-heat-pump', label: '热泵机组数据', path: 'heat-pump-unit-data' },
-          { id: 'unit-data-air-cooled', label: '风冷模块机组数据', path: 'air-cooled-unit-data' },
         ],
       },
       {
@@ -185,7 +126,6 @@ const BASE_MODULES = [
         path: 'device-management',
         tabs: [
           { id: 'ops-heat-pump', label: '热泵', path: 'heat-pump' },
-          { id: 'ops-air-cooled-module', label: '风冷模块', path: 'air-cooled-module' },
           { id: 'ops-loop-pump', label: '热泵循环泵', path: 'heat-pump-loop-pump' },
           { id: 'ops-terminal-loop-pump', label: '末端循环泵', path: 'terminal-loop-pump' },
           { id: 'ops-coupling', label: '耦合能源', path: 'coupling-energy' },
@@ -204,7 +144,7 @@ const BASE_MODULES = [
   // },
 ]
 
-export const modules = applyProjectProfileToModules(BASE_MODULES)
+export const modules = BASE_MODULES
 
 const sectionIconMap = {
   'mode-select': iconModeSelect,

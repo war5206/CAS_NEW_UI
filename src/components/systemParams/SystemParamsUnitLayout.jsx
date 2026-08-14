@@ -12,28 +12,19 @@ import longArrowDownGrayIcon from '../../assets/long-arrow-down-gray.svg'
 import {
   buildUnitDeviceIds,
   COUPLE_ENERGY_TYPE_NONE_ID,
-  createFixedUnitLayoutState,
-  getFixedUnitLayoutLabel,
   getTotalUnitCount,
   parseUnitDeviceCodeLoose,
   toUnitDeviceCode,
   toUnitNoLabel,
-  USE_FIXED_UNIT_LAYOUT,
 } from '../../config/projectUnitDevices'
 import { queryDeviceArrange, saveDeviceArrange, scanDeviceState } from '../../api/modules/home'
 
 const UNIT_LAYOUT_COLS = 10
 const UNIT_LAYOUT_ROWS = 10
 
-function formatUnitDisplayLabel(id, { showOriginal = false, numberingValue = null } = {}) {
+function formatUnitDisplayLabel(id, { numberingValue = null } = {}) {
   if (numberingValue != null) {
     return String(numberingValue)
-  }
-  if (showOriginal) {
-    return toUnitNoLabel(id)
-  }
-  if (USE_FIXED_UNIT_LAYOUT) {
-    return getFixedUnitLayoutLabel(id)
   }
   return toUnitNoLabel(id)
 }
@@ -42,16 +33,6 @@ function createEmptyUnitLayoutState() {
   return {
     slots: Array.from({ length: UNIT_LAYOUT_COLS * UNIT_LAYOUT_ROWS }, () => null),
     pendingIds: [],
-    layoutLocked: false,
-    numberingDone: false,
-    numberingMap: {},
-    showOriginalNo: false,
-  }
-}
-
-function createAppliedFixedUnitLayoutState() {
-  return {
-    ...createFixedUnitLayoutState(UNIT_LAYOUT_COLS, UNIT_LAYOUT_ROWS),
     layoutLocked: false,
     numberingDone: false,
     numberingMap: {},
@@ -100,24 +81,20 @@ const SystemParamsUnitLayout = forwardRef(function SystemParamsUnitLayout(
   },
   ref,
 ) {
-  const [unitSlots, setUnitSlots] = useState(() =>
-    USE_FIXED_UNIT_LAYOUT ? [...createAppliedFixedUnitLayoutState().slots] : [...createEmptyUnitLayoutState().slots],
-  )
-  const [pendingUnitIds, setPendingUnitIds] = useState(() =>
-    USE_FIXED_UNIT_LAYOUT ? [] : [...createEmptyUnitLayoutState().pendingIds],
-  )
+  const [unitSlots, setUnitSlots] = useState(() => [...createEmptyUnitLayoutState().slots])
+  const [pendingUnitIds, setPendingUnitIds] = useState(() => [...createEmptyUnitLayoutState().pendingIds])
   const [unitLayoutLocked, setUnitLayoutLocked] = useState(false)
   const [unitNumberingMap, setUnitNumberingMap] = useState(() => ({}))
   const [unitNumberingDone, setUnitNumberingDone] = useState(false)
   const [showOriginalNo, setShowOriginalNo] = useState(false)
   const [longPressedPendingIds, setLongPressedPendingIds] = useState(() => ({}))
   const [smartScanEnabled, setSmartScanEnabled] = useState(true)
-  const [hasUnitLayoutReset, setHasUnitLayoutReset] = useState(USE_FIXED_UNIT_LAYOUT)
+  const [hasUnitLayoutReset, setHasUnitLayoutReset] = useState(false)
   const [manualDraggingPumpId, setManualDraggingPumpId] = useState(null)
   const [manualDraggingSource, setManualDraggingSource] = useState(null)
   const [manualDragPointer, setManualDragPointer] = useState({ x: 0, y: 0 })
   const [savedUnitLayoutState, setSavedUnitLayoutState] = useState(() =>
-    cloneUnitLayoutState(USE_FIXED_UNIT_LAYOUT ? createAppliedFixedUnitLayoutState() : createEmptyUnitLayoutState()),
+    cloneUnitLayoutState(createEmptyUnitLayoutState()),
   )
   const [projectId, setProjectId] = useState('')
   const [isOperating, setIsOperating] = useState(false)
@@ -339,24 +316,6 @@ const SystemParamsUnitLayout = forwardRef(function SystemParamsUnitLayout(
     manualDraggingPumpIdRef.current = manualDraggingPumpId
   }, [manualDraggingPumpId])
 
-  const applyFixedUnitLayout = useCallback(() => {
-    const nextState = createAppliedFixedUnitLayoutState()
-    setUnitSlots(nextState.slots)
-    setPendingUnitIds(nextState.pendingIds)
-    setUnitLayoutLocked(nextState.layoutLocked)
-    setUnitNumberingDone(nextState.numberingDone)
-    setUnitNumberingMap(nextState.numberingMap)
-    setShowOriginalNo(nextState.showOriginalNo)
-    setLongPressedPendingIds({})
-    setSmartScanEnabled(true)
-    setHasUnitLayoutReset(true)
-    setManualDraggingPumpId(null)
-    setManualDraggingSource(null)
-    draggingPumpIdRef.current = null
-    setUnitCountOverride(null)
-    setSavedUnitLayoutState(cloneUnitLayoutState(nextState))
-  }, [])
-
   useEffect(() => {
     const shouldLockScroll = Boolean(manualDraggingPumpId)
     document.body.classList.toggle('unit-layout-drag-lock', shouldLockScroll)
@@ -403,28 +362,8 @@ const SystemParamsUnitLayout = forwardRef(function SystemParamsUnitLayout(
     const addedIds = nextSlots.filter((id) => id != null)
     const placedCount = addedIds.length
 
-    // 后端无已保存排布时：固定排布项目直接写入网格；否则待添加为空，需用户点击「智能扫描」
+    // 后端无已保存排布时：待添加为空，需用户点击「智能扫描」
     if (placedCount === 0) {
-      if (USE_FIXED_UNIT_LAYOUT) {
-        const fixedState = createAppliedFixedUnitLayoutState()
-        setProjectId(nextProjectId)
-        setUnitSlots(fixedState.slots)
-        setPendingUnitIds(fixedState.pendingIds)
-        setUnitLayoutLocked(fixedState.layoutLocked)
-        setUnitNumberingDone(fixedState.numberingDone)
-        setUnitNumberingMap(fixedState.numberingMap)
-        setShowOriginalNo(false)
-        setLongPressedPendingIds({})
-        setSmartScanEnabled(true)
-        setHasUnitLayoutReset(true)
-        setManualDraggingPumpId(null)
-        setManualDraggingSource(null)
-        draggingPumpIdRef.current = null
-        setUnitCountOverride(null)
-        setSavedUnitLayoutState(cloneUnitLayoutState(fixedState))
-        return
-      }
-
       const freshState = createEmptyUnitLayoutState()
       setProjectId(nextProjectId)
       setUnitSlots(freshState.slots)
@@ -516,13 +455,6 @@ const SystemParamsUnitLayout = forwardRef(function SystemParamsUnitLayout(
     if (isOperating) {
       return
     }
-    if (USE_FIXED_UNIT_LAYOUT) {
-      applyFixedUnitLayout()
-      if (arrangeViewOnly) {
-        onArrangeViewOnlyExit?.()
-      }
-      return
-    }
     setIsOperating(true)
     try {
       const response = await scanDeviceState('reset')
@@ -567,10 +499,6 @@ const SystemParamsUnitLayout = forwardRef(function SystemParamsUnitLayout(
       return
     }
     if (!smartScanEnabled || isOperating) {
-      return
-    }
-    if (USE_FIXED_UNIT_LAYOUT) {
-      applyFixedUnitLayout()
       return
     }
     setIsOperating(true)

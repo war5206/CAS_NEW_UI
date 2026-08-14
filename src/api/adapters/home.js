@@ -6,12 +6,9 @@ import {
   getHeatPumpStatusSummary,
 } from '@/config/homeHeatPumps'
 import {
-  AIR_COOLED_MODULE_START_NO,
   getUnitDisplayName,
   parseUnitDeviceCodeLoose,
-  resolveUnitDisplayLabelFromCode,
 } from '@/config/projectUnitDevices'
-import { USE_FIXED_UNIT_LAYOUT } from '@/config/projectProfile'
 import { createUnitDeviceDetailsFromParam } from '@/config/unitDeviceParamPoints'
 import { isOnValue } from '@/utils/realvalMap'
 import {
@@ -388,11 +385,7 @@ export function adaptHeatPumpArrange(rawData) {
     const codeText = toText(item?.code, '')
     const unitId = parseUnitDeviceCodeLoose(codeText) ?? toNumberOrFallback(item?.id, index + 1)
 
-    if (!USE_FIXED_UNIT_LAYOUT && unitId >= AIR_COOLED_MODULE_START_NO) {
-      return
-    }
-
-    const displayName = USE_FIXED_UNIT_LAYOUT ? getUnitDisplayName(unitId) : `热泵${unitId}`
+    const displayName = `热泵${unitId}`
 
     arrangedMap.set(`${safeRow}-${safeCol}`, {
       key: `hp-${codeText || unitId}-${safeRow}-${safeCol}`,
@@ -462,20 +455,7 @@ export function adaptHeatPumpOverviewPage(rawData) {
   const fallback = createDefaultHeatPumpOverviewPage()
   const responseData = rawData?.data ?? rawData
   const source = responseData?.data ?? responseData ?? {}
-  const list = Array.isArray(source?.list)
-    ? source.list.map((item) => {
-        if (!USE_FIXED_UNIT_LAYOUT) {
-          return item
-        }
-        const codeCandidate = item?.heatPumpCode ?? item?.heatPumpNo ?? item?.热泵序号 ?? item?.code
-        const displayName = resolveUnitDisplayLabelFromCode(codeCandidate)
-        return {
-          ...item,
-          heatPumpNo: displayName,
-          热泵序号: displayName,
-        }
-      })
-    : []
+  const list = Array.isArray(source?.list) ? source.list : []
 
   return {
     list,

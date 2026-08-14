@@ -24,7 +24,6 @@ import {
   querySystemStateData,
   querySystemType,
 } from '@/api/modules/operations'
-import { USE_SPLIT_OPS_UNIT_DATA_TABS } from '@/config/projectProfile'
 
 export function useOpsSystemStateQuery({ enabled = true } = {}) {
   return usePollingQuery({
@@ -51,16 +50,6 @@ export function useOpsHeatPumpSingleQuery(code, { enabled = true } = {}) {
     queryKey: ['ops', 'heat-pump-single', code],
     queryFn: () => queryHeatPumpParam({ code }),
     enabled: enabled && Boolean(code),
-    select: (response) => adaptOpsUnitDeviceMetrics(response?.data ?? response, code),
-    placeholderData: createDefaultOpsUnitDeviceMetrics(),
-  })
-}
-
-export function useOpsUnitDeviceParamQuery(code, { enabled = true } = {}) {
-  return usePollingQuery({
-    queryKey: ['ops', 'unit-device-param', code],
-    queryFn: () => queryHeatPumpParam({ code }),
-    enabled: enabled && Boolean(code) && USE_SPLIT_OPS_UNIT_DATA_TABS,
     select: (response) => adaptOpsUnitDeviceMetrics(response?.data ?? response, code),
     placeholderData: createDefaultOpsUnitDeviceMetrics(),
   })
