@@ -608,6 +608,7 @@ function HomePage({ onActivePageChange, committedUnitLayoutSlots }) {
               <HomeHeatPumpOverview
                 onBack={goBackHome}
                 committedUnitLayoutSlots={committedUnitLayoutSlots}
+                heatPumpCount={systemConfig.heatPumpCount}
                 heatPumpItems={homeOverview.heatPumpItems}
               />
             </div>

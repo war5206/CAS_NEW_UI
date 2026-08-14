@@ -19,7 +19,7 @@ import {
   HEAT_PUMP_STATUS,
   HEAT_PUMP_STATUS_LABEL,
 } from '../config/homeHeatPumps'
-import { resolveUnitDisplayLabelFromCode, toUnitDeviceCode } from '../config/projectUnitDevices'
+import { parseUnitDeviceCodeLoose, resolveUnitDisplayLabelFromCode, toUnitDeviceCode } from '../config/projectUnitDevices'
 import { UNIT_DEVICE_OVERVIEW_METRIC_KEYS } from '../config/unitDeviceParamPoints'
 import { useHeatPumpBoardStatusPoll } from '../hooks/useHeatPumpBoardStatusPoll'
 import { useHeatPumpArrangeQuery } from '../features/home/hooks/useHeatPumpArrangeQuery'
@@ -104,13 +104,18 @@ function applyLiveStatusToBoardItem(item, liveStatusByCode) {
   }
 }
 
-function HomeHeatPumpOverview({ onBack, committedUnitLayoutSlots, heatPumpItems: externalHeatPumpItems = null }) {
+function HomeHeatPumpOverview({
+  onBack,
+  committedUnitLayoutSlots,
+  heatPumpCount: configuredHeatPumpCount,
+  heatPumpItems: externalHeatPumpItems = null,
+}) {
   const [activePump, setActivePump] = useState(null)
   const [pendingPump, setPendingPump] = useState(null)
   const [isOverviewModalOpen, setIsOverviewModalOpen] = useState(false)
   const [overviewPage, setOverviewPage] = useState(1)
   const { data: arrangedHeatPumpItems } = useHeatPumpArrangeQuery()
-  const liveStatusByCode = useHeatPumpBoardStatusPoll({ enabled: true })
+  const { liveStatusByCode, resolvedCount: actualHeatPumpCount } = useHeatPumpBoardStatusPoll({ enabled: true })
   const { data: pendingPumpWithParam, isError: isPumpParamError } = useHeatPumpParamQuery({
     pump: pendingPump,
     enabled: Boolean(pendingPump),
@@ -175,9 +180,19 @@ function HomeHeatPumpOverview({ onBack, committedUnitLayoutSlots, heatPumpItems:
     [],
   )
 
+  const effectiveConfiguredCount = configuredHeatPumpCount ?? actualHeatPumpCount
+  const isPumpInConfiguredRange = useMemo(
+    () => (unitId) =>
+      unitId != null &&
+      (effectiveConfiguredCount == null || effectiveConfiguredCount <= 0 || unitId <= effectiveConfiguredCount),
+    [effectiveConfiguredCount],
+  )
+
   const boardHeatPumpItems = useMemo(() => {
     if (Array.isArray(arrangedHeatPumpItems) && arrangedHeatPumpItems.length > 0) {
-      return arrangedHeatPumpItems.map((item) => applyLiveStatusToBoardItem(item, liveStatusByCode))
+      return arrangedHeatPumpItems
+        .filter((item) => isPumpInConfiguredRange(item?.id))
+        .map((item) => applyLiveStatusToBoardItem(item, liveStatusByCode))
     }
 
     if (!Array.isArray(committedUnitLayoutSlots) || committedUnitLayoutSlots.length === 0) {
@@ -191,8 +206,9 @@ function HomeHeatPumpOverview({ onBack, committedUnitLayoutSlots, heatPumpItems:
     return Array.from({ length: HEAT_PUMP_GRID_ROWS * HEAT_PUMP_GRID_COLS }, (_, index) => {
       const row = Math.floor(index / HEAT_PUMP_GRID_COLS) + 1
       const col = (index % HEAT_PUMP_GRID_COLS) + 1
-      const pumpId = committedUnitLayoutSlots[index]
-      const mapped = baseById.get(pumpId)
+      const rawPumpId = committedUnitLayoutSlots[index]
+      const pumpId = isPumpInConfiguredRange(rawPumpId) ? rawPumpId : null
+      const mapped = pumpId != null ? baseById.get(pumpId) : null
 
       if (mapped) {
         return {
@@ -214,10 +230,28 @@ function HomeHeatPumpOverview({ onBack, committedUnitLayoutSlots, heatPumpItems:
         details: [],
       }
     }).map((item) => applyLiveStatusToBoardItem(item, liveStatusByCode))
-  }, [arrangedHeatPumpItems, committedUnitLayoutSlots, liveStatusByCode])
+  }, [arrangedHeatPumpItems, committedUnitLayoutSlots, isPumpInConfiguredRange, liveStatusByCode])
 
-  const totalOverviewPages = Math.max(1, overviewPageData.totalPages || 1)
-  const pagedHeatPumps = overviewPageData.list
+  const filteredOverviewPumps = useMemo(() => {
+    const list = Array.isArray(overviewPageData.list) ? overviewPageData.list : []
+    return list.filter((pump) => {
+      const unitId = parseUnitDeviceCodeLoose(
+        pump?.heatPumpCode ?? pump?.heatPumpNo ?? pump?.热泵序号 ?? pump?.code,
+      )
+      if (unitId == null) {
+        return false
+      }
+      if (!isPumpInConfiguredRange(unitId)) {
+        return false
+      }
+      if (actualHeatPumpCount != null && unitId > actualHeatPumpCount) {
+        return false
+      }
+      return true
+    })
+  }, [actualHeatPumpCount, isPumpInConfiguredRange, overviewPageData.list])
+  const totalOverviewPages = Math.max(1, overviewPageData.totalPages ?? 1)
+  const pagedHeatPumps = filteredOverviewPumps
   const emptyRowCount = Math.max(0, HEAT_PUMP_OVERVIEW_PAGE_SIZE - pagedHeatPumps.length)
 
   useEffect(() => {

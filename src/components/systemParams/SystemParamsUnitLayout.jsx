@@ -325,16 +325,20 @@ const SystemParamsUnitLayout = forwardRef(function SystemParamsUnitLayout(
   }, [manualDraggingPumpId])
 
   const applyQueryArrangeData = useCallback((responseData) => {
-    const arrangeList = Array.isArray(responseData?.pumpArrange) ? responseData.pumpArrange : []
+    const rawArrangeList = Array.isArray(responseData?.pumpArrange) ? responseData.pumpArrange : []
     const nextProjectId = String(responseData?.projectId ?? '')
     const nextSlots = Array.from({ length: UNIT_LAYOUT_COLS * UNIT_LAYOUT_ROWS }, () => null)
     const nextNumberingMap = {}
     const usedIds = new Set()
     let maxArrangeCode = 0
 
+    // 数据库可能仍保留大剧院 13 台的旧排布数据；标准项目以 allowedUnitIds 为准过滤，
+    // 避免 PLC 实际台数少于已保存排布时页面仍显示多余机组
+    const arrangeList = rawArrangeList.filter((item) =>
+      allowedUnitIds.includes(parseUnitDeviceCodeLoose(item?.device_uuid)),
+    )
+
     arrangeList.forEach((item) => {
-      // 回显已保存排布时不按「热泵台数」配置过滤：接口返回的机组全部展示，
-      // 避免台数配置与已保存排布不一致时页面显示为空
       const pumpId = parseUnitDeviceCodeLoose(item?.device_uuid)
       const rowNumber = Number(item?.row_number)
       const columnNumber = Number(item?.column_number)
@@ -412,7 +416,7 @@ const SystemParamsUnitLayout = forwardRef(function SystemParamsUnitLayout(
     draggingPumpIdRef.current = null
     setUnitCountOverride(placedCount + pendingIds.length)
     setSavedUnitLayoutState(cloneUnitLayoutState(nextState))
-  }, [coupleEnergyNumber, coupleEnergyTypeId, heatPumpCount])
+  }, [allowedUnitIds, coupleEnergyNumber, coupleEnergyTypeId, heatPumpCount])
 
   const queryArrangeFetchedRef = useRef(false)
   const unitConfigKey = `${heatPumpCount}-${coupleEnergyTypeId}-${coupleEnergyNumber}`

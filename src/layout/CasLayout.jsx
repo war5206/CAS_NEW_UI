@@ -178,11 +178,12 @@ function CasLayout({
           type="button"
           className="avatar"
           aria-label="重新登录"
-          onClick={() =>
+          onClick={() => {
+            window.sessionStorage.setItem('cas.loginIntent', 'layout-avatar')
             navigate('/auth/login', {
               state: { fromLayoutAvatar: true },
             })
-          }
+          }}
         >
           <img src={userAvatar} alt="" aria-hidden="true" />
         </button>

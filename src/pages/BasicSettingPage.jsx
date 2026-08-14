@@ -14,6 +14,11 @@ import {
 } from '../api/modules/settings'
 import { clearGuideWizardCache } from '@/utils/guideCache'
 import { notifyFactoryResetTriggered } from '@/hooks/useGlobalInitStateWatcher'
+import { suppressSystemStatusPollFor } from '@/hooks/useGlobalSystemStatusPoll'
+import {
+  setSystemPowerStatus,
+  useSystemStatusStore,
+} from '@/features/system/store/systemStatusStore'
 import {
   setHomeFeatureSettings,
   setIndoorTemperatureVisibility,
@@ -189,7 +194,7 @@ function FeatureSettingView() {
 function SystemResetView() {
   const navigate = useNavigate()
   const [confirmAction, setConfirmAction] = useState(null)
-  const [systemStatusValue, setSystemStatusValue] = useState('0')
+  const { powerStatus, hasFetched } = useSystemStatusStore()
   const [loadingActionId, setLoadingActionId] = useState('')
   const [attentionConfig, setAttentionConfig] = useState({
     open: false,
@@ -205,24 +210,25 @@ function SystemResetView() {
   })
 
   useEffect(() => {
+    if (hasFetched) {
+      return
+    }
     let cancelled = false
     void (async () => {
       try {
         const response = await queryRealvalByLongNames(LONG_NAME_SYSTEM_STATUS)
         const value = String(response?.data?.data?.[LONG_NAME_SYSTEM_STATUS] ?? '0')
         if (!cancelled) {
-          setSystemStatusValue(value === '1' ? '1' : '0')
+          setSystemPowerStatus(value === '1' ? '1' : '0')
         }
       } catch {
-        if (!cancelled) {
-          setSystemStatusValue('0')
-        }
+        // 全局轮询会在下一次周期自动校正，静默失败即可
       }
     })()
     return () => {
       cancelled = true
     }
-  }, [])
+  }, [hasFetched])
 
   const handleActionClick = (action) => {
     setConfirmAction(action)
@@ -268,18 +274,20 @@ function SystemResetView() {
         if (response?.data?.success) {
           clearGuideWizardCache()
           notifyFactoryResetTriggered()
+          window.localStorage.setItem('cas.factoryReset', '1')
           setConfirmAction(null)
           navigate('/auth/set-password')
           return
         }
         openAlert('执行失败')
       } else if (confirmAction.id === 'system-shutdown') {
-        const nextValue = systemStatusValue === '1' ? '0' : '1'
+        const nextValue = powerStatus === '1' ? '0' : '1'
         const response = await writeRealvalByLongNames({
           [LONG_NAME_SYSTEM_STATUS]: nextValue,
         })
         if (isWriteSuccess(response)) {
-          setSystemStatusValue(nextValue)
+          setSystemPowerStatus(nextValue)
+          suppressSystemStatusPollFor(3000)
           openAlert('保存成功')
         } else {
           openAlert('保存失败')
@@ -354,7 +362,7 @@ function SystemResetView() {
     }
     return {
       ...action,
-      title: systemStatusValue === '1' ? '系统关机' : '系统开机',
+      title: powerStatus === '1' ? '系统关机' : '系统开机',
     }
   })
 
@@ -477,9 +485,11 @@ function DeviceLockView() {
         return
       }
       if (nextValue === '1') {
+        window.localStorage.setItem('cas.deviceLocked', '1')
         navigate('/auth/login', { state: { deviceLocked: true } })
         return
       }
+      window.localStorage.removeItem('cas.deviceLocked')
       setIsDeviceLocked(false)
       setAttentionMessage('解锁成功')
     } catch {

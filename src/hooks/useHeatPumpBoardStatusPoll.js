@@ -63,6 +63,7 @@ async function queryBoardStatusMap(heatPumpCount) {
 export function useHeatPumpBoardStatusPoll({ enabled = true } = {}) {
   const heatPumpCountRef = useRef(STANDARD_DEFAULT_HEAT_PUMP_COUNT)
   const [liveStatusByCode, setLiveStatusByCode] = useState(() => new Map())
+  const [resolvedCount, setResolvedCount] = useState(null)
 
   useEffect(() => {
     if (!enabled) {
@@ -79,6 +80,7 @@ export function useHeatPumpBoardStatusPoll({ enabled = true } = {}) {
         }
 
         heatPumpCountRef.current = result.resolvedCount
+        setResolvedCount(result.resolvedCount)
         setLiveStatusByCode(result.statusByCode)
       } catch {
         // ignore
@@ -93,5 +95,5 @@ export function useHeatPumpBoardStatusPoll({ enabled = true } = {}) {
     }
   }, [enabled])
 
-  return liveStatusByCode
+  return { liveStatusByCode, resolvedCount }
 }

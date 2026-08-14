@@ -216,6 +216,8 @@ function SystemParamsPage({
   const [unitLayoutDirty, setUnitLayoutDirty] = useState(false)
   const [energyPriceDirty, setEnergyPriceDirty] = useState(false)
   const [projectDataLoading, setProjectDataLoading] = useState(false)
+  const [projectDataInitialized, setProjectDataInitialized] = useState(false)
+  const [unitLayoutProjectDataLoading, setUnitLayoutProjectDataLoading] = useState(false)
   const [projectSaveLoading, setProjectSaveLoading] = useState(false)
   const [circulationPumpDataLoading, setCirculationPumpDataLoading] = useState(false)
   const [circulationPumpSaveLoading, setCirculationPumpSaveLoading] = useState(false)
@@ -500,6 +502,7 @@ function SystemParamsPage({
         setProjectForm(next)
         setSavedProjectForm(deepClone(next))
         setSystemConfigState({ systemTypeUuid: next.systemType })
+        setProjectDataInitialized(true)
       } catch {
         // 保留当前表单，使用上次成功或默认
       } finally {
@@ -512,6 +515,41 @@ function SystemParamsPage({
       cancelled = true
     }
   }, [activeView])
+
+  useEffect(() => {
+    if (activeView !== 'unit-layout') {
+      setUnitLayoutProjectDataLoading(false)
+      return undefined
+    }
+    if (projectDataInitialized) {
+      return undefined
+    }
+
+    let cancelled = false
+    setUnitLayoutProjectDataLoading(true)
+    ;(async () => {
+      try {
+        const response = await queryProjectData()
+        const next = adaptProjectDataFromQueryResponse(response)
+        if (cancelled || !next) {
+          return
+        }
+        setProjectForm(next)
+        setSavedProjectForm(deepClone(next))
+        setSystemConfigState({ systemTypeUuid: next.systemType })
+        setProjectDataInitialized(true)
+      } catch {
+        // 保留当前表单，使用上次成功或默认
+      } finally {
+        if (!cancelled) {
+          setUnitLayoutProjectDataLoading(false)
+        }
+      }
+    })()
+    return () => {
+      cancelled = true
+    }
+  }, [activeView, projectDataInitialized])
 
   useEffect(() => {
     if (activeView !== 'loop-pump-count') {
@@ -1304,7 +1342,7 @@ function SystemParamsPage({
       {activeView === 'overview' ? renderOverview() : null}
       {activeView === 'project-system-type' ? renderProjectSystemTypeForm() : null}
       {activeView === 'loop-pump-count' ? renderLoopPumpCountDetail() : null}
-      {activeView === 'unit-layout' && unitLayoutCouplingReady ? (
+      {activeView === 'unit-layout' && unitLayoutCouplingReady && !unitLayoutProjectDataLoading ? (
         <SystemParamsUnitLayout
           key={`unit-layout-${projectForm.heatPumpCount}-${COUPLING_ENERGY_LABEL_TO_ID[couplingEnergyState.type] || COUPLE_ENERGY_TYPE_NONE_ID}-${couplingEnergyState.count}`}
           ref={unitLayoutRef}

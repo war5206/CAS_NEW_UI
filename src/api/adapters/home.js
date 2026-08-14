@@ -244,6 +244,7 @@ export function createDefaultSystemConfig() {
     systemTypeUuid: '1',
     terminalTypeUuid: '5',
     coupleEnergyTypeUuid: '',
+    heatPumpCount: null,
   }
 }
 
@@ -267,6 +268,7 @@ export function adaptSystemConfig(rawData) {
     systemTypeUuid: String(projectData.system_type_uuid ?? '1'),
     terminalTypeUuid: String(projectData.terminal_type_uuid ?? '5'),
     coupleEnergyTypeUuid: String(coupleEnergyTypeUuid),
+    heatPumpCount: projectData.heat_pump != null ? toNumberOrFallback(projectData.heat_pump, 0) : null,
   }
 }
 

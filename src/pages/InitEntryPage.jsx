@@ -15,6 +15,9 @@ const INIT_RETRY_INTERVAL_MS = 20 * 1000
 /** 欢迎图最短展示时长 */
 const MIN_WELCOME_DISPLAY_MS = 2500
 
+const DEVICE_LOCKED_KEY = 'cas.deviceLocked'
+const FACTORY_RESET_KEY = 'cas.factoryReset'
+
 function sleep(ms) {
   return new Promise((resolve) => {
     setTimeout(resolve, ms)
@@ -28,6 +31,19 @@ function normalizePathname(pathname) {
   const trimmed = pathname.replace(/\/$/, '')
   return trimmed || '/'
 }
+
+function readPersistedDeviceLocked() {
+  return typeof window !== 'undefined' && window.localStorage.getItem(DEVICE_LOCKED_KEY) === '1'
+}
+
+function readPersistedFactoryReset() {
+  return typeof window !== 'undefined' && window.localStorage.getItem(FACTORY_RESET_KEY) === '1'
+}
+
+const AUTH_LOGIN_PATH = normalizePathname('/auth/login')
+const AUTH_SET_PASSWORD_PATH = normalizePathname('/auth/set-password')
+const AUTH_CONFIRM_PASSWORD_PATH = normalizePathname('/auth/confirm-password')
+const FACTORY_RESET_AUTH_PATHS = [AUTH_SET_PASSWORD_PATH, AUTH_CONFIRM_PASSWORD_PATH, AUTH_LOGIN_PATH]
 
 /**
  * @param {{ ignoreStaleLock?: boolean }} [options] - 超管解锁成功后 navigate 带上 deviceUnlockSucceeded 时，若后端尚未刷新 lockStatus，仍按 initState 路由而不退回登录页
@@ -78,6 +94,8 @@ function InitEntryLayout() {
   const [aligned, setAligned] = useState(false)
   const [welcomeMinPassed, setWelcomeMinPassed] = useState(false)
   const [failedAttempts, setFailedAttempts] = useState(0)
+  const [fastAuthRedirect, setFastAuthRedirect] = useState(false)
+  const isAuthRoute = location.pathname.startsWith('/auth')
 
   const initFetchedRef = useRef(0)
 
@@ -93,6 +111,21 @@ function InitEntryLayout() {
     }
 
     const here = normalizePathname(location.pathname)
+    const deviceLocked = readPersistedDeviceLocked()
+    const factoryReset = readPersistedFactoryReset()
+
+    if (deviceLocked && here !== AUTH_LOGIN_PATH) {
+      setAligned(false)
+      navigate('/auth/login', { replace: true, state: { deviceLocked: true } })
+      return
+    }
+
+    if (factoryReset && !FACTORY_RESET_AUTH_PATHS.includes(here)) {
+      setAligned(false)
+      navigate('/auth/set-password', { replace: true })
+      return
+    }
+
     const targetPath = here === '/' ? '/home' : location.pathname
     const target = normalizePathname(targetPath)
 
@@ -103,6 +136,36 @@ function InitEntryLayout() {
     }
     setAligned(true)
   }, [skipInitGate, location.pathname, navigate])
+
+  // 非 skip 模式下，在拿到后端 initState 之前先用 localStorage 里的锁定/恢复出厂标记做兜底，
+  // 避免后端接口慢或卡住时用户先看到首页；等后端返回后再以真实状态为准。
+  useEffect(() => {
+    if (skipInitGate) {
+      return
+    }
+    if (initBody != null) {
+      return
+    }
+
+    const here = normalizePathname(location.pathname)
+    const deviceLocked = readPersistedDeviceLocked()
+    const factoryReset = readPersistedFactoryReset()
+
+    if (deviceLocked && here !== AUTH_LOGIN_PATH) {
+      navigate('/auth/login', { replace: true, state: { deviceLocked: true } })
+      return
+    }
+
+    if (factoryReset && !FACTORY_RESET_AUTH_PATHS.includes(here)) {
+      navigate('/auth/set-password', { replace: true })
+      return
+    }
+
+    if ((deviceLocked && here === AUTH_LOGIN_PATH) || (factoryReset && FACTORY_RESET_AUTH_PATHS.includes(here))) {
+      setFastAuthRedirect(true)
+      setAligned(true)
+    }
+  }, [skipInitGate, initBody, location.pathname, navigate])
 
   useEffect(() => {
     if (skipInitGate) {
@@ -188,13 +251,15 @@ function InitEntryLayout() {
     setFetchVersion((v) => v + 1)
   }, [])
 
-  const ready = welcomeMinPassed && (skipInitGate ? aligned : error == null && initBody != null && aligned)
+  const authRouteReady = isAuthRoute && fastAuthRedirect
+  const ready = (isAuthRoute || welcomeMinPassed) &&
+    (skipInitGate ? aligned : error == null && (initBody != null || authRouteReady) && (aligned || authRouteReady))
 
   useEffect(() => {
     setHomeCacheAllowed(ready)
   }, [ready, setHomeCacheAllowed])
 
-  if (!skipInitGate && error) {
+  if (!skipInitGate && error && !fastAuthRedirect) {
     return (
       <div className="init-entry-page">
         <p className="init-entry-page__message">无法连接服务，请检查网络后重试</p>
@@ -207,10 +272,10 @@ function InitEntryLayout() {
 
   if (!ready) {
     return (
-      <div className="init-entry-page init-entry-page--welcome" aria-busy="true">
-        <img className="init-entry-page__welcome" src={welcomeImg} alt="欢迎进入系统" />
+      <div className={`init-entry-page${isAuthRoute ? '' : ' init-entry-page--welcome'}`} aria-busy="true">
+        {isAuthRoute ? null : <img className="init-entry-page__welcome" src={welcomeImg} alt="欢迎进入系统" />}
         <div className="init-entry-page__spinner" aria-hidden />
-        {failedAttempts >= 3 ? (
+        {isAuthRoute ? null : failedAttempts >= 3 ? (
           <p className="init-entry-page__first-start-tip">首次启动系统，大约需要5分钟，请耐心等待...</p>
         ) : null}
       </div>

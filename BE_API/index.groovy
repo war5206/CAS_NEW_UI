@@ -50,21 +50,7 @@ SnowFlake creatId = new SnowFlake();
 
 int scale = 1;
 
-// 获取热泵总台数
 String selectTotalHeatPumpSql = "SELECT heat_pump FROM sjmg_project_data";
-int totalHPCount = 0;
-try {
-    List<Map<String,Object>> selectHPDataList = dynamicDataSource.excuteTenantSqlQuery(selectTotalHeatPumpSql, dbCode);
-    if (selectHPDataList.size() == 1) {
-        try {
-            totalHPCount = Integer.parseInt(selectHPDataList.get(0).get("heat_pump").toString());
-        } catch (Exception e) {
-            totalHPCount = new BigDecimal("0");
-        }
-    }
-} catch (Exception e) {
-    totalHPCount = 0;
-}
 
 // 查询热泵信息
 String selectHeatPumpSql = "SELECT device_uuid,arrange_code FROM sjmg_pump_arrange ORDER BY arrange_code";
@@ -107,13 +93,39 @@ def isPointValue = { String pointValue, int targetValue ->
     }
 };
 
+// 获取热泵总台数：标准项目优先读取 PLC 点位 Sys\FinforWorx\HPTotalNumber，
+// 读取失败或无效时回退到 sjmg_project_data.heat_pump
+int totalHPCount = 0;
+try {
+    String hpTotalNumberRealVal = getPointRealVal("Sys\\FinforWorx\\HPTotalNumber");
+    if (hpTotalNumberRealVal != null && !hpTotalNumberRealVal.trim().isEmpty()) {
+        totalHPCount = Integer.parseInt(hpTotalNumberRealVal.trim());
+    }
+} catch (Exception e) {
+    totalHPCount = 0;
+}
+if (totalHPCount <= 0) {
+    try {
+        List<Map<String,Object>> selectHPDataList = dynamicDataSource.excuteTenantSqlQuery(selectTotalHeatPumpSql, dbCode);
+        if (selectHPDataList.size() == 1) {
+            try {
+                totalHPCount = Integer.parseInt(selectHPDataList.get(0).get("heat_pump").toString());
+            } catch (Exception e) {
+                totalHPCount = 0;
+            }
+        }
+    } catch (Exception e) {
+        totalHPCount = 0;
+    }
+}
+
 int offlineHeatPump = 0;
 int alarmHeatPump = 0;
 int defrostHeatPump = 0;
 int runningHeatPump = 0;
 
-int[] fixedDeviceNos = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42];
-for (int deviceNo : fixedDeviceNos) {
+// 标准项目按实际热泵台数轮询，不再使用大剧院固定编号（含风冷模块 31~42）
+for (int deviceNo = 1; deviceNo <= totalHPCount; deviceNo++) {
     String heatPumpCode = "No" + deviceNo;
     String operationState = getPointRealVal("HeatPump\\SJMG\\" + heatPumpCode + "\\Machine_Operation");
     String defrostState = getPointRealVal("HeatPump\\SJMG\\" + heatPumpCode + "\\Systematic_Defrosting");

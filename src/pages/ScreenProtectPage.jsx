@@ -24,6 +24,7 @@ function ScreenProtectPage() {
     if (isFadingOut) return
     setIsFadingOut(true)
     setTimeout(() => {
+      window.sessionStorage.setItem('cas.loginIntent', 'screen-protect')
       navigate('/auth/login', { state: { fromScreenProtect: true } })
     }, FADE_OUT_DURATION)
   }, [navigate, isFadingOut])

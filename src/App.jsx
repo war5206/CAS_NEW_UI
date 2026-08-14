@@ -129,10 +129,6 @@ function AppRoutes({ homePageTitle, onHomePageTitleChange }) {
       ) : null}
 
       <Routes>
-        <Route path="/auth/set-password" element={<SetOperationPasswordPage />} />
-        <Route path="/auth/confirm-password" element={<ConfirmPasswordPage />} />
-        <Route path="/auth/login" element={<LoginPage />} />
-        <Route path="/auth/system-select" element={<SystemSelectPage />} />
         <Route path="/guide/system-config" element={<AuthGuard skipInitLockCheck>{renderGuideRoute(<SystemSelectConfigPage />)}</AuthGuard>} />
         <Route path="/guide/project-info" element={<AuthGuard skipInitLockCheck>{renderGuideRoute(<ProjectInfoPage />)}</AuthGuard>} />
         <Route path="/guide/area-select" element={<AuthGuard skipInitLockCheck>{renderGuideRoute(<AreaSelectPage />)}</AuthGuard>} />
@@ -142,6 +138,10 @@ function AppRoutes({ homePageTitle, onHomePageTitleChange }) {
         <Route path="/guide/energy-price" element={<AuthGuard skipInitLockCheck>{renderGuideRoute(<EnergyPriceGuidePage />)}</AuthGuard>} />
         <Route path="/guide/system-detect" element={<AuthGuard skipInitLockCheck>{renderGuideRoute(<SystemDetectGuidePage />)}</AuthGuard>} />
         <Route element={<InitEntryLayout />}>
+          <Route path="/auth/set-password" element={<SetOperationPasswordPage />} />
+          <Route path="/auth/confirm-password" element={<ConfirmPasswordPage />} />
+          <Route path="/auth/login" element={<LoginPage />} />
+          <Route path="/auth/system-select" element={<SystemSelectPage />} />
           <Route path="/" element={null} />
           <Route path={HOME_PATH} element={null} />
           <Route path="/playground" element={<PlaygroundPage />} />
