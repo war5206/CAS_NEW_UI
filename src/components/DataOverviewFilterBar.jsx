@@ -18,6 +18,7 @@ function DataOverviewFilterBar({
   titleAriaLabel = '选择分析对象',
   className = '',
   dateDisplayFormatter,
+  periodOptions = PERIOD_OPTIONS,
 }) {
   const renderDateControl = () => {
     if (period === '日') {
@@ -113,7 +114,7 @@ function DataOverviewFilterBar({
         {renderDateControl()}
 
         <div className="data-overview-filter-bar__segment" role="tablist" aria-label="周期">
-          {PERIOD_OPTIONS.map((option) => (
+          {periodOptions.map((option) => (
             <button
               key={option}
               type="button"

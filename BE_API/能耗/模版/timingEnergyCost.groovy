@@ -18,8 +18,6 @@ import com.sunwayland.platform.dao.data.DataTable;
 import com.sunwayland.platform.dao.data.DataRow;
 import com.sunwayland.platform.dynamic.DynamicDataSource;
 import com.sunwayland.platform.utils.SnowFlake;
-import java.text.SimpleDateFormat;
-import java.text.ParseException;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDate;
@@ -36,7 +34,23 @@ if ("base".equals(dbCode)) {
     dbCode = "t01";
 }
 
-SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
+/*
+ * 费用测试模式只改变“采暖季限制、统计日期和电价时段”。
+ * 电价仍从 sjmg_energy_price_detail 读取，EF 历史差值、费用计算、查重和写库全部复用正式代码。
+ * 测试完成后必须把 ENERGY_COST_TEST_MODE 改为 false。
+ */
+boolean ENERGY_COST_TEST_MODE = false;
+List<String> TEST_COST_START_TIMES = ["15:30:00", "15:34:00", "15:38:00"];
+List<String> TEST_COST_END_TIMES = ["15:32:59", "15:36:59", "15:40:59"];
+
+/*
+ * 跨日补录专项测试：只绕过采暖季限制，并且只补指定日期、指定设备。
+ * 不替换正式电价和正式 EF 历史区间。测试完成后必须改回 false。
+ */
+boolean ENERGY_COST_BACKFILL_TEST_MODE = false;
+String TEST_BACKFILL_STAT_DATE = "2026-09-01";
+String TEST_BACKFILL_DEVICE_CODE = "SYSTEM";
+boolean SEASON_BOUNDARY_TEST_MODE = false;
 
 def formatDateTime(LocalDateTime dt) {
     return dt.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss"));
@@ -45,12 +59,6 @@ def formatDateTime(LocalDateTime dt) {
 def formatDate(LocalDate dt) {
     return dt.format(DateTimeFormatter.ofPattern("yyyy-MM-dd"));
 }
-
-Calendar calNow = Calendar.getInstance();
-int year = calNow.get(Calendar.YEAR);
-int dayOfMonth = calNow.get(Calendar.DAY_OF_MONTH);
-int hour = calNow.get(Calendar.HOUR_OF_DAY);
-int monthOfYear = calNow.get(Calendar.MONTH) + 1;
 
 // ---------- helpers ----------
 
@@ -79,6 +87,11 @@ def isMonthDayInRange(String monthDay, String startDate, String endDate) {
 
 def toMonthDay(LocalDate date) {
     return String.format("%02d-%02d", date.getMonthValue(), date.getDayOfMonth());
+}
+
+def shiftMonthDay(String monthDay, int days) {
+    LocalDate anchor = LocalDate.parse("2000-" + monthDay, DateTimeFormatter.ofPattern("yyyy-MM-dd"));
+    return anchor.plusDays(days).format(DateTimeFormatter.ofPattern("MM-dd"));
 }
 
 def parseSegmentStart(LocalDate date, String startTime) {
@@ -225,14 +238,27 @@ def loadExistingArchiveKeys(dynamicDataSource, dbCode, String startDate, String 
     return keys;
 }
 
-def backfillMissingToday(dynamicDataSource, dbCode, dataService, idWorker,
-                         List<Map<String, Object>> priceRows, List<Map<String, String>> devices,
-                         LocalDateTime now) {
+def backfillMissingRecentDays(dynamicDataSource, dbCode, dataService, idWorker,
+                              List<Map<String, Object>> priceRows, List<Map<String, String>> devices,
+                              LocalDateTime now, int lookbackDays,
+                              String targetStatDate, String targetDeviceCode,
+                              boolean restrictToHeatingSeason, String seasonStart, String seasonEnd,
+                              Set<String> processedSeasonDates, Set<String> skippedOutOfSeasonDates) {
     LocalDate today = now.toLocalDate();
-    LocalDate yesterday = today.minusDays(1);
-    Set<String> existingKeys = loadExistingArchiveKeys(dynamicDataSource, dbCode, formatDate(yesterday), formatDate(today));
+    int safeLookbackDays = Math.max(1, lookbackDays);
+    LocalDate firstDate = today.minusDays(safeLookbackDays - 1L);
+    Set<String> existingKeys = loadExistingArchiveKeys(dynamicDataSource, dbCode, formatDate(firstDate), formatDate(today));
     int backfilled = 0;
-    for (LocalDate baseDate : [yesterday, today]) {
+    for (int dayOffset = 0; dayOffset < safeLookbackDays; dayOffset++) {
+        LocalDate baseDate = firstDate.plusDays(dayOffset);
+        if (targetStatDate != null && !formatDate(baseDate).equals(targetStatDate)) {
+            continue;
+        }
+        if (restrictToHeatingSeason && !isMonthDayInRange(toMonthDay(baseDate), seasonStart, seasonEnd)) {
+            skippedOutOfSeasonDates.add(formatDate(baseDate));
+            continue;
+        }
+        processedSeasonDates.add(formatDate(baseDate));
         List<Map<String, Object>> daySegments = resolveSegmentsForDate(baseDate, priceRows);
         for (Map<String, Object> seg : daySegments) {
             String startTime = seg.get("start_time").toString();
@@ -244,8 +270,9 @@ def backfillMissingToday(dynamicDataSource, dbCode, dataService, idWorker,
                 intervalEnd = intervalEnd.plusDays(1);
             }
 
-            // 只处理在今天内已经结束、且已经结束的区间；不补昨天非跨天区间
-            if (intervalEnd.isAfter(now) || !intervalEnd.toLocalDate().equals(today)) {
+            // 最近若干日内只要已经结束且尚未归档，就允许补录。
+            // EF 暂时无数据时不会写 0，下一次 Cron 仍会继续尝试。
+            if (intervalEnd.isAfter(now)) {
                 continue;
             }
 
@@ -258,6 +285,9 @@ def backfillMissingToday(dynamicDataSource, dbCode, dataService, idWorker,
 
             for (Map<String, String> device : devices) {
                 String deviceCode = device.get("code");
+                if (targetDeviceCode != null && !deviceCode.equals(targetDeviceCode)) {
+                    continue;
+                }
                 String key = dateStr + "|" + deviceCode + "|" + timeRange + "|" + unitPriceStr;
                 if (existingKeys.contains(key)) {
                     continue;
@@ -285,6 +315,7 @@ def backfillMissingToday(dynamicDataSource, dbCode, dataService, idWorker,
                         escapeSql(planStartDate) + "','" + escapeSql(planEndDate) + "','" +
                         escapeSql(cost.toPlainString()) + "')";
                 dynamicDataSource.excuteTenantSql(insertSql, dbCode);
+                existingKeys.add(key);
                 backfilled++;
             }
         }
@@ -322,33 +353,20 @@ if (selectAreaList != null && !selectAreaList.isEmpty()) {
     }
 }
 
-Date startDate = null;
-Date endDate = null;
-try {
-    if (monthOfYear < 7) {
-        startDate = sdf.parse((year - 1) + "-" + start_heating_season + " 00:00:00");
-        endDate = sdf.parse(year + "-" + end_heating_season + " 23:59:59");
-    } else {
-        startDate = sdf.parse(year + "-" + start_heating_season + " 00:00:00");
-        endDate = sdf.parse((year + 1) + "-" + end_heating_season + " 23:59:59");
-    }
-} catch (ParseException e) {
-    e.printStackTrace();
+if (SEASON_BOUNDARY_TEST_MODE) {
+    String beforeStart = shiftMonthDay(start_heating_season, -1);
+    String afterEnd = shiftMonthDay(end_heating_season, 1);
+    data.put("result", "采暖季边界判断测试完成，未读取EF、未写数据库");
+    data.put("seasonBoundaryChecks", [
+            [monthDay: beforeStart, inSeason: isMonthDayInRange(beforeStart, start_heating_season, end_heating_season)],
+            [monthDay: start_heating_season, inSeason: isMonthDayInRange(start_heating_season, start_heating_season, end_heating_season)],
+            [monthDay: end_heating_season, inSeason: isMonthDayInRange(end_heating_season, start_heating_season, end_heating_season)],
+            [monthDay: afterEnd, inSeason: isMonthDayInRange(afterEnd, start_heating_season, end_heating_season)]
+    ]);
+    return data;
 }
 
-boolean isInSeason = false;
-if (startDate != null && endDate != null) {
-    isInSeason = calNow.getTime().compareTo(startDate) >= 0 && calNow.getTime().compareTo(endDate) <= 0;
-} else {
-    data.put("result", "采暖季日期配置无效，跳过费用计算");
-    data.put("currentTime", sdf.format(calNow.getTime()));
-    return data;
-}
-if ("1".equals(projectTypeUuid) && !isInSeason) {
-    data.put("result", "当前不在采暖季，不执行下置操作");
-    data.put("currentTime", sdf.format(calNow.getTime()));
-    return data;
-}
+boolean restrictToHeatingSeason = !ENERGY_COST_TEST_MODE && !ENERGY_COST_BACKFILL_TEST_MODE && "1".equals(projectTypeUuid);
 
 // ---------- load price plan ----------
 
@@ -364,10 +382,53 @@ LocalDateTime now = LocalDateTime.now().withSecond(0).withNano(0);
 LocalDate today = now.toLocalDate();
 LocalDate yesterday = today.minusDays(1);
 
+// 测试模式沿用当天有效电价方案的前三条价格，只把三个价格段替换为短测试窗口。
+if (ENERGY_COST_TEST_MODE) {
+    List<Map<String, Object>> applicableRows = resolveSegmentsForDate(today, priceRows);
+    if (applicableRows == null || applicableRows.size() < 3) {
+        data.put("result", "测试日期有效电价不足3条，请先配置3个电价时段");
+        data.put("testDate", formatDate(today));
+        data.put("applicablePriceCount", applicableRows != null ? applicableRows.size() : 0);
+        return data;
+    }
+    List<Map<String, Object>> testPriceRows = new ArrayList<>();
+    List<Map<String, Object>> testPriceSegments = new ArrayList<>();
+    for (int i = 0; i < 3; i++) {
+        Map<String, Object> sourcePriceRow = applicableRows.get(i);
+        Map<String, Object> testPriceRow = new HashMap<>();
+        testPriceRow.putAll(sourcePriceRow);
+        testPriceRow.put("start_time", TEST_COST_START_TIMES.get(i));
+        testPriceRow.put("end_time", TEST_COST_END_TIMES.get(i));
+        testPriceRows.add(testPriceRow);
+
+        Map<String, Object> testPriceSegment = new LinkedHashMap<>();
+        testPriceSegment.put("priceName", sourcePriceRow.get("energy_price_name"));
+        testPriceSegment.put("unitPrice", sourcePriceRow.get("unit_price"));
+        testPriceSegment.put("historyStart", formatDate(today) + " " + TEST_COST_START_TIMES.get(i));
+        testPriceSegment.put("historyEnd", formatDate(today) + " " + TEST_COST_END_TIMES.get(i));
+        testPriceSegments.add(testPriceSegment);
+    }
+    priceRows = testPriceRows;
+
+    data.put("testMode", true);
+    data.put("testDate", formatDate(today));
+    data.put("testPriceSegments", testPriceSegments);
+}
+
 // key: stat_date|device_code -> tierMap
 Map<String, Map<String, Map<String, Object>>> archiveMap = new LinkedHashMap<>();
+List<Map<String, Object>> testDeviceResults = new ArrayList<>();
+Set<String> processedSeasonDates = new LinkedHashSet<>();
+Set<String> skippedOutOfSeasonDates = new LinkedHashSet<>();
 
-for (LocalDate baseDate : [yesterday, today]) {
+// 补录专项测试不走主归档，避免生成指定测试记录以外的非采暖季费用。
+List<LocalDate> archiveDates = ENERGY_COST_BACKFILL_TEST_MODE ? [] : (ENERGY_COST_TEST_MODE ? [today] : [yesterday, today]);
+for (LocalDate baseDate : archiveDates) {
+    if (restrictToHeatingSeason && !isMonthDayInRange(toMonthDay(baseDate), start_heating_season, end_heating_season)) {
+        skippedOutOfSeasonDates.add(formatDate(baseDate));
+        continue;
+    }
+    processedSeasonDates.add(formatDate(baseDate));
     List<Map<String, Object>> daySegments = resolveSegmentsForDate(baseDate, priceRows);
     for (Map<String, Object> seg : daySegments) {
         String startTime = seg.get("start_time").toString();
@@ -401,6 +462,15 @@ for (LocalDate baseDate : [yesterday, today]) {
             BigDecimal cost = kwh.multiply(unitPrice).setScale(2, RoundingMode.HALF_UP);
             if (cost.compareTo(BigDecimal.ZERO) == 0) {
                 continue;
+            }
+
+            if (ENERGY_COST_TEST_MODE) {
+                Map<String, Object> testDeviceResult = new LinkedHashMap<>();
+                testDeviceResult.put("deviceCode", device.get("code"));
+                testDeviceResult.put("deltaKwh", kwh);
+                testDeviceResult.put("unitPrice", unitPrice);
+                testDeviceResult.put("costAmount", cost);
+                testDeviceResults.add(testDeviceResult);
             }
 
             String dateStr = formatDate(baseDate);
@@ -447,8 +517,14 @@ for (Map.Entry<String, Map<String, Map<String, Object>>> entry : archiveMap.entr
 }
 
 int backfilledCount = 0;
+int backfillLookbackDays = ENERGY_COST_TEST_MODE ? 1 : 3;
+String backfillTargetDate = ENERGY_COST_BACKFILL_TEST_MODE ? TEST_BACKFILL_STAT_DATE : null;
+String backfillTargetDeviceCode = ENERGY_COST_BACKFILL_TEST_MODE ? TEST_BACKFILL_DEVICE_CODE : null;
 try {
-    backfilledCount = backfillMissingToday(dynamicDataSource, dbCode, dataService, idWorker, priceRows, devices, now);
+    backfilledCount = backfillMissingRecentDays(dynamicDataSource, dbCode, dataService, idWorker, priceRows, devices, now,
+            backfillLookbackDays, backfillTargetDate, backfillTargetDeviceCode,
+            restrictToHeatingSeason, start_heating_season, end_heating_season,
+            processedSeasonDates, skippedOutOfSeasonDates);
 } catch (Exception e) {
     archiveErrors.add("补录校验失败:" + (e.getMessage() != null ? e.getMessage() : "未知错误"));
 }
@@ -460,4 +536,15 @@ if (archiveErrors.isEmpty()) {
 }
 data.put("archiveCount", archivedRows);
 data.put("backfillCount", backfilledCount);
+data.put("backfillLookbackDays", backfillLookbackDays);
+data.put("processedSeasonDates", new ArrayList<String>(processedSeasonDates));
+data.put("skippedOutOfSeasonDates", new ArrayList<String>(skippedOutOfSeasonDates));
+if (ENERGY_COST_BACKFILL_TEST_MODE) {
+    data.put("backfillTestMode", true);
+    data.put("backfillTargetDate", TEST_BACKFILL_STAT_DATE);
+    data.put("backfillTargetDeviceCode", TEST_BACKFILL_DEVICE_CODE);
+}
+if (ENERGY_COST_TEST_MODE) {
+    data.put("testDeviceResults", testDeviceResults);
+}
 return data;

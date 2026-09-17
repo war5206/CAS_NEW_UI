@@ -1203,12 +1203,12 @@ function SystemAlarmPage({ onDetailBreadcrumbChange }) {
     }
   }
 
-  const handleDeleteCurrentHistoryPage = () => {
+  const handleDeleteAllHistory = () => {
     if (historyRows.length === 0 || isHistoryLoading) {
       return
     }
 
-    const confirmMessage = `确认删除当前页全部历史告警吗？\n\n页码：第 ${historyPage} 页\n条数：${historyRows.length} 条\n\n删除后将无法恢复，请确认操作。`
+    const confirmMessage = '确认删除全部历史告警吗？\n\n删除后将无法恢复，请确认操作。'
 
     requestConfirm(
       {
@@ -1219,19 +1219,28 @@ function SystemAlarmPage({ onDetailBreadcrumbChange }) {
         showCancel: true,
       },
       async () => {
+        setIsHistoryLoading(true)
         try {
-          await deleteCurrentPageHisAlarm({ current: historyPage, ...historyQuery })
-          await fetchHistoryRows({ current: historyPage, ...historyQuery })
+          for (let page = historyTotalPages; page >= 1; page -= 1) {
+            const response = await deleteCurrentPageHisAlarm({ current: page, ...historyQuery })
+            const responsePayload = response?.data?.data ?? response?.data ?? {}
+            if (responsePayload.state === 'fail') {
+              throw new Error(responsePayload.message || '历史告警删除失败')
+            }
+          }
+          await fetchHistoryRows({ current: 1, ...historyQuery })
         } catch (_error) {
           requestConfirm(
             {
               title: '提示',
-              message: '当前页历史告警删除失败，请稍后重试。',
+              message: _error?.message || '历史告警全部删除失败，请稍后重试。',
               confirmText: '知道了',
               showCancel: false,
             },
             undefined,
           )
+        } finally {
+          setIsHistoryLoading(false)
         }
       },
     )
@@ -1248,7 +1257,7 @@ function SystemAlarmPage({ onDetailBreadcrumbChange }) {
           <button
             type="button"
             className="alerts-page__delete-all-btn"
-            onClick={handleDeleteCurrentHistoryPage}
+            onClick={handleDeleteAllHistory}
             disabled={isHistoryLoading || historyRows.length === 0}
           >
             全部删除

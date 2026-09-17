@@ -106,6 +106,13 @@ def formatParamValue = { String key, String rawVal ->
     if ("开关机".equals(key)) {
         return formatPowerOnValue(rawVal);
     }
+    if ("系统1压缩机电流".equals(key) || "系统2压缩机电流".equals(key)) {
+        try {
+            return new BigDecimal(rawVal).divide(BigDecimal.TEN).stripTrailingZeros().toPlainString();
+        } catch (Exception e) {
+            return rawVal;
+        }
+    }
     return rawVal;
 };
 

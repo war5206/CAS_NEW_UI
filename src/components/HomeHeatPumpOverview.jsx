@@ -277,6 +277,11 @@ function HomeHeatPumpOverview({
     setOverviewPage((current) => Math.min(totalOverviewPages, current + 1))
   }
 
+  // 弹窗状态直接取轮询实时值，与网格卡片保持一致；接口快照只提供 details 明细
+  const activePumpLiveStatus = activePump?.code ? liveStatusByCode.get(activePump.code) : null
+  const activePumpDisplayStatus = activePumpLiveStatus?.status ?? activePump?.status
+  const activePumpDisplayState = activePumpLiveStatus?.state ?? activePump?.state
+
   return (
     <>
       <div className="home-hp-overview">
@@ -374,19 +379,19 @@ function HomeHeatPumpOverview({
               </div>
 
               <div className="home-hp-modal-body">
-                <div className={`home-hp-modal-status is-${activePump.status}`}>
+                <div className={`home-hp-modal-status is-${activePumpDisplayStatus}`}>
                   <img
-                    src={HEAT_PUMP_MODAL_ICON_MAP[activePump.status] || HEAT_PUMP_ICON_MAP[activePump.status]}
+                    src={HEAT_PUMP_MODAL_ICON_MAP[activePumpDisplayStatus] || HEAT_PUMP_ICON_MAP[activePumpDisplayStatus]}
                     alt=""
                     aria-hidden="true"
                     className="home-hp-modal-status-icon"
                   />
                   <span>
-                    {activePump.status === HEAT_PUMP_STATUS.MALFUNCTION
+                    {activePumpDisplayStatus === HEAT_PUMP_STATUS.MALFUNCTION
                       ? HEAT_PUMP_STATUS_LABEL[HEAT_PUMP_STATUS.MALFUNCTION]
-                      : activePump.status === HEAT_PUMP_STATUS.DEFROSTING
+                      : activePumpDisplayStatus === HEAT_PUMP_STATUS.DEFROSTING
                         ? '化霜'
-                        : activePump.state || HEAT_PUMP_STATUS_LABEL[activePump.status]}
+                        : activePumpDisplayState || HEAT_PUMP_STATUS_LABEL[activePumpDisplayStatus]}
                   </span>
                 </div>
 

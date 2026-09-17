@@ -65,7 +65,6 @@ function ResourceStatisticsPage({ pageType, titleOverride }) {
   const configOverrides = titleOverride
     ? {
         legendName: titleOverride,
-        cardLabels: [`当前月总${titleOverride}（kWh）`, `日均${titleOverride}（kWh）`],
         currentTotalLabel: `当前总${titleOverride}`,
         compareNames: { mom: `上一周期${titleOverride}`, yoy: `去年同期${titleOverride}` },
       }

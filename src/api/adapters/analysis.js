@@ -70,15 +70,22 @@ export function adaptAnalysisOverviewSummary(rawData) {
   const unitElectricity = splitMetricValue(source.dpmydl)
   const unitFee = splitMetricValue(source.dpmfy)
 
-  return {
-    seasonLabel: `本采暖季（${toText(source.startHeatingSeason, '--')} - ${toText(source.endHeatingSeason, '--')}）`,
-    metrics: [
-      { title: isCooling ? '系统累计制冷COP' : '系统累计COP', color: '#FF5A36', value: cop.value, trend: cop.trend },
-      { title: isCooling ? '系统累计制冷量（kWh）' : '累计制热量（kWh）', color: '#6B3DFF', value: heat.value, trend: heat.trend },
-      { title: isCooling ? '系统累计制冷用电量（kWh）' : '累计用电量（kWh）', color: '#22A8FF', value: electricity.value, trend: electricity.trend },
+  const metrics = [
+    { title: isCooling ? '系统累计制冷COP' : '系统累计COP', color: '#FF5A36', value: cop.value, trend: cop.trend },
+    { title: isCooling ? '系统累计制冷量（kWh）' : '累计制热量（kWh）', color: '#6B3DFF', value: heat.value, trend: heat.trend },
+    { title: isCooling ? '系统累计制冷用电量（kWh）' : '累计用电量（kWh）', color: '#22A8FF', value: electricity.value, trend: electricity.trend },
+  ]
+
+  if (!isCooling) {
+    metrics.push(
       { title: '单平米用电量', color: '#D749C7', value: unitElectricity.value, trend: unitElectricity.trend },
       { title: '单平米费用', color: '#62F96D', value: unitFee.value, trend: unitFee.trend },
-    ],
+    )
+  }
+
+  return {
+    seasonLabel: `本采暖季（${toText(source.startHeatingSeason, '--')} - ${toText(source.endHeatingSeason, '--')}）`,
+    metrics,
   }
 }
 
@@ -178,6 +185,7 @@ export function adaptAnalysisTrendViewModel(rawData, options) {
   const yMap = source.yMap ?? {}
   const summaryAll = toNumberOrFallback(source.allValue, 0)
   const summaryAvg = toNumberOrFallback(source.avgValue, 0)
+  const previousData = normalizeList(yMap?.y1PreviousList)
 
   let series = []
   let compareBasisData = []
@@ -268,6 +276,7 @@ export function adaptAnalysisTrendViewModel(rawData, options) {
       yAxisMax: axis.yAxisMax,
       yAxisInterval: axis.yAxisInterval,
       compareBasisData,
+      previousData: previousData.length > 0 ? previousData : null,
       compareLegendNames: compareNames,
       legend: series.map((item) => ({ name: item.name, color: item.color || color })),
       series,

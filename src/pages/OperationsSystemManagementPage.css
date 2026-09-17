@@ -423,60 +423,6 @@
   height: 100%;
 }
 
-.ops-trend-modal__chart .ops-trend-modal__grid,
-.ops-trend-modal__chart .ops-trend-modal__svg,
-.ops-trend-modal__chart .ops-trend-modal__xaxis {
-  display: none;
-}
-
-.ops-trend-modal__grid {
-  display: grid;
-  gap: 0;
-  height: 364px;
-  grid-template-rows: repeat(var(--ops-grid-rows, 6), minmax(0, 1fr));
-}
-
-.ops-trend-modal__grid-row {
-  display: grid;
-  grid-template-columns: 58px 1fr;
-  align-items: center;
-  gap: 6px;
-  min-height: 0;
-}
-
-.ops-trend-modal__grid-row span {
-  color: #a9b5c4;
-  font-size: 16px;
-  text-align: center;
-}
-
-.ops-trend-modal__grid-row i {
-  border-top: 1px dashed rgba(198, 213, 238, 0.68);
-}
-
-.ops-trend-modal__svg {
-  position: absolute;
-  inset: 0 0 66px 64px;
-  width: calc(100% - 64px);
-  height: calc(100% - 66px);
-  overflow: visible;
-  pointer-events: auto;
-  cursor: crosshair;
-}
-
-.ops-trend-modal__xaxis {
-  margin-left: 64px;
-  display: grid;
-  grid-template-columns: repeat(10, 1fr);
-  padding-top: 8px;
-  color: #a9b5c4;
-  font-size: 18px;
-}
-
-.ops-trend-modal__xaxis span:last-child {
-  text-align: right;
-}
-
 .ops-trend-modal__legend {
   display: inline-flex;
   align-items: center;

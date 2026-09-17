@@ -21,6 +21,8 @@ import java.text.SimpleDateFormat;
 import java.text.ParseException;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
 
 def dynamicDataSource = ApplicationContextProvider.getBean(DynamicDataSource.class);
 def dataService = ApplicationContextProvider.getBean(DataService.class);
@@ -30,6 +32,45 @@ PtUser ptUser = ThreadLocalUtil.getCurrentUser();
 String dbCode = ptUser != null && ptUser.dbCode != null ? ptUser.dbCode.toString() : "t01";
 if ("base".equals(dbCode)) {
     dbCode = "t01";
+}
+
+/*
+ * EF 日COP历史链路测试只改变“触发时间、统计日期、历史查询窗口”。
+ * 日COP点位、历史查询、取值、查重和写库全部复用正式代码。
+ * 月/年COP来自MySQL汇总，不属于EF历史点位测试。
+ * 全部测试完成后需把 EF_HISTORY_TEST_MODE、PERIOD_COP_TEST_MODE 都改为 false。
+ */
+boolean EF_HISTORY_TEST_MODE = false;
+String TEST_START_TIME = "15:20:00";
+String TEST_END_TIME = "15:24:59";
+
+// 月/年COP手动测试：只改变触发条件和统计区间，计算及写库仍走正式代码。
+boolean PERIOD_COP_TEST_MODE = false;
+String TEST_MONTH_START_DATE = "2026-09-01";
+String TEST_MONTH_END_DATE = "2026-09-01";
+String TEST_YEAR_START_DATE = "2026-01-01";
+String TEST_YEAR_END_DATE = "2026-09-01";
+String TEST_PERIOD_STAT_DATE = "2026-09-01";
+boolean SEASON_BOUNDARY_TEST_MODE = false;
+
+def getMonthDayOrder(String monthDay) {
+    if (monthDay == null || !monthDay.contains("-")) return -1;
+    String[] parts = monthDay.split("-");
+    return Integer.parseInt(parts[0]) * 100 + Integer.parseInt(parts[1]);
+}
+
+def isStatDateInHeatingSeason(String statDate, String seasonStart, String seasonEnd) {
+    if (statDate == null || statDate.length() < 10) return false;
+    int target = getMonthDayOrder(statDate.substring(5, 10));
+    int start = getMonthDayOrder(seasonStart);
+    int end = getMonthDayOrder(seasonEnd);
+    if (target < 0 || start < 0 || end < 0) return false;
+    return start <= end ? (target >= start && target <= end) : (target >= start || target <= end);
+}
+
+def shiftMonthDay(String monthDay, int days) {
+    LocalDate anchor = LocalDate.parse("2000-" + monthDay, DateTimeFormatter.ofPattern("yyyy-MM-dd"));
+    return anchor.plusDays(days).format(DateTimeFormatter.ofPattern("MM-dd"));
 }
 
 String selectAreaSql = "select project_type_uuid,system_type_uuid,project_acreage,start_heating_season,end_heating_season from sjmg_project_data";
@@ -46,29 +87,17 @@ int day_of_month = calendar.get(Calendar.DAY_OF_MONTH); // 当前日期
 int hour = calendar.get(Calendar.HOUR_OF_DAY); // 当前小时
 int monthOfYear = calendar.get(Calendar.MONTH)+1; // 当前月份
 
-// 采暖季是跨年的
-Date startDate = null;
-Date endDate = null;
-try {
-    if (monthOfYear<7){
-        startDate = sdf.parse((year-1)+"-"+start_heating_season+" 00:00:00");
-        endDate = sdf.parse(year+"-"+end_heating_season+" 23:59:59");
-    }else {
-        startDate = sdf.parse(year+"-"+start_heating_season+" 00:00:00");
-        endDate = sdf.parse((year+1)+"-"+end_heating_season+" 23:59:59");
-    }
-} catch (ParseException e) {
-    e.printStackTrace();
-}
-
-//是否在采暖季
-boolean isno_season = calendar.getTime().compareTo(startDate) >= 0 && calendar.getTime().compareTo(endDate) <= 0;
-if ("1".equals(projectTypeUuid) && !isno_season){
-    data.put("result", "当前不在采暖季，不执行归档操作");
-    data.put("currentTime", sdf.format(calendar.getTime()));
-    data.put("startDate", sdf.format(startDate));
-    data.put("endDate", sdf.format(endDate));
-    return;
+if (SEASON_BOUNDARY_TEST_MODE) {
+    String beforeStart = shiftMonthDay(start_heating_season, -1);
+    String afterEnd = shiftMonthDay(end_heating_season, 1);
+    data.put("result", "采暖季边界判断测试完成，未读取EF、未写数据库");
+    data.put("seasonBoundaryChecks", [
+            [monthDay: beforeStart, inSeason: isStatDateInHeatingSeason("2000-" + beforeStart, start_heating_season, end_heating_season)],
+            [monthDay: start_heating_season, inSeason: isStatDateInHeatingSeason("2000-" + start_heating_season, start_heating_season, end_heating_season)],
+            [monthDay: end_heating_season, inSeason: isStatDateInHeatingSeason("2000-" + end_heating_season, start_heating_season, end_heating_season)],
+            [monthDay: afterEnd, inSeason: isStatDateInHeatingSeason("2000-" + afterEnd, start_heating_season, end_heating_season)]
+    ]);
+    return data;
 }
 
 def escapeSql(String s) {
@@ -76,7 +105,7 @@ def escapeSql(String s) {
     return s.replace("'", "''");
 }
 
-// 辅助函数：从历史数据中获取指定时间范围内靠近结束时间的大于1的值
+// 辅助函数：区分“EF没有记录”和“EF确实返回0”；优先取窗口末端最后一个正值
 def getValueFromHistory(String tagName, String startTime, String endTime, DataService dataService) {
     try {
         String tagEscaped = tagName.replace("'", "''");
@@ -84,29 +113,32 @@ def getValueFromHistory(String tagName, String startTime, String endTime, DataSe
         DataTable dt = dataService.queryListDataBySql(sql);
         int rowCount = dt != null ? dt.getRows().size() : 0;
         if (rowCount == 0) {
-            return null;
+            return [hasData: false, value: BigDecimal.ZERO];
         }
+        boolean hasNumericData = false;
         for (int j = dt.getRows().size() - 1; j >= 0; j--) {
             DataRow dataRow = dt.getDataRow(j);
             Object hisvalObj = dataRow.getValue(2);
             if (hisvalObj != null) {
                 try {
                     BigDecimal value = new BigDecimal(hisvalObj.toString());
+                    hasNumericData = true;
                     if (value.compareTo(BigDecimal.ZERO) > 0) {
-                        return value.setScale(2, RoundingMode.HALF_UP);
+                        return [hasData: true, value: value.setScale(2, RoundingMode.HALF_UP)];
                     }
                 } catch (NumberFormatException nfe) {
                     // ignore
                 }
             }
         }
+        return [hasData: hasNumericData, value: BigDecimal.ZERO.setScale(2, RoundingMode.HALF_UP)];
     } catch (Exception e) {
-        // ignore
+        return [hasData: false, value: BigDecimal.ZERO];
     }
-    return null;
 }
 
-def insertCopDetail(String statDate, String copType, String cycleType, String systemType, BigDecimal copValue) {
+def insertCopDetail(String statDate, String copType, String cycleType, String systemType, BigDecimal copValue,
+                    DynamicDataSource dynamicDataSource, String dbCode, SnowFlake idWorker) {
     String id = idWorker.nextId();
     String sysTypeCondition;
     String sysTypeValue;
@@ -129,7 +161,7 @@ def insertCopDetail(String statDate, String copType, String cycleType, String sy
     dynamicDataSource.excuteTenantSql(insertSql, dbCode);
 }
 
-def queryBigDecimal(String sql) {
+def queryBigDecimal(String sql, DynamicDataSource dynamicDataSource, String dbCode) {
     List<Map<String, Object>> rows = dynamicDataSource.excuteTenantSqlQuery(sql, dbCode);
     if (rows != null && !rows.isEmpty() && rows.get(0).get("total") != null) {
         return new BigDecimal(rows.get(0).get("total").toString());
@@ -137,7 +169,7 @@ def queryBigDecimal(String sql) {
     return BigDecimal.ZERO;
 }
 
-def querySumAndCount(String sql) {
+def querySumAndCount(String sql, DynamicDataSource dynamicDataSource, String dbCode) {
     List<Map<String, Object>> rows = dynamicDataSource.excuteTenantSqlQuery(sql, dbCode);
     Map<String, Object> result = new HashMap<>();
     if (rows != null && !rows.isEmpty()) {
@@ -156,21 +188,39 @@ int dailyCount = 0;
 int dailyCountWithData = 0;
 int dailyCountZero = 0;
 int dailySkippedExisting = 0;
+int dailyUpdated = 0;
+int dailyMissing = 0;
 int monthlyCount = 0;
 int monthlySkipped = 0;
 int yearlyCount = 0;
 int yearlySkipped = 0;
 List<String> dailyProcessedDates = new ArrayList<>();
 List<String> dailySkippedExistingDates = new ArrayList<>();
+List<String> processedSeasonDates = new ArrayList<>();
+List<String> skippedOutOfSeasonDates = new ArrayList<>();
 
-if (hour == 0) {
-    // 昨天日期（因为0点执行，统计的是昨天）
+// 执行时间由平台 Cron 控制；EF无记录时不落0，等待下一次Cron重试。
+if (true) {
+    // 测试模式处理今天；正式模式在0点处理昨天
     Calendar yesterdayCal = Calendar.getInstance();
-    yesterdayCal.add(Calendar.DAY_OF_MONTH, -1);
+    if (!EF_HISTORY_TEST_MODE) {
+        yesterdayCal.add(Calendar.DAY_OF_MONTH, -1);
+    }
     String yesterdayDateStr = dateSdf.format(yesterdayCal.getTime());
 
-    // 日COP只处理昨天
-    String dailyYesterdayStr = yesterdayDateStr;
+    // 月/年手动测试不重复执行日COP；其他模式保持原有日COP正式路径。
+    if (!PERIOD_COP_TEST_MODE) {
+        List<String> dailyTargetDates = new ArrayList<>();
+        if (EF_HISTORY_TEST_MODE) {
+            dailyTargetDates.add(yesterdayDateStr);
+        } else {
+            // 正式模式检查最近3天，弥补平台停机或EF历史文件延迟
+            for (int offset = 1; offset <= 3; offset++) {
+                Calendar targetCal = Calendar.getInstance();
+                targetCal.add(Calendar.DAY_OF_MONTH, -offset);
+                dailyTargetDates.add(dateSdf.format(targetCal.getTime()));
+            }
+        }
 
     String heatDailyCOP = "Sys\\FinforWorx\\EnergyCost\\Heat_Daily_COP";
     String coldDailyCOP = "Sys\\FinforWorx\\EnergyCost\\Cold_Daily_COP";
@@ -178,62 +228,90 @@ if (hour == 0) {
     List<String> dailyCopTypes = ['HEAT', 'COLD', 'SYSTEM'];
     List<String> dailyCopTags = [heatDailyCOP, coldDailyCOP, systemDailyCOP];
 
-    String targetDate = dailyYesterdayStr;
-    // 计算 targetDate 的 23:55:00 - 23:59:59
-    Calendar rangeCal = Calendar.getInstance();
-    try {
-        rangeCal.setTime(dateSdf.parse(targetDate));
-    } catch (Exception e) {
-        // ignore, keep current date
+    for (String targetDate : dailyTargetDates) {
+    if (!EF_HISTORY_TEST_MODE && "1".equals(projectTypeUuid)
+            && !isStatDateInHeatingSeason(targetDate, start_heating_season, end_heating_season)) {
+        skippedOutOfSeasonDates.add(targetDate);
+        continue;
     }
-    rangeCal.set(Calendar.HOUR_OF_DAY, 23);
-    rangeCal.set(Calendar.MINUTE, 55);
-    rangeCal.set(Calendar.SECOND, 0);
-    rangeCal.set(Calendar.MILLISECOND, 0);
-    String dayStart = sdf.format(rangeCal.getTime());
-    rangeCal.set(Calendar.MINUTE, 59);
-    rangeCal.set(Calendar.SECOND, 59);
-    String dayEnd = sdf.format(rangeCal.getTime());
+    processedSeasonDates.add(targetDate);
+    // 测试模式使用指定窗口；正式模式使用 23:55:00 - 23:59:59
+    String dayStart;
+    String dayEnd;
+    if (EF_HISTORY_TEST_MODE) {
+        dayStart = targetDate + " " + TEST_START_TIME;
+        dayEnd = targetDate + " " + TEST_END_TIME;
+    } else {
+        Calendar rangeCal = Calendar.getInstance();
+        try {
+            rangeCal.setTime(dateSdf.parse(targetDate));
+        } catch (Exception e) {
+            // ignore, keep current date
+        }
+        rangeCal.set(Calendar.HOUR_OF_DAY, 23);
+        rangeCal.set(Calendar.MINUTE, 55);
+        rangeCal.set(Calendar.SECOND, 0);
+        rangeCal.set(Calendar.MILLISECOND, 0);
+        dayStart = sdf.format(rangeCal.getTime());
+        rangeCal.set(Calendar.MINUTE, 59);
+        rangeCal.set(Calendar.SECOND, 59);
+        dayEnd = sdf.format(rangeCal.getTime());
+    }
+
+    data.put("testMode", EF_HISTORY_TEST_MODE);
+    data.put("statDate", targetDate);
+    data.put("historyStart", dayStart);
+    data.put("historyEnd", dayEnd);
 
     // 查询已存在的日COP类型
-    String existSql = "SELECT cop_type FROM sjmg_cop_detail " +
+    String existSql = "SELECT cop_type, cop_value FROM sjmg_cop_detail " +
             "WHERE cycle_type = 'DAILY' AND stat_date = '" + escapeSql(targetDate) + "' " +
             "AND cop_type IN ('HEAT','COLD','SYSTEM') AND system_type IS NULL";
     List<Map<String, Object>> existRows = dynamicDataSource.excuteTenantSqlQuery(existSql, dbCode);
-    Set<String> existingTypes = new HashSet<>();
+    Map<String, BigDecimal> existingValues = new HashMap<>();
     if (existRows != null) {
         for (Map<String, Object> row : existRows) {
             if (row.get("cop_type") != null) {
-                existingTypes.add(row.get("cop_type").toString());
+                BigDecimal existingValue = row.get("cop_value") != null
+                        ? new BigDecimal(row.get("cop_value").toString()) : BigDecimal.ZERO;
+                existingValues.put(row.get("cop_type").toString(), existingValue);
             }
         }
     }
 
-    // 如果 3 条都存在，跳过该日期
-    if (existingTypes.size() < 3) {
+    boolean allDailyValuesValid = existingValues.size() >= 3 && existingValues.values().every {
+        it != null && it.compareTo(BigDecimal.ZERO) > 0
+    };
+    if (!allDailyValuesValid) {
         int dateInserted = 0;
         int dateInsertedWithData = 0;
         int dateInsertedZero = 0;
         for (int i = 0; i < dailyCopTypes.size(); i++) {
             String copType = dailyCopTypes.get(i);
-            if (existingTypes.contains(copType)) {
+            BigDecimal existingValue = existingValues.get(copType);
+            if (existingValue != null && existingValue.compareTo(BigDecimal.ZERO) > 0) {
                 dailySkippedExisting++;
                 continue;
             }
-            BigDecimal value = getValueFromHistory(dailyCopTags.get(i), dayStart, dayEnd, dataService);
-            if (value != null) {
-                insertCopDetail(targetDate, copType, "DAILY", null, value);
-                dailyCount++;
-                dailyCountWithData++;
-                dateInserted++;
-                dateInsertedWithData++;
+            Map<String, Object> historyResult = getValueFromHistory(dailyCopTags.get(i), dayStart, dayEnd, dataService);
+            boolean hasData = Boolean.valueOf(historyResult.get("hasData").toString());
+            if (hasData) {
+                BigDecimal value = (BigDecimal) historyResult.get("value");
+                insertCopDetail(targetDate, copType, "DAILY", null, value, dynamicDataSource, dbCode, idWorker);
+                if (existingValue != null) {
+                    dailyUpdated++;
+                } else {
+                    dailyCount++;
+                    dailyCountWithData++;
+                    dateInserted++;
+                    dateInsertedWithData++;
+                    if (value.compareTo(BigDecimal.ZERO) == 0) {
+                        dailyCountZero++;
+                        dateInsertedZero++;
+                    }
+                }
             } else {
-                // 缺失且无有效历史数据，补0
-                insertCopDetail(targetDate, copType, "DAILY", null, BigDecimal.ZERO);
-                dailyCount++;
-                dailyCountZero++;
-                dateInserted++;
-                dateInsertedZero++;
+                dailyMissing++;
             }
         }
         if (dateInserted > 0) {
@@ -243,96 +321,148 @@ if (hour == 0) {
         dailySkippedExisting += 3;
         dailySkippedExistingDates.add(targetDate);
     }
+    }
 
-    if (day_of_month == 1) {
+    }
+
+    if (PERIOD_COP_TEST_MODE || (!EF_HISTORY_TEST_MODE && day_of_month == 1)) {
         // 月COP：以上月（昨天所在的月份）为统计周期
-        Calendar monthStartCal = (Calendar) yesterdayCal.clone();
-        monthStartCal.set(Calendar.DAY_OF_MONTH, 1);
-        String monthStartStr = dateSdf.format(monthStartCal.getTime());
-        String monthEndStr = yesterdayDateStr;
+        String monthStartStr;
+        String monthEndStr;
+        String periodStatDate;
+        if (PERIOD_COP_TEST_MODE) {
+            monthStartStr = TEST_MONTH_START_DATE;
+            monthEndStr = TEST_MONTH_END_DATE;
+            periodStatDate = TEST_PERIOD_STAT_DATE;
+        } else {
+            Calendar monthStartCal = (Calendar) yesterdayCal.clone();
+            monthStartCal.set(Calendar.DAY_OF_MONTH, 1);
+            monthStartStr = dateSdf.format(monthStartCal.getTime());
+            monthEndStr = yesterdayDateStr;
+            periodStatDate = yesterdayDateStr;
+        }
+
+        data.put("periodTestMode", PERIOD_COP_TEST_MODE);
+        data.put("periodStatDate", periodStatDate);
+        data.put("monthStart", monthStartStr);
+        data.put("monthEnd", monthEndStr);
 
         String systemTypeStr = "1".equals(systemTypeUuid) ? "PRIMARY" : "SECONDARY";
+        data.put("periodSystemType", systemTypeStr);
 
         String systemMonthlyElecSql = "SELECT IFNULL(SUM(elec_value),0) AS total, COUNT(*) AS cnt FROM sjmg_electricity_daily_detail " +
                 "WHERE stat_date >= '" + escapeSql(monthStartStr) + "' AND stat_date <= '" + escapeSql(monthEndStr) + "' " +
                 "AND device_code = 'SYSTEM'";
-        Map<String, Object> systemMonthlyElecResult = querySumAndCount(systemMonthlyElecSql);
+        Map<String, Object> systemMonthlyElecResult = querySumAndCount(systemMonthlyElecSql, dynamicDataSource, dbCode);
         BigDecimal systemMonthlyElec = (BigDecimal) systemMonthlyElecResult.get("total");
         int systemMonthlyElecCnt = (Integer) systemMonthlyElecResult.get("cnt");
 
         String heatMonthlySql = "SELECT IFNULL(SUM(heat_value),0) AS total, COUNT(*) AS cnt FROM sjmg_heat_daily_detail " +
                 "WHERE stat_date >= '" + escapeSql(monthStartStr) + "' AND stat_date <= '" + escapeSql(monthEndStr) + "' " +
                 "AND system_type = '" + escapeSql(systemTypeStr) + "' AND energy_type = 'HEATING'";
-        Map<String, Object> heatMonthlyResult = querySumAndCount(heatMonthlySql);
+        Map<String, Object> heatMonthlyResult = querySumAndCount(heatMonthlySql, dynamicDataSource, dbCode);
         BigDecimal heatMonthly = (BigDecimal) heatMonthlyResult.get("total");
         int heatMonthlyCnt = (Integer) heatMonthlyResult.get("cnt");
 
         String coldMonthlySql = "SELECT IFNULL(SUM(heat_value),0) AS total, COUNT(*) AS cnt FROM sjmg_heat_daily_detail " +
                 "WHERE stat_date >= '" + escapeSql(monthStartStr) + "' AND stat_date <= '" + escapeSql(monthEndStr) + "' " +
                 "AND system_type = '" + escapeSql(systemTypeStr) + "' AND energy_type = 'COOLING'";
-        Map<String, Object> coldMonthlyResult = querySumAndCount(coldMonthlySql);
+        Map<String, Object> coldMonthlyResult = querySumAndCount(coldMonthlySql, dynamicDataSource, dbCode);
         BigDecimal coldMonthly = (BigDecimal) coldMonthlyResult.get("total");
         int coldMonthlyCnt = (Integer) coldMonthlyResult.get("cnt");
 
-        if (systemMonthlyElecCnt > 0 && heatMonthlyCnt > 0 && coldMonthlyCnt > 0) {
-            BigDecimal heatMonthlyCOP = BigDecimal.ZERO;
-            BigDecimal coldMonthlyCOP = BigDecimal.ZERO;
-            if (systemMonthlyElec.compareTo(BigDecimal.ZERO) != 0) {
-                heatMonthlyCOP = heatMonthly.divide(systemMonthlyElec, 2, RoundingMode.HALF_UP);
-                coldMonthlyCOP = coldMonthly.divide(systemMonthlyElec, 2, RoundingMode.HALF_UP);
-            }
-            insertCopDetail(yesterdayDateStr, "HEAT", "MONTHLY", systemTypeStr, heatMonthlyCOP);
-            insertCopDetail(yesterdayDateStr, "COLD", "MONTHLY", systemTypeStr, coldMonthlyCOP);
-            monthlyCount = 2;
+        data.put("monthSystemElecTotal", systemMonthlyElec);
+        data.put("monthSystemElecCount", systemMonthlyElecCnt);
+        data.put("monthHeatTotal", heatMonthly);
+        data.put("monthHeatCount", heatMonthlyCnt);
+        data.put("monthColdTotal", coldMonthly);
+        data.put("monthColdCount", coldMonthlyCnt);
+
+        boolean hasMonthlySystemElec = systemMonthlyElecCnt > 0 && systemMonthlyElec.compareTo(BigDecimal.ZERO) != 0;
+        if (hasMonthlySystemElec && heatMonthlyCnt > 0) {
+            BigDecimal heatMonthlyCOP = heatMonthly.divide(systemMonthlyElec, 2, RoundingMode.HALF_UP);
+            data.put("monthHeatCOP", heatMonthlyCOP);
+            insertCopDetail(periodStatDate, "HEAT", "MONTHLY", systemTypeStr, heatMonthlyCOP, dynamicDataSource, dbCode, idWorker);
+            monthlyCount++;
         } else {
-            monthlySkipped = 2;
+            monthlySkipped++;
+        }
+        if (hasMonthlySystemElec && coldMonthlyCnt > 0) {
+            BigDecimal coldMonthlyCOP = coldMonthly.divide(systemMonthlyElec, 2, RoundingMode.HALF_UP);
+            data.put("monthColdCOP", coldMonthlyCOP);
+            insertCopDetail(periodStatDate, "COLD", "MONTHLY", systemTypeStr, coldMonthlyCOP, dynamicDataSource, dbCode, idWorker);
+            monthlyCount++;
+        } else {
+            monthlySkipped++;
         }
 
-        if (monthOfYear == 1) {
+        if (PERIOD_COP_TEST_MODE || monthOfYear == 1) {
             // 年COP：以上一年1月1日至12月31日为统计周期
-            int prevYear = year - 1;
-            String yearStartStr = prevYear + "-01-01";
-            String yearEndStr = prevYear + "-12-31";
+            String yearStartStr;
+            String yearEndStr;
+            if (PERIOD_COP_TEST_MODE) {
+                yearStartStr = TEST_YEAR_START_DATE;
+                yearEndStr = TEST_YEAR_END_DATE;
+            } else {
+                int prevYear = year - 1;
+                yearStartStr = prevYear + "-01-01";
+                yearEndStr = prevYear + "-12-31";
+            }
+            data.put("yearStart", yearStartStr);
+            data.put("yearEnd", yearEndStr);
 
             String systemYearlyElecSql = "SELECT IFNULL(SUM(elec_value),0) AS total, COUNT(*) AS cnt FROM sjmg_electricity_daily_detail " +
                     "WHERE stat_date >= '" + escapeSql(yearStartStr) + "' AND stat_date <= '" + escapeSql(yearEndStr) + "' " +
                     "AND device_code = 'SYSTEM'";
-            Map<String, Object> systemYearlyElecResult = querySumAndCount(systemYearlyElecSql);
+            Map<String, Object> systemYearlyElecResult = querySumAndCount(systemYearlyElecSql, dynamicDataSource, dbCode);
             BigDecimal systemYearlyElec = (BigDecimal) systemYearlyElecResult.get("total");
             int systemYearlyElecCnt = (Integer) systemYearlyElecResult.get("cnt");
 
             String heatYearlySql = "SELECT IFNULL(SUM(heat_value),0) AS total, COUNT(*) AS cnt FROM sjmg_heat_daily_detail " +
                     "WHERE stat_date >= '" + escapeSql(yearStartStr) + "' AND stat_date <= '" + escapeSql(yearEndStr) + "' " +
                     "AND system_type = '" + escapeSql(systemTypeStr) + "' AND energy_type = 'HEATING'";
-            Map<String, Object> heatYearlyResult = querySumAndCount(heatYearlySql);
+            Map<String, Object> heatYearlyResult = querySumAndCount(heatYearlySql, dynamicDataSource, dbCode);
             BigDecimal heatYearly = (BigDecimal) heatYearlyResult.get("total");
             int heatYearlyCnt = (Integer) heatYearlyResult.get("cnt");
 
             String coldYearlySql = "SELECT IFNULL(SUM(heat_value),0) AS total, COUNT(*) AS cnt FROM sjmg_heat_daily_detail " +
                     "WHERE stat_date >= '" + escapeSql(yearStartStr) + "' AND stat_date <= '" + escapeSql(yearEndStr) + "' " +
                     "AND system_type = '" + escapeSql(systemTypeStr) + "' AND energy_type = 'COOLING'";
-            Map<String, Object> coldYearlyResult = querySumAndCount(coldYearlySql);
+            Map<String, Object> coldYearlyResult = querySumAndCount(coldYearlySql, dynamicDataSource, dbCode);
             BigDecimal coldYearly = (BigDecimal) coldYearlyResult.get("total");
             int coldYearlyCnt = (Integer) coldYearlyResult.get("cnt");
 
-            if (systemYearlyElecCnt > 0 && heatYearlyCnt > 0 && coldYearlyCnt > 0) {
-                BigDecimal heatYearlyCOP = BigDecimal.ZERO;
-                BigDecimal coldYearlyCOP = BigDecimal.ZERO;
-                if (systemYearlyElec.compareTo(BigDecimal.ZERO) != 0) {
-                    heatYearlyCOP = heatYearly.divide(systemYearlyElec, 2, RoundingMode.HALF_UP);
-                    coldYearlyCOP = coldYearly.divide(systemYearlyElec, 2, RoundingMode.HALF_UP);
-                }
-                insertCopDetail(yesterdayDateStr, "HEAT", "YEARLY", systemTypeStr, heatYearlyCOP);
-                insertCopDetail(yesterdayDateStr, "COLD", "YEARLY", systemTypeStr, coldYearlyCOP);
-                yearlyCount = 2;
+            data.put("yearSystemElecTotal", systemYearlyElec);
+            data.put("yearSystemElecCount", systemYearlyElecCnt);
+            data.put("yearHeatTotal", heatYearly);
+            data.put("yearHeatCount", heatYearlyCnt);
+            data.put("yearColdTotal", coldYearly);
+            data.put("yearColdCount", coldYearlyCnt);
+
+            boolean hasYearlySystemElec = systemYearlyElecCnt > 0 && systemYearlyElec.compareTo(BigDecimal.ZERO) != 0;
+            if (hasYearlySystemElec && heatYearlyCnt > 0) {
+                BigDecimal heatYearlyCOP = heatYearly.divide(systemYearlyElec, 2, RoundingMode.HALF_UP);
+                data.put("yearHeatCOP", heatYearlyCOP);
+                insertCopDetail(periodStatDate, "HEAT", "YEARLY", systemTypeStr, heatYearlyCOP, dynamicDataSource, dbCode, idWorker);
+                yearlyCount++;
             } else {
-                yearlySkipped = 2;
+                yearlySkipped++;
+            }
+            if (hasYearlySystemElec && coldYearlyCnt > 0) {
+                BigDecimal coldYearlyCOP = coldYearly.divide(systemYearlyElec, 2, RoundingMode.HALF_UP);
+                data.put("yearColdCOP", coldYearlyCOP);
+                insertCopDetail(periodStatDate, "COLD", "YEARLY", systemTypeStr, coldYearlyCOP, dynamicDataSource, dbCode, idWorker);
+                yearlyCount++;
+            } else {
+                yearlySkipped++;
             }
         }
     }
 }
 
-data.put("result", "COP归档成功，日COP " + dailyCount + " 条（有效值 " + dailyCountWithData + " 条，0值 " + dailyCountZero + " 条，跳过已存在 " + dailySkippedExisting + " 条），月COP " + monthlyCount + " 条（跳过无数据 " + monthlySkipped + " 条），年COP " + yearlyCount + " 条（跳过无数据 " + yearlySkipped + " 条）");
+data.put("result", "COP归档完成，日COP新增 " + dailyCount + " 条（EF有记录 " + dailyCountWithData + " 条、真实0值 " + dailyCountZero + " 条），更新0值记录 " + dailyUpdated + " 条，跳过有效记录 " + dailySkippedExisting + " 条，待重试 " + dailyMissing + " 条；月COP " + monthlyCount + " 条（跳过无数据 " + monthlySkipped + " 条），年COP " + yearlyCount + " 条（跳过无数据 " + yearlySkipped + " 条）");
 data.put("dailyProcessedDates", dailyProcessedDates);
 data.put("dailySkippedExistingDates", dailySkippedExistingDates);
+data.put("processedSeasonDates", processedSeasonDates);
+data.put("skippedOutOfSeasonDates", skippedOutOfSeasonDates);
 return data;

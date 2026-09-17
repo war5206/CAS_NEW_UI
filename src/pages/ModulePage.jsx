@@ -4,6 +4,8 @@ import PageTransition from '../components/PageTransition'
 import { useSystemConfigStore } from '@/features/system/store/systemConfigStore'
 import { useAuthStore } from '@/features/auth/store/authStore'
 import { isRestrictedSettingsUser } from '@/features/auth/userRole'
+import { useAnalysisProjectContextQuery } from '@/features/analysis/hooks/useAnalysisProjectContextQuery'
+import { isHeatingCoolingProject } from '@/config/analysisProjectContext'
 
 const AlertsModulePage = lazy(() => import('./AlertsModulePage'))
 const ArchiveManagementPage = lazy(() => import('./ArchiveManagementPage'))
@@ -45,6 +47,9 @@ function ModulePage({
   const { systemTypeUuid } = useSystemConfigStore()
   const { userRole } = useAuthStore()
   const isSystemType2 = String(systemTypeUuid) === '2'
+  const projectContext = useAnalysisProjectContextQuery({
+    enabled: module.id === 'analysis' && section?.id === 'cold',
+  })
   let content = null
 
   const isModeSelectSection = module.id === 'settings' && section?.id === 'mode-select'
@@ -140,7 +145,11 @@ function ModulePage({
   }
 
   if (!content && module.id === 'analysis' && section?.id === 'cold') {
-    content = <ColdStatisticsPage />
+    if (!isHeatingCoolingProject(projectContext.data.projectTypeId)) {
+      content = <Navigate to="/analysis/data-overview" replace />
+    } else {
+      content = <ColdStatisticsPage />
+    }
   }
 
   if (!content && module.id === 'analysis' && section?.id === 'cost') {

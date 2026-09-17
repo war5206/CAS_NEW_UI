@@ -18,6 +18,8 @@ import { suppressSystemStatusPollFor } from '@/hooks/useGlobalSystemStatusPoll'
 import { useAuthStore } from '@/features/auth/store/authStore'
 import { isRestrictedSettingsUser } from '@/features/auth/userRole'
 import { writeRealvalByLongNames } from '@/api/modules/settings'
+import { useAnalysisProjectContextQuery } from '@/features/analysis/hooks/useAnalysisProjectContextQuery'
+import { isHeatingCoolingProject } from '@/config/analysisProjectContext'
 
 const SYSTEM_STATUS_LONG_NAME = 'Sys\\FinforWorx\\SystemStatus'
 const ALERT_INDICATOR_VISIBLE_COUNT = 5
@@ -100,13 +102,20 @@ function CasLayout({
     return items
   }, [activeModule, activeSection, activeTab, extraBreadcrumbLabel, homePageTitle, isHomeLayout])
 
-  const sectionList = activeModule.sections ?? []
+  const sectionList = useMemo(() => activeModule.sections ?? [], [activeModule.sections])
+  const projectContext = useAnalysisProjectContextQuery({
+    enabled: activeModule.id === 'analysis',
+  })
   const secondarySectionList = useMemo(() => {
-    if (!isRestrictedSettingsUser(userRole)) {
-      return sectionList
+    let list = sectionList
+    if (isRestrictedSettingsUser(userRole)) {
+      list = list.filter((item) => item.id !== 'base-setting')
     }
-    return sectionList.filter((item) => item.id !== 'base-setting')
-  }, [sectionList, userRole])
+    if (activeModule.id === 'analysis' && !isHeatingCoolingProject(projectContext.data.projectTypeId)) {
+      list = list.filter((item) => item.id !== 'cold')
+    }
+    return list
+  }, [sectionList, userRole, activeModule.id, projectContext.data.projectTypeId])
   const tabList = useMemo(() => {
     const source = activeSection?.tabs ?? []
     const isSystemType2 = String(systemTypeUuid) === '2'

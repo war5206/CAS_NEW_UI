@@ -132,6 +132,7 @@ function createMainWindow() {
     backgroundColor: '#0e0e14',
     autoHideMenuBar: true,
     fullscreen: true,
+    alwaysOnTop: !isDev,
     width: 1920,
     height: 1080,
     webPreferences: {
@@ -144,6 +145,10 @@ function createMainWindow() {
   mainWindow.once('ready-to-show', () => {
     mainWindow.maximize()
     mainWindow.setFullScreen(true)
+    if (!isDev) {
+      // screen-saver 是 Windows 上较高的置顶层级，确保其他应用弹窗也无法遮挡
+      mainWindow.setAlwaysOnTop(true, 'screen-saver')
+    }
     mainWindow.show()
   })
 

@@ -179,26 +179,6 @@ function buildSharedTooltipContent({ axisLabel, params, yoyPercentage, chartMode
   `
 }
 
-function buildComparisonSeriesData(sourceData = []) {
-  const normalized = sourceData.map((value, index) => {
-    if (value == null) {
-      return null
-    }
-
-    const numeric = Number(value)
-    return Number((numeric * (0.82 + (index % 4) * 0.03)).toFixed(2))
-  })
-
-  return {
-    prevData: normalized.map((value, index) =>
-      value == null ? null : Number((value * (0.92 + (index % 3) * 0.015)).toFixed(2)),
-    ),
-    yoyData: normalized.map((value, index) =>
-      value == null ? null : Number((value * (0.78 + (index % 5) * 0.018)).toFixed(2)),
-    ),
-  }
-}
-
 function buildPowerStatisticsOption(chartModel, compareMode, period, range) {
   const stackTotals = chartModel.labels.map((_, index) =>
     chartModel.series.reduce((sum, seriesItem) => sum + (Number(seriesItem.data[index]) || 0), 0),
@@ -231,13 +211,9 @@ function buildPowerStatisticsOption(chartModel, compareMode, period, range) {
     chartModel.series[0]?.data.map((value) => (value == null ? null : Number(value))) ??
     []
 
-  const hasRealPreviousData = chartModel.previousData?.length > 0
-  const { prevData, yoyData } = hasRealPreviousData
-    ? {
-        prevData: chartModel.previousData.map((value) => (value == null ? null : Number(value))),
-        yoyData: chartModel.previousData.map((value) => (value == null ? null : Number(value))),
-      }
-    : buildComparisonSeriesData(compareBasisData)
+  const previousData = chartModel.previousData?.map((value) => (value == null ? null : Number(value))) ?? []
+  const prevData = previousData
+  const yoyData = previousData
   const yoyPercentages = compareBasisData.map((value, index) =>
     value == null || yoyData[index] == null ? null : Number((((value - yoyData[index]) / (yoyData[index] || 1)) * 100).toFixed(1))
   )

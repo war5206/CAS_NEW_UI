@@ -14,6 +14,7 @@ import './DataOverviewPage.css'
 
 const defaultAnalysisMonth = getDefaultCalendarMonthValue()
 const currentCalendarYear = String(new Date().getFullYear())
+const DATA_OVERVIEW_PERIOD_OPTIONS = ['日', '月']
 
 const DEFAULT_FILTERS = {
   day: {
@@ -138,6 +139,7 @@ function DataOverviewPage() {
         titleValue={copType}
         onTitleChange={setCopType}
         titleAriaLabel="选择COP类型"
+        periodOptions={DATA_OVERVIEW_PERIOD_OPTIONS}
         period={period}
         onPeriodChange={setPeriod}
         compareMode={compareMode}

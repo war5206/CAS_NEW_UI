@@ -19,16 +19,13 @@ const PAGE_CONFIGS = {
       耦合能源: '#34D399',
     },
     legendName: '用电量',
-    cardLabels: ['当前月总用电量（kWh）', '日均用电量（kWh）'],
     currentTotalLabel: '当前总用电量',
-    summaryValueOrder: 'avg-all',
     compareNames: { mom: '上一周期用电量', yoy: '去年同期用电量' },
   },
   water: {
     unit: 't',
     color: '#1FA8FF',
     legendName: '用水量',
-    cardLabels: ['当前月总用水量（t）', '日均用水量（t）'],
     currentTotalLabel: '当前总用水量',
     compareNames: { mom: '上一周期用水量', yoy: '去年同期用水量' },
   },
@@ -36,7 +33,6 @@ const PAGE_CONFIGS = {
     unit: 'kWh',
     color: '#D247B1',
     legendName: '耗热量',
-    cardLabels: ['当前月总耗热量（kWh）', '日均耗热量（kWh）'],
     currentTotalLabel: '当前总耗热量',
     compareNames: { mom: '上一周期耗热量', yoy: '去年同期耗热量' },
   },
@@ -44,10 +40,24 @@ const PAGE_CONFIGS = {
     unit: '元',
     color: '#F0A216',
     legendName: '费用',
-    cardLabels: ['当前月总费用（元）', '日均费用（元）'],
     currentTotalLabel: '当前总费用',
     compareNames: { mom: '上一周期费用', yoy: '去年同期费用' },
   },
+}
+
+function getTrendCardLabels(period, legendName, unit) {
+  const suffix = unit ? `（${unit}）` : ''
+  const totalLabels = {
+    日: `当前月总${legendName}${suffix}`,
+    月: `区间总${legendName}${suffix}`,
+    年: `区间总${legendName}${suffix}`,
+  }
+  const avgLabels = {
+    日: `日均${legendName}${suffix}`,
+    月: `月均${legendName}${suffix}`,
+    年: `年均${legendName}${suffix}`,
+  }
+  return [totalLabels[period] ?? totalLabels['日'], avgLabels[period] ?? avgLabels['日']]
 }
 
 const POWER_TYPE_MAP = {
@@ -105,7 +115,9 @@ function resolveTypeParam(pageType, titleValue) {
 export function useAnalysisTrendQuery({ pageType, period, compareMode, range, titleValue, configOverrides, enabled = true } = {}) {
   const lastSuccessRef = useRef(null)
   const baseConfig = PAGE_CONFIGS[pageType]
-  const config = configOverrides ? { ...baseConfig, ...configOverrides } : baseConfig
+  const mergedConfig = configOverrides ? { ...baseConfig, ...configOverrides } : baseConfig
+  const cardLabels = getTrendCardLabels(period, mergedConfig.legendName, mergedConfig.unit)
+  const config = { ...mergedConfig, cardLabels }
   const payload = useMemo(() => {
     const dateRange = resolveDateRange(period, range)
     const withType = resolveTypeParam(pageType, titleValue)

@@ -24,10 +24,15 @@ function toNumberOrFallback(value, fallback = 0) {
 
 function resolveChartType(unit, label) {
   const text = `${toText(unit)} ${toText(label)}`.toLowerCase()
+  // 状态/开关类需先于数值类判断，避免「定压泵1手动开关」被误判为压力
+  if (text.includes('反馈')) return 'state'
+  if (text.includes('开关') || text.includes('使能') || text.includes('功能')) return 'switch'
   if (text.includes('压') || text.includes('kpa')) return 'pressure'
   if (text.includes('温') || text.includes('℃')) return 'temperature'
   if (text.includes('%')) return 'humidity'
   if (text.includes('db') || text.includes('噪')) return 'noise'
+  if (text.includes('kwh') || text.includes('耗电')) return 'energy'
+  if (text.includes('kw') || text.includes('功率')) return 'power'
   if (text.includes('角')) return 'angle'
   if (text.includes('档')) return 'gear'
   return 'enum'
@@ -69,7 +74,15 @@ function resolveOpsUnitDeviceChartType(def) {
   if (label.includes('电流')) return 'current'
   if (label.includes('运行时长')) return 'duration'
   if (label.includes('℃')) return 'temperature'
-  return 'enum'
+  // 其余数值型参数（如回差值）按连续曲线处理，避免落入枚举 fallback「状态0/状态1」
+  return 'number'
+}
+
+/** 枚举类机组参数的曲线状态文案，tooltip/Y 轴按此展示 */
+function resolveOpsUnitDeviceChartStates(def) {
+  if (def.valueType === 'settingMode') return ['制冷', '制热']
+  if (def.valueType === 'powerOn') return ['关', '开']
+  return undefined
 }
 
 function buildFixedOpsUnitOptions(deviceIds) {
@@ -143,6 +156,7 @@ export function adaptOpsUnitDeviceMetrics(rawData, deviceCode) {
       unit,
       longName: buildUnitDeviceLongName(pointNo, def.suffix),
       chartType: resolveOpsUnitDeviceChartType(def),
+      chartStates: resolveOpsUnitDeviceChartStates(def),
     }
   })
 }
