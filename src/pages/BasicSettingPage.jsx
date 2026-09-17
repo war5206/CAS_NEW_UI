@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import FeatureInfoCard from '../components/FeatureInfoCard'
+import NumericKeypadModal from '../components/NumericKeypadModal'
 import TimePickerModal from '../components/TimePickerModal'
 import AttentionModal from '../components/AttentionModal'
 import {
@@ -203,7 +204,7 @@ const METER_COUNT_FIELDS = [
   { key: 'waterPumpMeterCount', label: '水泵电表', max: 10 },
   { key: 'couplingMeterCount', label: '耦合能源电表', max: 10 },
   { key: 'heatMeterCount', label: '热表', max: 3 },
-  { key: 'waterMeterCount', label: '水表', max: 1, disabled: true },
+  { key: 'waterMeterCount', label: '水表', max: 1 },
 ]
 
 /** 表计数量设置：配置运维-系统管理页各组表计展示的卡片数量，保存后立即生效 */
@@ -211,22 +212,21 @@ function MeterCountSection() {
   const meterConfig = useMeterConfig()
   const [draft, setDraft] = useState(meterConfig)
   const [saveMessage, setSaveMessage] = useState('')
+  const [activeFieldKey, setActiveFieldKey] = useState(null)
+
+  const activeField = METER_COUNT_FIELDS.find((field) => field.key === activeFieldKey) ?? null
 
   useEffect(() => {
     setDraft(meterConfig)
   }, [meterConfig])
 
-  const handleCountChange = (field) => (event) => {
-    const raw = event.target.value
-    if (raw === '') {
-      setDraft((previous) => ({ ...previous, [field.key]: '' }))
-      return
+  const handleKeypadConfirm = (value) => {
+    const number = Math.round(Number(value))
+    if (activeField && Number.isFinite(number)) {
+      const clamped = Math.min(activeField.max, Math.max(0, number))
+      setDraft((previous) => ({ ...previous, [activeField.key]: clamped }))
     }
-    const number = Math.round(Number(raw))
-    if (!Number.isFinite(number)) {
-      return
-    }
-    setDraft((previous) => ({ ...previous, [field.key]: Math.min(field.max, Math.max(1, number)) }))
+    setActiveFieldKey(null)
   }
 
   const handleSave = () => {
@@ -243,28 +243,33 @@ function MeterCountSection() {
     <section className="basic-setting-page__meter-config" aria-label="表计数量配置">
       <div className="basic-setting-page__meter-config-head">
         <h3>表计数量</h3>
-        <p>配置运维-系统管理页展示的表计卡片数量，数量上限受系统支持范围约束</p>
+        <p>配置运维-系统管理页展示的表计卡片数量，数量上限受系统支持范围约束，0 表示不展示</p>
       </div>
       <div className="basic-setting-page__meter-config-body">
         {METER_COUNT_FIELDS.map((field) => (
-          <label key={field.key} className="basic-setting-page__meter-config-item">
+          <div key={field.key} className="basic-setting-page__meter-config-item">
             <span>{field.label}</span>
-            <input
-              type="number"
-              min={1}
-              max={field.max}
-              step={1}
-              value={draft[field.key]}
-              disabled={field.disabled}
-              onChange={handleCountChange(field)}
-              aria-label={`${field.label}数量`}
-            />
-          </label>
+            <button
+              type="button"
+              className="basic-setting-page__meter-config-value"
+              onClick={() => setActiveFieldKey(field.key)}
+              aria-label={`设置${field.label}数量`}
+            >
+              {draft[field.key]}
+            </button>
+          </div>
         ))}
         <button type="button" className="basic-setting-page__meter-config-save" onClick={handleSave}>
           保存
         </button>
       </div>
+      <NumericKeypadModal
+        isOpen={Boolean(activeField)}
+        title={activeField ? `${activeField.label}数量` : ''}
+        initialValue={activeField ? String(draft[activeField.key] ?? '') : ''}
+        onClose={() => setActiveFieldKey(null)}
+        onConfirm={handleKeypadConfirm}
+      />
       {saveMessage ? (
         <AttentionModal
           isOpen

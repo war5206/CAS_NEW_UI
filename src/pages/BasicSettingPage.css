@@ -142,7 +142,8 @@
   font-size: 18px;
 }
 
-.basic-setting-page__meter-config-item input {
+.basic-setting-page__meter-config-item input,
+.basic-setting-page__meter-config-value {
   width: 88px;
   height: 48px;
   border: 1px solid rgba(255, 255, 255, 0.14);
@@ -153,9 +154,12 @@
   text-align: center;
 }
 
-.basic-setting-page__meter-config-item input:disabled {
-  opacity: 0.55;
-  cursor: not-allowed;
+.basic-setting-page__meter-config-value {
+  cursor: pointer;
+}
+
+.basic-setting-page__meter-config-value:hover {
+  border-color: rgba(110, 133, 171, 0.6);
 }
 
 .basic-setting-page__meter-config-save {

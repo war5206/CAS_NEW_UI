@@ -16,11 +16,11 @@ export const DEFAULT_METER_CONFIG = {
 }
 
 const METER_COUNT_LIMITS = {
-  heatPumpMeterCount: { min: 1, max: 10 },
-  waterPumpMeterCount: { min: 1, max: 10 },
-  couplingMeterCount: { min: 1, max: 10 },
-  heatMeterCount: { min: 1, max: 3 },
-  waterMeterCount: { min: 1, max: 1 },
+  heatPumpMeterCount: { min: 0, max: 10 },
+  waterPumpMeterCount: { min: 0, max: 10 },
+  couplingMeterCount: { min: 0, max: 10 },
+  heatMeterCount: { min: 0, max: 3 },
+  waterMeterCount: { min: 0, max: 1 },
 }
 
 const listeners = new Set()
