@@ -7,7 +7,8 @@
  *
  * Optional input:
  *   data.maxRetry: default 3
- *   data.dbCode: tenant DB code when invoked by scheduler/cron (no PtUser in ThreadLocal)
+ *   data.dbCode: tenant DB code when invoked by scheduler/cron (no PtUser in ThreadLocal);
+ *                falls back to default tenant "t01" when omitted
  */
 
 import com.alibaba.fastjson.JSON;
@@ -35,10 +36,7 @@ if (dbCode == null || dbCode.isEmpty()) {
     dbCode = dc != null ? dc.toString().trim() : null;
 }
 if (dbCode == null || dbCode.isEmpty()) {
-    data.put("state", "fail");
-    data.put("message", "missing dbCode: cron/scheduler calls must pass data.dbCode when no login user context exists");
-    data.put("results", new ArrayList<>());
-    return data;
+    dbCode = "t01";
 }
 if ("base".equals(dbCode)) {
     dbCode = "t01";

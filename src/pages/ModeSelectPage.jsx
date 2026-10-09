@@ -26,12 +26,15 @@ import { useSystemConfigStore } from '@/features/system/store/systemConfigStore'
 import { useWriteWithDelayedVerify } from '../hooks/useWriteWithDelayedVerify'
 import { getStoredClimateMode, setStoredClimateMode } from '../utils/climateModeState'
 import { getStoredTemperatureMode, setStoredTemperatureMode } from '../utils/temperatureModeState'
+import { getStoredSmartTimerSwitch, setStoredSmartTimerSwitch } from '../utils/smartTimerState'
 import {
   hpRunModeSwitch,
   queryManualSwitch,
   queryRealvalByLongNames,
   writeRealvalByLongNames,
 } from '../api/modules/settings'
+import { querySmartTimerPlan, toggleSmartTimerPlan } from '../api/modules/smartTimer'
+import { adaptSmartTimerPlans } from '../api/adapters/smartTimer'
 import { HOME_OVERVIEW_QUERY_KEY } from '@/features/home/hooks/useHomeOverviewQuery'
 import './ModeSelectPage.css'
 
@@ -64,6 +67,9 @@ const TEMPERATURE_OPTIONS = [
   },
 ]
 
+const TIMER_DESCRIPTION_ON = '开启时，按定时方案分时段运行'
+const TIMER_DESCRIPTION_OFF = '关闭时，7*24小时全天候运行'
+
 const MODE_SETTING_CARDS = [
   {
     id: 'climate',
@@ -83,7 +89,7 @@ const MODE_SETTING_CARDS = [
   {
     id: 'timer',
     title: '智能定时',
-    description: '可选择全天候运行和定时',
+    description: TIMER_DESCRIPTION_ON,
     statusIcon: timerStatusIcon,
     statusIconActive: timerStatusIconActive,
     routePath: '/settings/mode-setting/smart-timer',
@@ -163,14 +169,12 @@ const MANUAL_POWERON_DEVICE_CONFIG = {
 const LONG_NAME_SYSTEM_OPERATING_MODE = 'Sys\\FinforWorx\\SystemOperatingMode'
 const LONG_NAME_HP_TOTAL_RUN_MODE = 'Sys\\FinforWorx\\HPTotalRunMode'
 const LONG_NAME_CLIMATE = 'Sys\\FinforWorx\\QHBC'
-const LONG_NAME_TIMER = 'Sys\\FinforWorx\\ZNDS'
 const LONG_NAME_PEAK = 'Sys\\FinforWorx\\GFTJ'
 const LONG_NAME_COUPLING = 'Sys\\FinforWorx\\OHNY'
 const LONG_NAME_PROTECTION = 'Sys\\FinforWorx\\Function1'
 
 const SETTING_CARD_LONG_NAME_MAP = {
   climate: LONG_NAME_CLIMATE,
-  timer: LONG_NAME_TIMER,
   peak: LONG_NAME_PEAK,
   coupling: LONG_NAME_COUPLING,
   protection: LONG_NAME_PROTECTION,
@@ -178,13 +182,12 @@ const SETTING_CARD_LONG_NAME_MAP = {
 
 const SETTING_SWITCH_LONG_NAMES = [
   LONG_NAME_CLIMATE,
-  LONG_NAME_TIMER,
   LONG_NAME_PEAK,
   LONG_NAME_COUPLING,
   LONG_NAME_PROTECTION,
 ]
 
-// 智能模式下需要轮询的全部点位（模式 + 制热制冷 + 5 个开关）
+// 智能模式下需要轮询的全部点位（模式 + 制热制冷 + 4 个开关，智能定时为纯本地开关不参与轮询）
 const SMART_MODE_POLL_LONG_NAMES = [
   LONG_NAME_SYSTEM_OPERATING_MODE,
   LONG_NAME_HP_TOTAL_RUN_MODE,
@@ -362,11 +365,13 @@ function ModeSelectPage() {
   const [settingState, setSettingState] = useState(() => ({
     ...INITIAL_CARD_SWITCH_STATE,
     climate: getStoredClimateMode() === 'climate',
+    timer: getStoredSmartTimerSwitch(),
   }))
   const [manualDeviceType, setManualDeviceType] = useState(() => manualTypeOptions[0].value)
   const [manualDeviceList, setManualDeviceList] = useState([])
   const [attentionMessage, setAttentionMessage] = useState('')
   const [isRunModeSwitching, setIsRunModeSwitching] = useState(false)
+  const [isTimerSwitching, setIsTimerSwitching] = useState(false)
   /** 下置进行中：轮询回读时跳过这些点位，避免用旧实值冲掉刚点的蓝/灰 */
   const manualTogglePendingRef = useRef(new Set())
 
@@ -537,7 +542,7 @@ function ModeSelectPage() {
   }, [featureMode, manualDeviceType])
 
   // 进入页面立即拉取 + 每 10s 轮询；按模式拉取对应数据
-  // - 智能模式：模式点位 + 制热制冷 + 5 个开关点位
+  // - 智能模式：模式点位 + 制热制冷 + 4 个开关点位（智能定时为纯本地开关，不参与）
   // - 手动模式：模式点位 + 制热制冷 + 对应设备类型的手动设备列表
   useEffect(() => {
     const pollOnce = async () => {
@@ -655,10 +660,47 @@ function ModeSelectPage() {
     [fetchRealvals, patchHomeOverviewTemperatureIcon, isRunModeSwitching, performRunModeSwitch, temperatureMode],
   )
 
+  // 智能定时开关：不对应点位，状态与智能定时页共用 localStorage（开=智能定时，关=全天候）；
+  // 关闭时把已启用的定时方案全部停用，后端轮询便不再命中任何时段
+  const handleTimerToggle = useCallback(async () => {
+    if (isTimerSwitching) return
+    const nextOn = !settingState.timer
+
+    if (nextOn) {
+      setStoredSmartTimerSwitch(true)
+      setSettingState((prev) => ({ ...prev, timer: true }))
+      return
+    }
+
+    setIsTimerSwitching(true)
+    try {
+      const response = await querySmartTimerPlan({ enabled: 1 })
+      const { plans } = adaptSmartTimerPlans(response?.data ?? response)
+      for (const plan of plans) {
+        const toggleResponse = await toggleSmartTimerPlan({ id: plan.id, enabled: false })
+        const responseData = toggleResponse?.data ?? {}
+        if (responseData.state !== 'success') {
+          setAttentionMessage(responseData.message || '关闭定时方案失败，请稍后再试。')
+          return
+        }
+      }
+      setStoredSmartTimerSwitch(false)
+      setSettingState((prev) => ({ ...prev, timer: false }))
+    } catch (error) {
+      setAttentionMessage(error?.message || '关闭定时方案失败，请检查网络。')
+    } finally {
+      setIsTimerSwitching(false)
+    }
+  }, [isTimerSwitching, settingState.timer])
+
   // 点击模式调节里的开关
   const handleSettingToggle = useCallback(
     (cardId) => {
       if (cardId === 'start-stop') return
+      if (cardId === 'timer') {
+        handleTimerToggle()
+        return
+      }
       const longName = SETTING_CARD_LONG_NAME_MAP[cardId]
       // 无后端点位的其它模块走本地切换（智能启停已固定为开，不进入此分支）
       if (!longName) {
@@ -681,7 +723,7 @@ function ModeSelectPage() {
         },
       )
     },
-    [fetchRealvals, performWrite, settingState],
+    [fetchRealvals, handleTimerToggle, performWrite, settingState],
   )
 
   // 手动设备类型下拉切换（纯读操作，无需乐观更新）
@@ -795,13 +837,20 @@ function ModeSelectPage() {
           <div className="mode-select-page__setting-grid">
             {settingCards.map((item) => {
               const isStartStopLocked = item.id === 'start-stop'
+              const isTimerCard = item.id === 'timer'
               return (
                 <ModeSettingCard
                   key={item.id}
                   id={item.id}
                   title={item.title}
                   subtitle={item.subtitle}
-                  description={item.description}
+                  description={
+                    isTimerCard
+                      ? settingState.timer
+                        ? TIMER_DESCRIPTION_ON
+                        : TIMER_DESCRIPTION_OFF
+                      : item.description
+                  }
                   isEnabled={isStartStopLocked ? true : Boolean(settingState[item.id])}
                   onToggle={() => handleSettingToggle(item.id)}
                   statusIcon={item.statusIcon}
@@ -811,7 +860,7 @@ function ModeSelectPage() {
                   toggleConfirmConfig={({ nextChecked }) => ({
                     message: `确认${nextChecked ? '开启' : '关闭'}${item.title}吗？`,
                   })}
-                  toggleDisabled={isStartStopLocked}
+                  toggleDisabled={isStartStopLocked || (isTimerCard && isTimerSwitching)}
                 />
               )
             })}

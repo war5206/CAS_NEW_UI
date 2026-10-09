@@ -8,6 +8,7 @@ import ToggleSwitch from '../components/ToggleSwitch'
 import { useActionConfirm } from '../hooks/useActionConfirm'
 import { useSmartTimerPlansQuery } from '../features/settings/hooks/useSmartTimerPlansQuery'
 import { buildSmartTimerPlanPayload } from '../api/adapters/smartTimer'
+import { getStoredSmartTimerPageMode, setStoredSmartTimerPageMode } from '../utils/smartTimerState'
 import {
   saveSmartTimerPlan,
   deleteSmartTimerPlan,
@@ -652,7 +653,7 @@ function SmartTimerPlanCard({ plan, onEdit, onToggle, toggleConfirmConfig }) {
 
 function SmartTimerPage() {
   const { requestConfirm, confirmModal } = useActionConfirm()
-  const [pageMode, setPageMode] = useState('smart')
+  const [pageMode, setPageModeState] = useState(() => getStoredSmartTimerPageMode())
   const { data: plansQueryData, refetch: refetchPlans } = useSmartTimerPlansQuery({
     enabled: pageMode === 'smart',
   })
@@ -1189,6 +1190,47 @@ function SmartTimerPage() {
     }
   }
 
+  const applyPageMode = (nextMode) => {
+    setStoredSmartTimerPageMode(nextMode)
+    setPageModeState(nextMode)
+  }
+
+  // 切换页面模式：切到全天候时把已启用的方案全部关闭，后端轮询便不再命中任何时段
+  const handlePageModeChange = async (nextMode) => {
+    if (nextMode === pageMode || isMutating) {
+      return
+    }
+    if (nextMode !== 'all-day') {
+      applyPageMode(nextMode)
+      return
+    }
+
+    const enabledPlans = plans.filter((plan) => plan.enabled)
+    if (enabledPlans.length === 0) {
+      applyPageMode(nextMode)
+      return
+    }
+
+    setIsMutating(true)
+    try {
+      for (const plan of enabledPlans) {
+        const response = await toggleSmartTimerPlan({ id: plan.id, enabled: false })
+        const responseData = response?.data ?? {}
+        if (responseData.state !== 'success') {
+          showAttentionModal(responseData.message || '关闭定时方案失败，请稍后再试。')
+          return
+        }
+      }
+
+      await refetchPlans()
+      applyPageMode(nextMode)
+    } catch (error) {
+      showAttentionModal(error?.message || '关闭定时方案失败，请检查网络。')
+    } finally {
+      setIsMutating(false)
+    }
+  }
+
   return (
     <>
       <main className="smart-timer-page">
@@ -1199,7 +1241,7 @@ function SmartTimerPage() {
             description="自主设定工作时段区间"
             selected={pageMode === 'smart'}
             selectedBadgePosition="start"
-            onClick={() => setPageMode('smart')}
+            onClick={() => handlePageModeChange('smart')}
             confirmConfig={pageMode === 'smart' ? null : { message: '确认切换为智能定时模式吗？' }}
             className="smart-timer-page__mode-card"
           />
@@ -1208,7 +1250,7 @@ function SmartTimerPage() {
             title="全天候模式"
             description="7*24小时全天候运行"
             selected={pageMode === 'all-day'}
-            onClick={() => setPageMode('all-day')}
+            onClick={() => handlePageModeChange('all-day')}
             confirmConfig={pageMode === 'all-day' ? null : { message: '确认切换为全天候模式吗？' }}
             className="smart-timer-page__mode-card"
           />
