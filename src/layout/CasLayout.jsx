@@ -20,6 +20,7 @@ import { isRestrictedSettingsUser } from '@/features/auth/userRole'
 import { writeRealvalByLongNames } from '@/api/modules/settings'
 import { useAnalysisProjectContextQuery } from '@/features/analysis/hooks/useAnalysisProjectContextQuery'
 import { isHeatingCoolingProject } from '@/config/analysisProjectContext'
+import { COUPLE_ENERGY_TYPE_NONE_ID, normalizeCouplingEnergyTypeId } from '@/config/couplingEnergyTypes'
 
 const SYSTEM_STATUS_LONG_NAME = 'Sys\\FinforWorx\\SystemStatus'
 const ALERT_INDICATOR_VISIBLE_COUNT = 5
@@ -67,7 +68,7 @@ function CasLayout({
   const isMonitorLayout = activeModule.id === 'monitor'
   const { liveRows: activeAlerts, liveTotal: alertsTotal, liveMessage: alertsMessage, ignored: isAlertIgnored } = useAlertsStore()
   const { powerStatus, isToggling: isPowerToggling } = useSystemStatusStore()
-  const { systemTypeUuid, hasFetched: hasFetchedSystemConfig } = useSystemConfigStore()
+  const { systemTypeUuid, coupleEnergyTypeUuid, hasFetched: hasFetchedSystemConfig } = useSystemConfigStore()
   const { userRole } = useAuthStore()
   const isSystemPoweredOn = powerStatus === '1'
 
@@ -119,6 +120,9 @@ function CasLayout({
   const tabList = useMemo(() => {
     const source = activeSection?.tabs ?? []
     const isSystemType2 = String(systemTypeUuid) === '2'
+    const hasNoCouplingEnergy =
+      hasFetchedSystemConfig &&
+      normalizeCouplingEnergyTypeId(coupleEnergyTypeUuid) === COUPLE_ENERGY_TYPE_NONE_ID
 
     if (activeModule.id === 'settings' && activeSection?.id === 'device-params') {
       if (isSystemType2) {
@@ -127,16 +131,27 @@ function CasLayout({
       return source.filter((item) => item.id !== 'terminal-loop-pump')
     }
 
-    if (activeModule.id === 'operations' && activeSection?.id === 'device-management') {
-      const resolvedSystemType = hasFetchedSystemConfig ? String(systemTypeUuid) : String(opsSystemType)
-      if (resolvedSystemType === '2') {
+    if (activeModule.id === 'settings' && activeSection?.id === 'mode-setting') {
+      if (!hasNoCouplingEnergy) {
         return source
       }
-      return source.filter((item) => item.id !== 'ops-terminal-loop-pump')
+      return source.filter((item) => item.id !== 'coupling')
+    }
+
+    if (activeModule.id === 'operations' && activeSection?.id === 'device-management') {
+      const resolvedSystemType = hasFetchedSystemConfig ? String(systemTypeUuid) : String(opsSystemType)
+      let list = source
+      if (resolvedSystemType !== '2') {
+        list = list.filter((item) => item.id !== 'ops-terminal-loop-pump')
+      }
+      if (hasNoCouplingEnergy) {
+        list = list.filter((item) => item.id !== 'ops-coupling')
+      }
+      return list
     }
 
     return source
-  }, [activeModule.id, activeSection, hasFetchedSystemConfig, opsSystemType, systemTypeUuid])
+  }, [activeModule.id, activeSection, coupleEnergyTypeUuid, hasFetchedSystemConfig, opsSystemType, systemTypeUuid])
   const showSecondaryNav = !hideSecondaryNav && (secondarySectionList.length > 0 || !isHomeLayout)
   const hasTabs = !hideModuleTabs && tabList.length > 0
   const hasNoAlertMessage = alertsMessage === '没有更多报警数据'

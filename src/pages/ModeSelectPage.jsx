@@ -105,7 +105,7 @@ const MODE_SETTING_CARDS = [
   {
     id: 'protection',
     title: '热泵长时间运行防护',
-    description: '可选择全天候运行和定时',
+    description: '开启时，热泵运行时间超过设定时间，停机防护',
     statusIcon: protectionStatusIcon,
     statusIconActive: protectionStatusIconActive,
   },

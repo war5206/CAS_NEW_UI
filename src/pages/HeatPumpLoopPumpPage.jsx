@@ -139,14 +139,14 @@ function HeatPumpLoopPumpPage() {
             confirmConfig={({ nextValue }) => ({ message: `确认将循环泵间隔停止时间设置为 ${nextValue} 分钟吗？` })}
           />
           <LabeledSelectRow
-            label="热泵循环轮值时间（天）"
+            label="热泵循环轮值时间（小时）"
             description="循环泵主备相互切换的时间"
             value={rotationDays}
-            suffix="天"
+            suffix="小时"
             onChange={(v) => handleWrite(LN_HPXHB4, v, setRotationDays)}
             disabled={!isIntervalSavingEnabled}
             useModeCardControl
-            confirmConfig={({ nextValue }) => ({ message: `确认将热泵循环轮值时间设置为 ${nextValue} 天吗？` })}
+            confirmConfig={({ nextValue }) => ({ message: `确认将热泵循环轮值时间设置为 ${nextValue} 小时吗？` })}
           />
         </div>
       </section>

@@ -6,6 +6,7 @@ import { useAuthStore } from '@/features/auth/store/authStore'
 import { isRestrictedSettingsUser } from '@/features/auth/userRole'
 import { useAnalysisProjectContextQuery } from '@/features/analysis/hooks/useAnalysisProjectContextQuery'
 import { isHeatingCoolingProject } from '@/config/analysisProjectContext'
+import { COUPLE_ENERGY_TYPE_NONE_ID, normalizeCouplingEnergyTypeId } from '@/config/couplingEnergyTypes'
 
 const AlertsModulePage = lazy(() => import('./AlertsModulePage'))
 const ArchiveManagementPage = lazy(() => import('./ArchiveManagementPage'))
@@ -44,9 +45,12 @@ function ModulePage({
   onUnitLayoutCommitted,
 }) {
   const { module, section, tab } = routeInfo
-  const { systemTypeUuid } = useSystemConfigStore()
+  const { systemTypeUuid, coupleEnergyTypeUuid, hasFetched: hasFetchedSystemConfig } = useSystemConfigStore()
   const { userRole } = useAuthStore()
   const isSystemType2 = String(systemTypeUuid) === '2'
+  const hasNoCouplingEnergy =
+    hasFetchedSystemConfig &&
+    normalizeCouplingEnergyTypeId(coupleEnergyTypeUuid) === COUPLE_ENERGY_TYPE_NONE_ID
   const projectContext = useAnalysisProjectContextQuery({
     enabled: module.id === 'analysis' && section?.id === 'cold',
   })
@@ -125,7 +129,11 @@ function ModulePage({
   }
 
   if (!content && module.id === 'settings' && section?.id === 'mode-setting' && tab?.id === 'coupling') {
-    content = <CouplingEnergyPage />
+    content = hasNoCouplingEnergy ? (
+      <Navigate to="/settings/mode-setting/climate-compensation" replace />
+    ) : (
+      <CouplingEnergyPage />
+    )
   }
 
   if (!content && module.id === 'analysis' && section?.id === 'data-overview') {
@@ -171,6 +179,8 @@ function ModulePage({
   if (!content && module.id === 'operations' && section?.id === 'device-management' && tab) {
     if (tab.id === 'ops-terminal-loop-pump' && !isSystemType2) {
       content = <Navigate to="/operations/device-management/heat-pump-loop-pump" replace />
+    } else if (tab.id === 'ops-coupling' && hasNoCouplingEnergy) {
+      content = <Navigate to="/operations/device-management/heat-pump" replace />
     } else {
       content = <OperationsDeviceManagementPage tabId={tab.id} />
     }
